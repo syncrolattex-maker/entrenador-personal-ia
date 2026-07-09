@@ -57,6 +57,7 @@ class Ejercicio(BaseModel):
     nombre: str
     series: int
     repeticiones: str
+    descripcion: Optional[str] = None  # Brief execution tip for the user
 
 class FuerzaResponse(BaseModel):
     tipo_sesion: Literal["Fuerza"]
@@ -378,7 +379,12 @@ async def get_rutina_hoy():
             "Analiza el historial de entrenamientos recientes proporcionado en el prompt. "
             "Si observas indicios de cansancio (ej. esfuerzo subjetivo 'agotador' en su última sesión, o frecuencia cardíaca media > 160 lpm), reconfigura la rutina reduciendo la carga (menos series, menos repeticiones, ritmos de carrera más suaves, descansos más largos).\n"
             "Si por el contrario ves que reportó esfuerzo 'facil' de forma continua, sube ligeramente la intensidad.\n"
-            "En caso de realizar una adaptación (por fatiga o progresión), DEBES escribir un mensaje breve, empático y explicativo en el campo 'mensaje_adaptacion' (ej: 'Hoy bajamos series porque tu última sesión fue muy intensa, cuidemos tus glúteos sin sobreentrenar').\n"
+            "En caso de realizar una adaptación (por fatiga o progresión), DEBES escribir un mensaje breve, empático y explicativo en el campo 'mensaje_adaptacion'.\n\n"
+            "INSTRUCCIÓN DE DESCRIPCIONES DE EJERCICIO:\n"
+            "Para cada ejercicio de Fuerza, rellena el campo 'descripcion' con 1-2 frases claras y sencillas explicando: "
+            "la posición de inicio, el movimiento principal y el músculo que trabaja. "
+            "Usa un lenguaje muy simple, como si se lo explicaras a alguien que nunca ha ido al gimnasio. "
+            "Ejemplo: 'De pie con los pies a la anchura de los hombros, baja el glúteo hacia atrás como si te fueras a sentar. Trabaja glúteos y cuádriceps.'\n\n"
             "Toda la respuesta debe ser estrictamente en JSON."
         )
         

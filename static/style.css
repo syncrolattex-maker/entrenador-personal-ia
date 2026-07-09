@@ -269,6 +269,17 @@ header {
   color: var(--text-secondary);
 }
 
+/* Exercise description tip in the routine card */
+.exercise-desc {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin-top: 2px;
+  opacity: 0.8;
+  font-style: italic;
+  max-width: 220px;
+}
+
 .exercise-reps {
   background: var(--bg-card);
   padding: 6px 12px;
@@ -781,3 +792,18 @@ header {
 .guided-feedback-btn[data-value="facil"].active  { border-color: var(--guided-accent-rest); }
 .guided-feedback-btn[data-value="optimo"].active { border-color: var(--guided-accent-carrera); background: rgba(96,165,250,0.1); }
 .guided-feedback-btn[data-value="agotador"].active { border-color: var(--guided-accent-fuerza); background: rgba(251,113,133,0.1); }
+
+/* Description tip shown in guided session below reps */
+.guided-ex-desc {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-size: 0.88rem;
+  color: var(--guided-text-dim);
+  line-height: 1.5;
+  text-align: center;
+  max-width: 340px;
+  font-style: italic;
+  animation: fadeSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}

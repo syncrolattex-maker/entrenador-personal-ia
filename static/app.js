@@ -214,6 +214,7 @@ function renderWorkout(workout) {
           <div class="exercise-info">
             <span class="exercise-name">${ex.nombre}</span>
             <span class="exercise-sets">${ex.series} series</span>
+            ${ex.descripcion ? `<span class="exercise-desc">${ex.descripcion}</span>` : ""}
           </div>
           <span class="exercise-reps">${ex.repeticiones}</span>
         </div>`;
@@ -353,6 +354,21 @@ function showFuerzaExercise() {
   elGuidedSetCurrent.textContent = guided.setIndex + 1;
   elGuidedSetTotal.textContent   = ex.series;
   elGuidedReps.textContent       = ex.repeticiones;
+
+  // Show or hide description tip
+  let descEl = document.getElementById("guided-ex-desc");
+  if (ex.descripcion) {
+    if (!descEl) {
+      descEl = document.createElement("div");
+      descEl.id = "guided-ex-desc";
+      descEl.className = "guided-ex-desc";
+      elGuidedReps.insertAdjacentElement("afterend", descEl);
+    }
+    descEl.textContent = ex.descripcion;
+    descEl.style.display = "block";
+  } else if (descEl) {
+    descEl.style.display = "none";
+  }
 
   show(elGuidedSetCounter);
   show(elGuidedReps);
