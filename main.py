@@ -262,7 +262,7 @@ async def registrar_en_intervals(payload: ActividadCompletadaPayload) -> bool:
     if payload.frecuencia_cardiaca_media:
         body["average_heartrate"] = int(payload.frecuencia_cardiaca_media)
 
-    url = f"https://intervals.icu/api/v1/athlete/{athlete_id}/activities"
+    url = f"https://intervals.icu/api/v1/athlete/0/activities/manual"
     auth = ("API_KEY", api_key)
 
     try:
