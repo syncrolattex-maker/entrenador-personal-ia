@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Fitness Flow</title>
+  
+  <!-- PWA Metadata -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#18181B">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="AI Flow">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="/style.css">
+  
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Top Brand Header -->
+    <header>
+      <div class="brand">
+        <img src="/icons/icon-192.png" alt="Icon" class="brand-icon">
+        <span class="brand-title">Fitness AI Flow</span>
+      </div>
+      <h1 class="main-heading">Tu Flujo Diario</h1>
+    </header>
+
+    <!-- Offline notification -->
+    <div id="offline-notification" class="offline-banner" style="display: none;">
+      <i data-lucide="wifi-off" style="width: 16px; height: 16px;"></i>
+      <span>Estás navegando sin conexión. Algunas funciones podrían ser limitadas.</span>
+    </div>
+
+    <!-- Status Stats Banner -->
+    <div class="status-banner">
+      <div class="status-item">
+        <span class="status-label">Último</span>
+        <span id="status-ultimo" class="status-value">-</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">Siguiente</span>
+        <span id="status-siguiente" class="status-value highlight">-</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">Sin entrenar</span>
+        <span id="status-dias" class="status-value">-</span>
+      </div>
+    </div>
+
+    <!-- Main Dynamic Card Area -->
+    <div id="main-card-container">
+      
+      <!-- Loading State (Default) -->
+      <div id="loading-state" class="workout-card loading-state">
+        <div class="spinner"></div>
+        <span class="loading-text">Diseñando tu sesión personalizada...</span>
+      </div>
+
+      <!-- Workout Routine Card (Populated by JS) -->
+      <div id="workout-card" class="workout-card" style="display: none;">
+        <div class="card-header">
+          <div id="workout-badge" class="badge">Sesión</div>
+          <h2 class="card-title">Entrenamiento de Hoy</h2>
+        </div>
+        
+        <!-- Adaptation Banner (shown if Gemini adapted the routine) -->
+        <div id="adaptation-banner" class="rest-banner" style="display: none; margin-bottom: 16px; background-color: #F0FDF4; border-color: #DCFCE7; color: #166534; font-size: 0.85rem; padding: 12px 16px; border-radius: 16px; gap: 10px;">
+          <span style="font-size: 1.1rem;">💡</span>
+          <span id="adaptation-text" class="rest-message" style="font-weight: 500; font-size: 0.85rem; line-height: 1.4;"></span>
+        </div>
+
+        <div id="workout-content">
+          <!-- Populated dynamically: Exercise List or Carrera Instructions -->
+        </div>
+
+        <!-- Custom Warning or Status Message -->
+        <p id="workout-note" style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; font-style: italic; margin-top: 8px; opacity: 0.7;"></p>
+
+        <!-- Actions -->
+        <div class="button-container" id="workout-actions">
+          <button id="btn-completar" class="btn btn-primary">
+            <i data-lucide="check-circle" style="width: 20px; height: 20px;"></i>
+            Marcar como completado
+          </button>
+          <button id="btn-descansar" class="btn btn-secondary">
+            <i data-lucide="clock" style="width: 20px; height: 20px;"></i>
+            Hoy descanso
+          </button>
+        </div>
+
+        <!-- Feedback section (Hidden by default, shown when clicking Completar) -->
+        <div id="feedback-section" style="display: none; flex-direction: column; gap: 16px; animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
+          <p style="font-weight: 600; text-align: center; font-size: 0.95rem; color: var(--text-primary);">¿Cómo sentiste el entrenamiento?</p>
+          <div class="feedback-options" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+            <button type="button" class="btn btn-secondary feedback-btn" data-value="facil" style="padding: 12px; border-radius: 12px; font-size: 0.85rem;">
+              😊 Fácil
+            </button>
+            <button type="button" class="btn btn-secondary feedback-btn" data-value="optimo" style="padding: 12px; border-radius: 12px; font-size: 0.85rem;">
+              ⚡ Óptimo
+            </button>
+            <button type="button" class="btn btn-secondary feedback-btn" data-value="agotador" style="padding: 12px; border-radius: 12px; font-size: 0.85rem;">
+              🥵 Agotador
+            </button>
+          </div>
+          <div style="display: flex; gap: 10px; margin-top: 4px;">
+            <button id="btn-cancelar-feedback" class="btn btn-secondary" style="flex: 1; padding: 12px; font-size: 0.9rem; border-radius: 12px; box-shadow: none;">
+              Atrás
+            </button>
+            <button id="btn-confirmar-feedback" class="btn btn-primary" style="flex: 2; padding: 12px; font-size: 0.9rem; border-radius: 12px; box-shadow: none;" disabled>
+              Confirmar
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Success Message Overlay -->
+    <div id="success-banner" class="rest-banner" style="display: none; animation: slideIn 0.3s ease-out;">
+      <span class="rest-icon">✨</span>
+      <span id="success-text" class="rest-message">¡Gran trabajo! Tu rutina te esperará para el próximo bloque.</span>
+    </div>
+
+  </div>
+
+  <!-- App Logic script -->
+  <script src="/app.js"></script>
+</body>
+</html>
