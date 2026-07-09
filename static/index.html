@@ -84,38 +84,14 @@
 
         <!-- Actions -->
         <div class="button-container" id="workout-actions">
-          <button id="btn-completar" class="btn btn-primary">
-            <i data-lucide="check-circle" style="width: 20px; height: 20px;"></i>
-            Marcar como completado
+          <button id="btn-empezar" class="btn btn-primary">
+            <i data-lucide="play-circle" style="width: 20px; height: 20px;"></i>
+            Empezar sesión guiada
           </button>
           <button id="btn-descansar" class="btn btn-secondary">
             <i data-lucide="clock" style="width: 20px; height: 20px;"></i>
             Hoy descanso
           </button>
-        </div>
-
-        <!-- Feedback section (Hidden by default, shown when clicking Completar) -->
-        <div id="feedback-section" style="display: none; flex-direction: column; gap: 16px; animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
-          <p style="font-weight: 600; text-align: center; font-size: 0.95rem; color: var(--text-primary);">¿Cómo sentiste el entrenamiento?</p>
-          <div class="feedback-options" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-            <button type="button" class="btn btn-secondary feedback-btn" data-value="facil" style="padding: 12px; border-radius: 12px; font-size: 0.85rem;">
-              😊 Fácil
-            </button>
-            <button type="button" class="btn btn-secondary feedback-btn" data-value="optimo" style="padding: 12px; border-radius: 12px; font-size: 0.85rem;">
-              ⚡ Óptimo
-            </button>
-            <button type="button" class="btn btn-secondary feedback-btn" data-value="agotador" style="padding: 12px; border-radius: 12px; font-size: 0.85rem;">
-              🥵 Agotador
-            </button>
-          </div>
-          <div style="display: flex; gap: 10px; margin-top: 4px;">
-            <button id="btn-cancelar-feedback" class="btn btn-secondary" style="flex: 1; padding: 12px; font-size: 0.9rem; border-radius: 12px; box-shadow: none;">
-              Atrás
-            </button>
-            <button id="btn-confirmar-feedback" class="btn btn-primary" style="flex: 2; padding: 12px; font-size: 0.9rem; border-radius: 12px; box-shadow: none;" disabled>
-              Confirmar
-            </button>
-          </div>
         </div>
       </div>
 
@@ -128,6 +104,98 @@
     </div>
 
   </div>
+
+  <!-- ===================== GUIDED SESSION OVERLAY ===================== -->
+  <div id="guided-overlay" class="guided-overlay" style="display: none;">
+    
+    <!-- Header: close + progress -->
+    <div class="guided-header">
+      <button id="guided-close" class="guided-close-btn" aria-label="Salir de la sesión">
+        <i data-lucide="x" style="width:22px;height:22px;"></i>
+      </button>
+      <div class="guided-progress-bar">
+        <div id="guided-progress-fill" class="guided-progress-fill"></div>
+      </div>
+      <span id="guided-counter" class="guided-counter">1/5</span>
+    </div>
+
+    <!-- Phase label -->
+    <div id="guided-phase-label" class="guided-phase-label">PREPARADO</div>
+
+    <!-- Main content area -->
+    <div class="guided-main">
+
+      <!-- Exercise / Phase name -->
+      <div id="guided-exercise-name" class="guided-exercise-name">—</div>
+
+      <!-- Set counter (Fuerza only) -->
+      <div id="guided-set-counter" class="guided-set-counter" style="display:none;">
+        Serie <span id="guided-set-current">1</span> de <span id="guided-set-total">4</span>
+      </div>
+
+      <!-- Reps / info (Fuerza only) -->
+      <div id="guided-reps" class="guided-reps" style="display:none;">—</div>
+
+      <!-- Countdown timer (REST + Carrera phases) -->
+      <div id="guided-timer-wrap" class="guided-timer-wrap" style="display:none;">
+        <svg class="guided-timer-ring" viewBox="0 0 120 120">
+          <circle class="guided-timer-track" cx="60" cy="60" r="54"/>
+          <circle id="guided-timer-arc" class="guided-timer-arc" cx="60" cy="60" r="54"/>
+        </svg>
+        <span id="guided-timer-display" class="guided-timer-display">60</span>
+      </div>
+
+    </div>
+
+    <!-- Bottom action area -->
+    <div class="guided-footer">
+
+      <!-- Fuerza: tap when set done -->
+      <div id="guided-actions-fuerza" style="display:none; flex-direction:column; gap:12px; width:100%;">
+        <button id="btn-serie-done" class="btn btn-primary guided-action-btn">
+          <i data-lucide="check" style="width:22px;height:22px;"></i>
+          Serie completada
+        </button>
+        <button id="btn-skip-exercise" class="btn btn-secondary" style="font-size:0.9rem; padding:14px;">
+          <i data-lucide="skip-forward" style="width:18px;height:18px;"></i>
+          Saltar ejercicio
+        </button>
+      </div>
+
+      <!-- Rest: skip button -->
+      <div id="guided-actions-rest" style="display:none; flex-direction:column; gap:12px; width:100%;">
+        <button id="btn-skip-rest" class="btn btn-secondary" style="font-size:0.9rem; padding:14px;">
+          <i data-lucide="fast-forward" style="width:18px;height:18px;"></i>
+          Saltar descanso
+        </button>
+      </div>
+
+      <!-- Carrera phases: pause/resume -->
+      <div id="guided-actions-carrera" style="display:none; flex-direction:column; gap:12px; width:100%;">
+        <button id="btn-pause-carrera" class="btn btn-secondary" style="font-size:0.9rem; padding:14px;">
+          <i data-lucide="pause" style="width:18px;height:18px;"></i>
+          Pausar
+        </button>
+      </div>
+
+      <!-- Completed: feedback + save -->
+      <div id="guided-actions-done" style="display:none; flex-direction:column; gap:14px; width:100%;">
+        <p style="text-align:center; font-weight:700; font-size:1rem; color:var(--guided-text);">¿Cómo te has sentido?</p>
+        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
+          <button class="guided-feedback-btn" data-value="facil">😊<br><small>Fácil</small></button>
+          <button class="guided-feedback-btn" data-value="optimo">⚡<br><small>Óptimo</small></button>
+          <button class="guided-feedback-btn" data-value="agotador">🥵<br><small>Agotador</small></button>
+        </div>
+        <button id="btn-guardar-sesion" class="btn btn-primary guided-action-btn" disabled>
+          <i data-lucide="save" style="width:20px;height:20px;"></i>
+          Guardar en Intervals.icu
+        </button>
+      </div>
+
+    </div>
+
+  </div>
+  <!-- ================================================================= -->
 
   <!-- App Logic script -->
   <script src="/app.js"></script>

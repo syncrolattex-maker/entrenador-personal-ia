@@ -41,6 +41,17 @@ class WebhookPayload(BaseModel):
     distancia_km: Optional[float] = None
     esfuerzo_subjetivo: Optional[Literal["facil", "optimo", "agotador"]] = None
 
+# --- Pydantic Model for completed guided session ---
+class ActividadCompletadaPayload(BaseModel):
+    tipo: Literal["Fuerza", "Carrera"]
+    duracion_segundos: int
+    esfuerzo_subjetivo: Optional[Literal["facil", "optimo", "agotador"]] = None
+    frecuencia_cardiaca_media: Optional[float] = None
+    calorias: Optional[float] = None
+    distancia_km: Optional[float] = None
+    series_completadas: Optional[int] = None
+    ejercicios_completados: Optional[int] = None
+
 # --- Pydantic Models for Structured Gemini Output ---
 class Ejercicio(BaseModel):
     nombre: str
@@ -206,6 +217,72 @@ async def generar_rutina_mock(mensaje_warning: str = None):
             "mensaje": mensaje_warning or "Usando rutina local de prueba (Introduce tu GEMINI_API_KEY en el archivo .env para conectar con la IA)."
         }
 
+async def registrar_en_intervals(payload: ActividadCompletadaPayload) -> bool:
+    """
+    Registers a completed workout as a real activity in Intervals.icu.
+    """
+    api_key = os.getenv("INTERVALS_API_KEY")
+    athlete_id = os.getenv("INTERVALS_ATHLETE_ID", "").strip()
+
+    if athlete_id.lower().startswith("i"):
+        athlete_id = athlete_id[1:]
+
+    if (not api_key or api_key == "YOUR_INTERVALS_API_KEY" or
+            not athlete_id or athlete_id == "YOUR_INTERVALS_ATHLETE_ID"):
+        print("Warning: Intervals.icu credentials not configured. Skipping activity registration.")
+        return False
+
+    from datetime import datetime
+    now_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
+    activity_type = "WeightTraining" if payload.tipo == "Fuerza" else "Run"
+    name = f"{'💪 Fuerza' if payload.tipo == 'Fuerza' else '🏃 Carrera'} — Entrenador IA"
+
+    description_lines = ["Sesión generada y guiada por tu Entrenador Personal IA."]
+    if payload.esfuerzo_subjetivo:
+        emoji = {"facil": "😊", "optimo": "⚡", "agotador": "🥵"}.get(payload.esfuerzo_subjetivo, "")
+        description_lines.append(f"Esfuerzo percibido: {emoji} {payload.esfuerzo_subjetivo.capitalize()}")
+    if payload.series_completadas:
+        description_lines.append(f"Series completadas: {payload.series_completadas}")
+    if payload.ejercicios_completados:
+        description_lines.append(f"Ejercicios completados: {payload.ejercicios_completados}")
+
+    body = {
+        "name": name,
+        "type": activity_type,
+        "start_date_local": now_str,
+        "elapsed_time": payload.duracion_segundos,
+        "moving_time": payload.duracion_segundos,
+        "distance": int((payload.distancia_km or 0) * 1000),
+        "description": "\n".join(description_lines),
+    }
+    if payload.calorias:
+        body["calories"] = int(payload.calorias)
+    if payload.frecuencia_cardiaca_media:
+        body["average_heartrate"] = int(payload.frecuencia_cardiaca_media)
+
+    url = f"https://intervals.icu/api/v1/athlete/{athlete_id}/activities"
+    auth = ("API_KEY", api_key)
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                url,
+                auth=auth,
+                json=body,
+                timeout=10.0
+            )
+            if response.status_code in [200, 201]:
+                print(f"✅ Activity '{name}' registered in Intervals.icu.")
+                return True
+            else:
+                print(f"Intervals.icu activity error: {response.status_code} - {response.text}")
+                return False
+    except Exception as e:
+        print(f"Failed to register activity in Intervals.icu: {str(e)}")
+        return False
+
+
 # --- API Endpoints ---
 
 @app.get("/estado-db")
@@ -244,6 +321,40 @@ def webhook_iphone(payload: WebhookPayload):
         })
         
     return {"status": "ok", "msg": "Estado actualizado", "db": db}
+
+
+@app.post("/registrar-actividad")
+async def post_registrar_actividad(payload: ActividadCompletadaPayload):
+    """
+    Called by the PWA guided session on completion.
+    Registers the activity in Intervals.icu and updates local DB history.
+    """
+    # Update in-memory db
+    db["dias_sin_entrenar"] = 0
+    db["ultimo_entreno"] = payload.tipo
+    db["siguiente_bloque"] = "Carrera" if payload.tipo == "Fuerza" else "Fuerza"
+
+    db["historial_entrenamientos"].append({
+        "tipo": payload.tipo,
+        "completado": True,
+        "duracion_minutos": round(payload.duracion_segundos / 60, 1),
+        "frecuencia_cardiaca_media": payload.frecuencia_cardiaca_media,
+        "calorias_activas": payload.calorias,
+        "distancia_km": payload.distancia_km,
+        "esfuerzo_subjetivo": payload.esfuerzo_subjetivo,
+        "series_completadas": payload.series_completadas,
+        "ejercicios_completados": payload.ejercicios_completados,
+        "fecha": "Hoy"
+    })
+
+    # Register real activity in Intervals.icu
+    registrado = await registrar_en_intervals(payload)
+
+    return {
+        "status": "ok",
+        "registrado_en_intervals": registrado,
+        "db": db
+    }
 
 @app.get("/rutina-hoy")
 async def get_rutina_hoy():
