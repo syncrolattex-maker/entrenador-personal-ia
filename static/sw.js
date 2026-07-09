@@ -1,4 +1,4 @@
-const CACHE_NAME = "ai-flow-cache-v1";
+const CACHE_NAME = "ai-flow-cache-v2";
 const ASSETS = [
   "/",
   "/index.html",
@@ -9,9 +9,10 @@ const ASSETS = [
 
 // Install Event
 self.addEventListener("install", (e) => {
+  self.skipWaiting(); // activate immediately
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log("[Service Worker] Caching all static assets");
+      console.log("[Service Worker] Caching all static assets v2");
       return cache.addAll(ASSETS);
     })
   );
@@ -29,14 +30,19 @@ self.addEventListener("activate", (e) => {
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
 });
 
 // Fetch Event
 self.addEventListener("fetch", (e) => {
-  // Let API requests bypass the cache
-  if (e.request.url.includes("/rutina-hoy") || e.request.url.includes("/webhook-iphone") || e.request.url.includes("/estado-db")) {
+  // Let all API requests bypass the cache
+  if (
+    e.request.url.includes("/rutina-hoy") ||
+    e.request.url.includes("/webhook-iphone") ||
+    e.request.url.includes("/estado-db") ||
+    e.request.url.includes("/registrar-actividad")
+  ) {
     return fetch(e.request);
   }
 
