@@ -546,26 +546,19 @@ async function onGuardarSesion() {
   const elapsed = Math.round((new Date() - guided.startTime) / 1000);
 
   const payload = {
-    tipo:                 guided.tipo,
-    duracion_segundos:    elapsed,
-    esfuerzo_subjetivo:   guided.selectedFeedback,
-    series_completadas:   guided.tipo === "Fuerza" ? guided.totalSeries : null,
+    tipo:                   guided.tipo,
+    duracion_segundos:      elapsed,
+    esfuerzo_subjetivo:     guided.selectedFeedback,
+    series_completadas:     guided.tipo === "Fuerza" ? guided.totalSeries : null,
     ejercicios_completados: guided.tipo === "Fuerza" ? guided.exercises.length : null,
-    distancia_km:         null,
-    calorias:             null,
+    distancia_km:           null,
+    calorias:               null,
     frecuencia_cardiaca_media: null
   };
 
-  // Simulated metrics (same logic as before for AI feedback loop)
-  const effort = guided.selectedFeedback;
-  if (guided.tipo === "Fuerza") {
-    payload.calorias = 220 + Math.floor(Math.random() * 80);
-    payload.frecuencia_cardiaca_media = effort === "agotador" ? 145 + Math.floor(Math.random()*15) : 112 + Math.floor(Math.random()*15);
-  } else {
-    payload.calorias = 310 + Math.floor(Math.random() * 90);
-    payload.distancia_km = effort === "agotador" ? 3.5 + Math.random()*0.8 : 4.6 + Math.random()*1.5;
-    payload.frecuencia_cardiaca_media = effort === "agotador" ? 168 + Math.floor(Math.random()*8) : 142 + Math.floor(Math.random()*16);
-  }
+  // Note: HR and calories come from Apple Watch → Apple Health → Intervals.icu
+  // We only register what we actually know: duration, type, effort, series count
+
 
   try {
     const res = await fetch("/registrar-actividad", {
