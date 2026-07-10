@@ -59,31 +59,79 @@ class Ejercicio(BaseModel):
     repeticiones: str
     descripcion: Optional[str] = None  # Brief execution tip for the user
 
-class FuerzaResponse(BaseModel):
-    tipo_sesion: Literal["Fuerza"]
-    ejercicios: List[Ejercicio]
-    mensaje_adaptacion: Optional[str] = None
-
 class FaseCarrera(BaseModel):
     name: str
     duration_seconds: int
     type: Literal["WARMUP", "WORK", "COOLDOWN"]
 
-class CarreraResponse(BaseModel):
-    tipo_sesion: Literal["Carrera"]
-    phases: List[FaseCarrera]
+class RutinaResponse(BaseModel):
+    tipo_sesion: Literal["Fuerza", "Carrera"]
+    explicacion_tipo: str  # Why the AI selected Strength or Running today
+    ejercicios: Optional[List[Ejercicio]] = None
+    phases: Optional[List[FaseCarrera]] = None
     mensaje_adaptacion: Optional[str] = None
 
 # --- Helpers ---
 
-async def enviar_a_intervals(phases: List[FaseCarrera]):
+async def get_intervals_history() -> List[dict]:
     """
-    Sends structured workout phases to Intervals.icu API to sync with Apple Watch.
+    Fetches the last 10 days of real activities from Intervals.icu API.
+    Used by Gemini to decide and adapt the workout of the day.
     """
     api_key = os.getenv("INTERVALS_API_KEY")
     athlete_id = os.getenv("INTERVALS_ATHLETE_ID", "").strip()
     
-    # Strip leading "i" if present (e.g. i636518 -> 636518)
+    if athlete_id.lower().startswith("i"):
+        athlete_id = athlete_id[1:]
+        
+    if (not api_key or api_key == "YOUR_INTERVALS_API_KEY" or 
+        not athlete_id or athlete_id == "YOUR_INTERVALS_ATHLETE_ID" or not athlete_id):
+        print("Warning: Intervals credentials missing for history fetch. Using local db.")
+        return []
+        
+    from datetime import datetime, timedelta
+    oldest = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d")
+    newest = datetime.now().strftime("%Y-%m-%d")
+    
+    url = f"https://intervals.icu/api/v1/athlete/{athlete_id}/activities"
+    auth = ("API_KEY", api_key)
+    params = {"oldest": oldest, "newest": newest}
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, auth=auth, params=params, timeout=10.0)
+            if response.status_code == 200:
+                activities = response.json()
+                history = []
+                for act in activities:
+                    t = act.get("type", "")
+                    tipo_mapeado = "Fuerza" if t in ["WeightTraining", "Strength"] else "Carrera" if t in ["Run"] else t
+                    history.append({
+                        "tipo": tipo_mapeado,
+                        "nombre": act.get("name", ""),
+                        "fecha": act.get("start_date_local", "")[:10],
+                        "duracion_minutos": round(act.get("moving_time", 0) / 60, 1),
+                        "frecuencia_cardiaca_media": act.get("average_heartrate"),
+                        "calorias_activas": act.get("calories"),
+                        "distancia_km": round(act.get("distance", 0) / 1000, 2) if act.get("distance") else None,
+                        "descripcion": act.get("description", "")
+                    })
+                return history
+            else:
+                print(f"Error fetching Intervals history: {response.status_code} - {response.text}")
+                return []
+    except Exception as e:
+        print(f"Exception fetching Intervals history: {str(e)}")
+        return []
+
+async def enviar_a_intervals(phases: List[FaseCarrera]):
+    """
+    Sends structured workout phases to Intervals.icu API.
+    Also formats a plain-text structured description so that Watchletic can parse and sync it to Apple Watch.
+    """
+    api_key = os.getenv("INTERVALS_API_KEY")
+    athlete_id = os.getenv("INTERVALS_ATHLETE_ID", "").strip()
+    
     if athlete_id.lower().startswith("i"):
         athlete_id = athlete_id[1:]
     
@@ -92,7 +140,6 @@ async def enviar_a_intervals(phases: List[FaseCarrera]):
         print("Warning: INTERVALS_API_KEY or INTERVALS_ATHLETE_ID is not configured. Skipping Intervals.icu sync.")
         return False
 
-    # Get local current date in YYYY-MM-DDT08:00:00 format
     from datetime import datetime
     today_date = datetime.now().strftime("%Y-%m-%dT08:00:00")
     
@@ -100,16 +147,35 @@ async def enviar_a_intervals(phases: List[FaseCarrera]):
         "Content-Type": "application/json"
     }
     
-    # Map pydantic phases to Intervals.icu steps format
+    # 1. Map to JSON steps for Intervals
+    # 2. Build plain-text structured description for Watchletic parser
     steps = []
+    desc_lines = [
+        "Entrenamiento de carrera estructurado generado por tu Entrenador IA.",
+        "Se sincroniza automáticamente con Apple Watch mediante Watchletic.",
+        ""
+    ]
+    
+    # Group by Warmup, Work and Cooldown headers
+    warmup_steps = []
+    work_steps = []
+    cooldown_steps = []
+    
     for p in phases:
         icu_type = "Active"
+        target_hr = "65-75% HR"
+        
         if p.type == "WARMUP":
             icu_type = "Warmup"
+            target_hr = "55-65% HR"
+            warmup_steps.append(p)
         elif p.type == "COOLDOWN":
             icu_type = "Cooldown"
-        elif p.type == "REST" or p.type == "RECOVERY":
-            icu_type = "Recovery"
+            target_hr = "50-60% HR"
+            cooldown_steps.append(p)
+        else:
+            target_hr = "80-85% HR"
+            work_steps.append(p)
             
         steps.append({
             "type": icu_type,
@@ -117,13 +183,41 @@ async def enviar_a_intervals(phases: List[FaseCarrera]):
             "duration_type": "DURATION_SECS",
             "name": p.name
         })
+    
+    # Add plain text workout blocks
+    if warmup_steps:
+        desc_lines.append("Warmup")
+        for p in warmup_steps:
+            mins = p.duration_seconds // 60
+            desc_lines.append(f"- {p.name} {mins}m 55-65% HR")
+        desc_lines.append("")
         
+    if work_steps:
+        desc_lines.append("Main Set")
+        # Check if it looks like interval reps
+        # (e.g. 5x (90s fast + 60s walk) or similar)
+        # If it is one single workout block, write it down directly
+        for p in work_steps:
+            mins = p.duration_seconds // 60
+            secs = p.duration_seconds % 60
+            dur_str = f"{mins}m"
+            if secs > 0:
+                dur_str += f"{secs}s"
+            desc_lines.append(f"- {p.name} {dur_str} 80-85% HR")
+        desc_lines.append("")
+        
+    if cooldown_steps:
+        desc_lines.append("Cooldown")
+        for p in cooldown_steps:
+            mins = p.duration_seconds // 60
+            desc_lines.append(f"- {p.name} {mins}m 50-60% HR")
+            
     payload = {
         "category": "WORKOUT",
         "type": "Run",
         "name": "Carrera de Hoy (IA Flow)",
         "start_date_local": today_date,
-        "description": "Entrenamiento de carrera generado dinámicamente por tu entrenador IA.",
+        "description": "\n".join(desc_lines),
         "workout": {
             "steps": steps
         }
@@ -151,60 +245,56 @@ async def enviar_a_intervals(phases: List[FaseCarrera]):
         print(f"Failed to connect to Intervals.icu: {str(e)}")
         return False
 
-async def generar_rutina_mock(mensaje_warning: str = None):
+async def generar_rutina_mock(mensaje_warning: str = None) -> dict:
     """
     Generates a localized offline mock routine with fatigue adaptation support.
-    Useful as a fallback when Gemini keys are missing or rate-limited.
+    Conforms to the new unified RutinaResponse schema.
     """
-    # Simple simulated adaptation for mock mode:
-    # If the last workout was marked as "agotador" or average heart rate was high (>165)
     is_fatigued = False
     last_workout = next((x for x in reversed(db["historial_entrenamientos"]) if x.get("completado")), None)
     if last_workout:
         if last_workout.get("esfuerzo_subjetivo") == "agotador" or (last_workout.get("frecuencia_cardiaca_media") or 0) > 165:
             is_fatigued = True
 
-    if db["siguiente_bloque"] == "Fuerza":
+    tipo_sesion = db["siguiente_bloque"]
+    explicacion = "Hemos alternado al bloque correspondiente según el plan de tonificación y balance semanal."
+    
+    if tipo_sesion == "Fuerza":
         ejercicios = [
-            {"nombre": "Sentadillas Goblet", "series": 4, "repediticiones": "12"},
-            {"nombre": "Hip Thrust con banda", "series": 4, "repediticiones": "15"},
-            {"nombre": "Zancadas Búlgaras (Piel de Melocotón)", "series": 3, "repediticiones": "10 por pierna"},
-            {"nombre": "Patada de Glúteo en cuadrupedia", "series": 3, "repediticiones": "15 por pierna"},
-            {"nombre": "Core: Plancha con rotación", "series": 3, "repediticiones": "45 seg"}
+            {"nombre": "Sentadillas Goblet", "series": 4, "repeticiones": "12", "descripcion": "Baja lentamente empujando el suelo con talones. Trabaja glúteos y piernas."},
+            {"nombre": "Hip Thrust con banda", "series": 4, "repeticiones": "15", "descripcion": "Eleva cadera contrayendo fuertemente los glúteos arriba. Enfocado en zona posterior."},
+            {"nombre": "Zancadas Búlgaras", "series": 3, "repeticiones": "10 por pierna", "descripcion": "Un pie en banco o silla detrás de ti, flexiona rodilla bajando cadera. Enfoque cuádriceps y glúteos."},
+            {"nombre": "Patada de Glúteo en cuadrupedia", "series": 3, "repeticiones": "15 por pierna", "descripcion": "En 4 apoyos, empuja talón al techo activando glúteo. Mantén espalda neutra."},
+            {"nombre": "Core: Plancha con rotación", "series": 3, "repeticiones": "45 seg", "descripcion": "En apoyo de antebrazos, rota cadera suavemente lado a lado manteniendo abdomen tenso."}
         ]
-        ejercicios_parsed = []
-        for ex in ejercicios:
-            ejercicios_parsed.append({
-                "nombre": ex["nombre"],
-                "series": ex["series"],
-                "repeticiones": ex["repediticiones"]
-            })
         
         msg_adapt = None
         if is_fatigued:
-            for ex in ejercicios_parsed:
+            for ex in ejercicios:
                 ex["series"] = max(2, ex["series"] - 1)
-            msg_adapt = "He notado fatiga en tu sesión anterior (esfuerzo agotador o pulso alto). Hoy bajamos el volumen de series para recuperarte sin perder tono."
+            msg_adapt = "Notamos cansancio acumulado. Bajamos volumen de series para favorecer la recuperación celular."
 
         return {
             "tipo_sesion": "Fuerza",
-            "ejercicios": ejercicios_parsed,
+            "explicacion_tipo": explicacion,
+            "ejercicios": ejercicios,
             "mensaje_adaptacion": msg_adapt,
-            "mensaje": mensaje_warning or "Usando rutina local de prueba (Introduce tu GEMINI_API_KEY en el archivo .env para conectar con la IA)."
+            "mensaje": mensaje_warning
         }
     else:
         phases = [
-            {"name": "Calentamiento: Trote suave articulaciones", "duration_seconds": 300, "type": "WARMUP"},
-            {"name": "Bloque de Trabajo: 5x (90s rápido + 60s caminata)", "duration_seconds": 750, "type": "WORK"},
-            {"name": "Enfriamiento: Caminata ligera y estiramientos", "duration_seconds": 300, "type": "COOLDOWN"}
+            {"name": "Calentamiento: Trote suave", "duration_seconds": 300, "type": "WARMUP"},
+            {"name": "Intervalos: 5x (90s rápido + 60s caminata)", "duration_seconds": 750, "type": "WORK"},
+            {"name": "Enfriamiento: Caminata ligera", "duration_seconds": 300, "type": "COOLDOWN"}
         ]
+        
         msg_adapt = None
         if is_fatigued:
-            phases[1]["name"] = "Bloque Suave: 4x (60s trote + 60s caminata)"
-            phases[1]["duration_seconds"] = 480
-            msg_adapt = "Sesión regenerativa hoy. He reducido la duración y la cantidad de intervalos debido al cansancio acumulado."
+            phases[1]["name"] = "Trote continuo y suave regenerativo"
+            phases[1]["duration_seconds"] = 600
+            msg_adapt = "Hoy rebajamos la intensidad a trote suave continuo sin intervalos por fatiga previa."
 
-        # Attempt to sync with Intervals.icu in mock mode if keys are present
+        # Sync event in mock mode if keys are present
         enviado = False
         if os.getenv("INTERVALS_API_KEY") and os.getenv("INTERVALS_API_KEY") != "YOUR_INTERVALS_API_KEY":
             phases_objs = [FaseCarrera(**p) for p in phases]
@@ -212,10 +302,11 @@ async def generar_rutina_mock(mensaje_warning: str = None):
 
         return {
             "tipo_sesion": "Carrera",
+            "explicacion_tipo": explicacion,
             "phases": phases,
             "mensaje_adaptacion": msg_adapt,
             "enviado_al_reloj": enviado,
-            "mensaje": mensaje_warning or "Usando rutina local de prueba (Introduce tu GEMINI_API_KEY en el archivo .env para conectar con la IA)."
+            "mensaje": mensaje_warning
         }
 
 async def registrar_en_intervals(payload: ActividadCompletadaPayload) -> bool:
@@ -360,8 +451,9 @@ async def post_registrar_actividad(payload: ActividadCompletadaPayload):
 @app.get("/rutina-hoy")
 async def get_rutina_hoy():
     """
-    Generates today's personalized workout using Gemini 2.5 Flash,
-    adapting intensity based on performance history.
+    Generates today's personalized workout using Gemini 1.5 Flash (high free limits),
+    deciding dynamically between Strength (Fuerza) and Running (Carrera) based on the athlete's real
+    Intervals.icu activity history.
     """
     api_key = os.getenv("GEMINI_API_KEY")
     
@@ -370,69 +462,82 @@ async def get_rutina_hoy():
         return await generar_rutina_mock()
         
     try:
+        # Fetch real history from Intervals.icu
+        real_history = await get_intervals_history()
+        
         client = genai.Client(api_key=api_key)
         
         system_instruction = (
-            "Eres el entrenador personal de una mujer de nivel intermedio cuyo objetivo es reducir celulitis y mejorar su tono muscular. "
-            "NUNCA utilices un tono punitivo o de culpa si lleva días sin entrenar; en su lugar, adapta suavemente la intensidad para que la rutina sea retadora pero 100% realizable.\n\n"
+            "Eres el entrenador personal experto de una mujer de nivel intermedio cuyo objetivo es reducir celulitis y mejorar su tono muscular. "
+            "Ella quiere una rutina bien balanceada. Tu tarea principal hoy es DECIDIR si hoy le corresponde una sesión de 'Fuerza' o de 'Carrera' y estructurarla.\n\n"
+            "INSTRUCCIONES DE DECISIÓN:\n"
+            "Analiza el historial de actividades reales de los últimos 10 días provisto en el prompt (proviene de su reloj/intervals.icu).\n"
+            "1. Distribución Semanal: La meta ideal es realizar entre 2 y 3 sesiones de Fuerza enfocadas en tren inferior (glúteos, piernas) y de 1 a 2 sesiones de Carrera (intervalos o trote regenerativo) por semana, con al menos 1-2 días completos de descanso.\n"
+            "2. Evita sesgar: Si el historial muestra que hizo Fuerza ayer, hoy dale Carrera (o viceversa si corresponde) para equilibrar la semana.\n"
+            "3. En el campo 'explicacion_tipo' explica breve y amistosamente por qué elegiste esta sesión hoy (ej: 'Veo que ayer entrenaste glúteos con fuerza, así que hoy haremos una carrera suave para mejorar tu resistencia aeróbica y ayudar a recuperar tus piernas').\n\n"
             "INSTRUCCIÓN DE ADAPTACIÓN INTELIGENTE:\n"
-            "Analiza el historial de entrenamientos recientes proporcionado en el prompt. "
-            "Si observas indicios de cansancio (ej. esfuerzo subjetivo 'agotador' en su última sesión, o frecuencia cardíaca media > 160 lpm), reconfigura la rutina reduciendo la carga (menos series, menos repeticiones, ritmos de carrera más suaves, descansos más largos).\n"
-            "Si por el contrario ves que reportó esfuerzo 'facil' de forma continua, sube ligeramente la intensidad.\n"
-            "En caso de realizar una adaptación (por fatiga o progresión), DEBES escribir un mensaje breve, empático y explicativo en el campo 'mensaje_adaptacion'.\n\n"
+            "Si el historial de entrenamientos recientes muestra indicios claros de fatiga (ej: esfuerzo subjetivo 'agotador' reportado, promedio de ritmo cardíaco muy elevado para entrenamientos suaves, o entrenamientos de más de 3 días seguidos), reconfigura la rutina del tipo elegido reduciendo el volumen (menos series, descansos más largos, o trote regenerativo muy suave).\n"
+            "Si no entrenó durante varios días, dale una sesión de reactivación placentera pero no extenuante. Nunca culpes a la usuaria.\n\n"
             "INSTRUCCIÓN DE DESCRIPCIONES DE EJERCICIO:\n"
-            "Para cada ejercicio de Fuerza, rellena el campo 'descripcion' con 1-2 frases claras y sencillas explicando: "
-            "la posición de inicio, el movimiento principal y el músculo que trabaja. "
-            "Usa un lenguaje muy simple, como si se lo explicaras a alguien que nunca ha ido al gimnasio. "
-            "Ejemplo: 'De pie con los pies a la anchura de los hombros, baja el glúteo hacia atrás como si te fueras a sentar. Trabaja glúteos y cuádriceps.'\n\n"
-            "Toda la respuesta debe ser estrictamente en JSON."
+            "Para cada ejercicio de Fuerza, debes obligatoriamente rellenar el campo 'descripcion' con 1-2 frases claras y simples explicando la postura de inicio, el movimiento y qué músculo siente trabajar. Sé empático, descriptivo y evita tecnicismos complicados.\n\n"
+            "Toda la respuesta debe ser estrictamente en JSON y seguir el esquema de RutinaResponse."
         )
         
         historial_str = ""
-        if db["historial_entrenamientos"]:
-            historial_str = "Historial de entrenamientos recientes:\n"
-            for log in db["historial_entrenamientos"][-5:]:
-                if log.get("completado"):
-                    historial_str += (
-                        f"- {log['tipo']} (Completado): Duración: {log.get('duracion_minutos')} min, "
-                        f"Pulsaciones medias: {log.get('frecuencia_cardiaca_media')} lpm, "
-                        f"Calorías: {log.get('calorias_activas')} kcal, "
-                        f"Esfuerzo: {log.get('esfuerzo_subjetivo')}\n"
-                    )
-                else:
-                    historial_str += f"- Descanso (No entrenó). Días sin entrenar acumulados: {log.get('dias_sin_entrenar_acumulados')}\n"
+        if real_history:
+            historial_str = "Historial de entrenamientos reales (últimos 10 días de Intervals.icu):\n"
+            for log in real_history:
+                dist_str = f", Distancia: {log['distancia_km']} km" if log['distancia_km'] else ""
+                fc_str = f", FC Media: {log['frecuencia_cardiaca_media']} ppm" if log['frecuencia_cardiaca_media'] else ""
+                desc_str = f", Notas: {log['descripcion']}" if log['descripcion'] else ""
+                historial_str += (
+                    f"- Fecha {log['fecha']}: {log['tipo']} ({log['nombre']}). "
+                    f"Duración: {log['duracion_minutos']} min{dist_str}{fc_str}{desc_str}\n"
+                )
         else:
-            historial_str = "No hay historial de entrenamientos registrado aún."
+            # Fallback to local DB history if Intervals.icu query returned empty
+            if db["historial_entrenamientos"]:
+                historial_str = "Historial de entrenamientos locales:\n"
+                for log in db["historial_entrenamientos"][-5:]:
+                    if log.get("completado"):
+                        historial_str += (
+                            f"- {log['tipo']} (Completado): Duración: {log.get('duracion_minutos')} min, "
+                            f"Esfuerzo: {log.get('esfuerzo_subjetivo')}\n"
+                        )
+            else:
+                historial_str = "No hay historial de entrenamientos registrado todavía."
 
         prompt = f"""
-        Lleva {db['dias_sin_entrenar']} días sin entrenar.
-        Último entrenamiento completado: {db['ultimo_entreno']}.
-        Hoy toca: {db['siguiente_bloque']}.
+        Días sin entrenar acumulados: {db['dias_sin_entrenar']}.
+        Último entrenamiento en base local: {db['ultimo_entreno']}.
         
         {historial_str}
         
-        Genera la sesión personalizada de hoy, adaptando la intensidad de manera inteligente en función de la fatiga o progresión reflejada en el historial.
+        Decide dinámicamente si hoy corresponde 'Fuerza' o 'Carrera' y diseña la sesión personalizada.
         """
         
-        schema = FuerzaResponse if db["siguiente_bloque"] == "Fuerza" else CarreraResponse
-        
+        # Switch model to gemini-1.5-flash for high free tier limits
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-1.5-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
                 response_mime_type="application/json",
-                response_schema=schema,
+                response_schema=RutinaResponse,
                 temperature=0.7,
             )
         )
         
         workout = json.loads(response.text)
         
+        # If Carrera is chosen, sync structured event (Watchletic syntax)
         if workout.get("tipo_sesion") == "Carrera":
             phases = [FaseCarrera(**p) for p in workout.get("phases", [])]
             enviado = await enviar_a_intervals(phases)
             workout["enviado_al_reloj"] = enviado
+
+        # Update local db tracking just in case
+        db["siguiente_bloque"] = "Carrera" if workout.get("tipo_sesion") == "Fuerza" else "Fuerza"
 
         return workout
 

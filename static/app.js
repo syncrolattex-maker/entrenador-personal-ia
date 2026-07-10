@@ -42,6 +42,8 @@ const elSuccessText       = document.getElementById("success-text");
 const elOfflineNotif      = document.getElementById("offline-notification");
 const elAdaptationBanner  = document.getElementById("adaptation-banner");
 const elAdaptationText    = document.getElementById("adaptation-text");
+const elDecisionBanner    = document.getElementById("decision-banner");
+const elDecisionText      = document.getElementById("decision-text");
 
 // ============================================================
 // DOM — Guided Session Overlay
@@ -145,9 +147,27 @@ async function initApp() {
     const dbRes = await fetch("/estado-db");
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
+    // Check local cache first to avoid abusing Gemini API
+    const todayStr = new Date().toDateString();
+    const cachedWorkout = localStorage.getItem("cached_workout");
+    const cachedDate = localStorage.getItem("cached_workout_date");
+
+    if (cachedWorkout && cachedDate === todayStr) {
+      console.log("[Cache] Serving today's workout from localStorage.");
+      state.currentWorkout = JSON.parse(cachedWorkout);
+      renderWorkout(state.currentWorkout);
+      showLoading(false);
+      return;
+    }
+
     const routineRes = await fetch("/rutina-hoy");
     if (routineRes.ok) {
       state.currentWorkout = await routineRes.json();
+      
+      // Save to cache
+      localStorage.setItem("cached_workout", JSON.stringify(state.currentWorkout));
+      localStorage.setItem("cached_workout_date", todayStr);
+      
       renderWorkout(state.currentWorkout);
     } else {
       showError("No pudimos cargar la rutina de hoy. Inténtalo de nuevo.");
@@ -196,6 +216,13 @@ function renderWorkout(workout) {
     elAdaptationBanner.style.display = "flex";
   } else {
     elAdaptationBanner.style.display = "none";
+  }
+
+  if (workout.explicacion_tipo) {
+    elDecisionText.textContent = workout.explicacion_tipo;
+    elDecisionBanner.style.display = "flex";
+  } else {
+    elDecisionBanner.style.display = "none";
   }
 
   const isFuerza = workout.tipo_sesion === "Fuerza";
@@ -275,6 +302,10 @@ async function handleRest() {
   showLoading(true);
   hideSuccessBanner();
   try {
+    // Clear today's cache on rest so tomorrow is a fresh choice
+    localStorage.removeItem("cached_workout");
+    localStorage.removeItem("cached_workout_date");
+
     const res = await fetch("/webhook-iphone", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -286,7 +317,13 @@ async function handleRest() {
       updateStatsBanner();
       showSuccessBanner(false);
       const r2 = await fetch("/rutina-hoy");
-      if (r2.ok) { state.currentWorkout = await r2.json(); renderWorkout(state.currentWorkout); }
+      if (r2.ok) {
+        state.currentWorkout = await r2.json();
+        // Save new mock/routine to cache
+        localStorage.setItem("cached_workout", JSON.stringify(state.currentWorkout));
+        localStorage.setItem("cached_workout_date", new Date().toDateString());
+        renderWorkout(state.currentWorkout);
+      }
     } else {
       showError("No pudimos actualizar tu estado.");
     }
@@ -573,9 +610,20 @@ async function onGuardarSesion() {
       closeGuided();
       updateStatsBanner();
       showSuccessBanner(true, data.registrado_en_intervals);
+      
+      // Clear today's cache as the session is completed successfully
+      localStorage.removeItem("cached_workout");
+      localStorage.removeItem("cached_workout_date");
+
       showLoading(true);
       const r = await fetch("/rutina-hoy");
-      if (r.ok) { state.currentWorkout = await r.json(); renderWorkout(state.currentWorkout); }
+      if (r.ok) {
+        state.currentWorkout = await r.json();
+        // Pre-cache tomorrow's or the next queued routine
+        localStorage.setItem("cached_workout", JSON.stringify(state.currentWorkout));
+        localStorage.setItem("cached_workout_date", new Date().toDateString());
+        renderWorkout(state.currentWorkout);
+      }
       showLoading(false);
     } else {
       elBtnGuardarSesion.textContent = "Error. Reintentar";
