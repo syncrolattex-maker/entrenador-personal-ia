@@ -516,9 +516,9 @@ async def get_rutina_hoy():
         Decide dinámicamente si hoy corresponde 'Fuerza' o 'Carrera' y diseña la sesión personalizada.
         """
         
-        # Switch model to gemini-1.5-flash for high free tier limits
+        # Switch model to gemini-flash-latest (1.5 Flash) for high free tier limits (1500 RPD)
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-flash-latest",
             contents=prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
