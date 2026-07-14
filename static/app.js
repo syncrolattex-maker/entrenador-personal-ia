@@ -146,6 +146,15 @@ async function initApp() {
     const dbRes = await fetch("/estado-db");
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
+    // Clear cache if version changed (cache buster)
+    const APP_VERSION = "v5";
+    const cachedVersion = localStorage.getItem("cached_version");
+    if (cachedVersion !== APP_VERSION) {
+      localStorage.removeItem("cached_workout");
+      localStorage.removeItem("cached_workout_date");
+      localStorage.setItem("cached_version", APP_VERSION);
+    }
+
     // Check local cache first to avoid abusing Gemini API
     const todayStr = new Date().toDateString();
     const cachedWorkout = localStorage.getItem("cached_workout");
