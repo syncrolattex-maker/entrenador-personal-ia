@@ -93,7 +93,7 @@ async def get_intervals_history() -> List[dict]:
     oldest = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d")
     newest = datetime.now().strftime("%Y-%m-%d")
     
-    url = f"https://intervals.icu/api/v1/athlete/{athlete_id}/activities"
+    url = f"https://intervals.icu/api/v1/athlete/0/activities"
     auth = ("API_KEY", api_key)
     params = {"oldest": oldest, "newest": newest}
     
