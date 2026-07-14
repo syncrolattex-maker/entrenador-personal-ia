@@ -75,7 +75,7 @@ const elGuidedFeedbackBtns  = document.querySelectorAll(".guided-feedback-btn");
 // ============================================================
 // GUIDED SESSION STATE
 // ============================================================
-const REST_DURATION = 60; // seconds between sets
+const REST_DURATION = 45; // Max 45 seconds between sets (customized for advanced level)
 
 let guided = {
   tipo: "Fuerza",         // "Fuerza" | "Carrera"
@@ -113,8 +113,7 @@ document.addEventListener("DOMContentLoaded", () => {
   elGuidedClose.addEventListener("click", () => {
     if (confirm("¿Salir de la sesión? El progreso no se guardará.")) closeGuided();
   });
-  elBtnSerieDone.addEventListener("click",    onSerieDone);
-  elBtnSkipExercise.addEventListener("click", onSkipExercise);
+  // Event listeners for Fuerza done and skip buttons are bound dynamically inside showFuerzaExercise
   elBtnSkipRest.addEventListener("click",     onSkipRest);
   elBtnPauseCarrera.addEventListener("click", onPauseCarrera);
   elBtnGuardarSesion.addEventListener("click", onGuardarSesion);
@@ -409,7 +408,64 @@ function showFuerzaExercise() {
 
   show(elGuidedSetCounter);
   show(elGuidedReps);
-  hide(elGuidedTimerWrap);
+
+  const workSeconds = getDurationFromReps(ex.repeticiones);
+  if (workSeconds) {
+    // Time-based exercise (e.g. Plancha 45 seg)
+    show(elGuidedTimerWrap);
+    elGuidedTimerArc.className = "guided-timer-arc";
+    updateTimerUI(workSeconds, workSeconds);
+
+    elGuidedActionsFuerza.innerHTML = `
+      <button id="btn-start-work-fuerza" class="btn btn-primary guided-action-btn">
+        <i data-lucide="play" style="width:22px;height:22px;"></i>
+        Iniciar Serie (${ex.repeticiones})
+      </button>
+      <button id="btn-skip-exercise" class="btn btn-secondary" style="font-size:0.9rem; padding:14px;">
+        <i data-lucide="skip-forward" style="width:18px;height:18px;"></i>
+        Saltar ejercicio
+      </button>
+    `;
+    lucide.createIcons();
+
+    document.getElementById("btn-start-work-fuerza").addEventListener("click", () => {
+      // Switch button to let user skip the working timer if needed
+      elGuidedActionsFuerza.innerHTML = `
+        <button id="btn-skip-work-timer" class="btn btn-primary guided-action-btn" style="background: var(--guided-accent-fuerza) !important; box-shadow: 0 8px 30px rgba(251, 113, 133, 0.3) !important;">
+          <i data-lucide="skip-forward" style="width:22px;height:22px;"></i>
+          Saltar e ir a Descanso
+        </button>
+      `;
+      lucide.createIcons();
+      document.getElementById("btn-skip-work-timer").addEventListener("click", () => {
+        clearTimer();
+        onSerieDone();
+      });
+
+      startCountdown(workSeconds, () => {
+        onSerieDone();
+      });
+    });
+
+    document.getElementById("btn-skip-exercise").addEventListener("click", onSkipExercise);
+  } else {
+    // Reps-based exercise (e.g. 12 reps)
+    hide(elGuidedTimerWrap);
+    elGuidedActionsFuerza.innerHTML = `
+      <button id="btn-serie-done" class="btn btn-primary guided-action-btn">
+        <i data-lucide="check" style="width:22px;height:22px;"></i>
+        Serie completada
+      </button>
+      <button id="btn-skip-exercise" class="btn btn-secondary" style="font-size:0.9rem; padding:14px;">
+        <i data-lucide="skip-forward" style="width:18px;height:18px;"></i>
+        Saltar ejercicio
+      </button>
+    `;
+    lucide.createIcons();
+
+    document.getElementById("btn-serie-done").addEventListener("click", onSerieDone);
+    document.getElementById("btn-skip-exercise").addEventListener("click", onSkipExercise);
+  }
 
   showActions("fuerza");
 }
@@ -652,6 +708,15 @@ function startCountdown(seconds, onDone) {
   guided.timerInterval = setInterval(() => {
     guided.timerRemaining--;
     updateTimerUI(guided.timerRemaining, guided.timerTotal);
+    
+    // Play warning count down sound on 3, 2, 1 seconds left
+    if (guided.timerRemaining >= 1 && guided.timerRemaining <= 3) {
+      playBeep(600, 0.12);
+    } else if (guided.timerRemaining === 0) {
+      // Deeper beep indicating start/end
+      playBeep(900, 0.25);
+    }
+
     if (guided.timerRemaining <= 0) {
       clearTimer();
       onDone();
@@ -672,6 +737,14 @@ function resumeTimer() {
   guided.timerInterval = setInterval(() => {
     guided.timerRemaining--;
     updateTimerUI(guided.timerRemaining, guided.timerTotal);
+
+    // Play warning count down sound on 3, 2, 1 seconds left
+    if (guided.timerRemaining >= 1 && guided.timerRemaining <= 3) {
+      playBeep(600, 0.12);
+    } else if (guided.timerRemaining === 0) {
+      playBeep(900, 0.25);
+    }
+
     if (guided.timerRemaining <= 0) {
       clearTimer();
       guided.exIndex++;
@@ -696,6 +769,47 @@ function updateTimerUI(remaining, total) {
   const ratio  = total > 0 ? remaining / total : 0;
   const offset = CIRCUMFERENCE * (1 - ratio);
   elGuidedTimerArc.style.strokeDashoffset = offset;
+}
+
+// ============================================================
+// HELPERS — audio synthesize & time parsing
+// ============================================================
+function playBeep(frequency = 800, duration = 0.1) {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    const audioCtx = new AudioContextClass();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    oscillator.type = "sine";
+    oscillator.frequency.value = frequency;
+    
+    // Low volume setting (0.05) to be warning but not piercing
+    gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + duration);
+  } catch (e) {
+    console.warn("Audio Context playback failed or blocked:", e);
+  }
+}
+
+function getDurationFromReps(repsStr) {
+  if (!repsStr) return null;
+  const clean = repsStr.toLowerCase();
+  // Match strings that contain seg, s, segundos, sec, seconds
+  if (clean.includes("seg") || clean.includes("segundos") || clean.includes(" sec") || clean.includes("second") || (clean.endsWith("s") && !clean.includes("reps") && !clean.includes("series"))) {
+    const match = clean.match(/\d+/);
+    if (match) {
+      return parseInt(match[0], 10);
+    }
+  }
+  return null;
 }
 
 // ============================================================
