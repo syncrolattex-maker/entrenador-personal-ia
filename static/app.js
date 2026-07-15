@@ -11,6 +11,34 @@ if ("serviceWorker" in navigator) {
 }
 
 // ============================================================
+// AUTO-HEALING FOR CACHE MISMATCHES (PWA UPDATE)
+// ============================================================
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", checkCacheIntegrity);
+} else {
+  checkCacheIntegrity();
+}
+
+function checkCacheIntegrity() {
+  if (!document.getElementById("selection-card")) {
+    console.warn("[Cache] Detected old HTML cache. Cleaning PWA cache and reloading...");
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (let r of registrations) r.unregister();
+      });
+    }
+    caches.keys().then((names) => {
+      for (let name of names) caches.delete(name);
+    });
+    localStorage.clear();
+    setTimeout(() => {
+      window.location.reload(true);
+    }, 450);
+  }
+}
+
+// ============================================================
+
 // APP STATE
 // ============================================================
 let state = {

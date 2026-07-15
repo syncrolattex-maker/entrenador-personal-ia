@@ -36,14 +36,13 @@ self.addEventListener("activate", (e) => {
 
 // Fetch Event
 self.addEventListener("fetch", (e) => {
-  // Let all API requests bypass the cache
-  if (
-    e.request.url.includes("/rutina-hoy") ||
-    e.request.url.includes("/webhook-iphone") ||
-    e.request.url.includes("/estado-db") ||
-    e.request.url.includes("/registrar-actividad")
-  ) {
-    return fetch(e.request);
+  const url = new URL(e.request.url);
+  // Only intercept static assets listed in ASSETS or the root path
+  const isAsset = ASSETS.some(asset => url.pathname === asset || url.pathname === "/");
+  
+  if (!isAsset) {
+    // Let all API calls and external requests pass directly to the network
+    return;
   }
 
   e.respondWith(
@@ -52,3 +51,4 @@ self.addEventListener("fetch", (e) => {
     })
   );
 });
+
