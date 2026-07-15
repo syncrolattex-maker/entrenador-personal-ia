@@ -206,7 +206,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v11"; // Bumped version for full-body and equipment update
+    const APP_VERSION = "v12"; // Bumped version for chat persistence
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
@@ -360,21 +360,37 @@ function renderRecommendation(rec) {
   // Show chat card
   if (elCoachChatCard) elCoachChatCard.style.display = "flex";
 
-  // Initialize chat history with coach welcome message
-  chatHistory = [
-    {
+  // Persistent Chat History loading
+  const savedChat = localStorage.getItem("coach_chat_history");
+  if (savedChat) {
+    try {
+      chatHistory = JSON.parse(savedChat);
+    } catch(e) {
+      chatHistory = [];
+    }
+  }
+
+  // Check if we should append a new daily recommendation or if history is empty
+  const todayStr = new Date().toDateString();
+  const lastRecDate = localStorage.getItem("last_rec_chat_date");
+
+  if (lastRecDate !== todayStr || chatHistory.length === 0) {
+    chatHistory.push({
       role: "model",
       parts: `¡Hola Verónica! He analizado tu historial de entrenamientos en tu reloj. Para hoy te recomiendo una sesión de **${rec.recomendacion}**.\n\n${rec.razon}\n\n¿Quieres que adaptemos algo de los ejercicios o estás lista para empezar?`
-    }
-  ];
+    });
+    localStorage.setItem("last_rec_chat_date", todayStr);
+    saveChat();
+  }
+  
   renderChatMessages();
 }
-
 
 // ============================================================
 // RENDER WORKOUT CARD
 // ============================================================
 function renderWorkout(workout) {
+
   elSelectionCard.style.display = "none";
   elWorkoutCard.style.display = "flex";
   if (elCoachChatCard) elCoachChatCard.style.display = "none";
@@ -1140,15 +1156,23 @@ function renderChatMessages() {
   elChatMessages.scrollTop = elChatMessages.scrollHeight;
 }
 
+function saveChat() {
+  if (chatHistory.length > 25) {
+    chatHistory = chatHistory.slice(-25);
+  }
+  localStorage.setItem("coach_chat_history", JSON.stringify(chatHistory));
+}
+
 async function enviarMensajeChat() {
   const text = elChatInput.value.trim();
   if (!text) return;
   
   elChatInput.value = "";
   
-  // 1. Add user message to state and render
+  // 1. Add user message to state, render and save
   chatHistory.push({ role: "user", parts: text });
   renderChatMessages();
+  saveChat();
   
   // 2. Show typing indicator
   const indicator = document.createElement("div");
@@ -1177,9 +1201,11 @@ async function enviarMensajeChat() {
       const data = await res.json();
       chatHistory.push({ role: "model", parts: data.respuesta });
       renderChatMessages();
+      saveChat();
     } else {
       chatHistory.push({ role: "model", parts: "Disculpa Verónica, he tenido un problema al procesar tu mensaje. ¿Puedes repetirlo?" });
       renderChatMessages();
+      saveChat();
     }
   } catch (err) {
     console.error("Chat error:", err);
@@ -1188,6 +1214,8 @@ async function enviarMensajeChat() {
     
     chatHistory.push({ role: "model", parts: "Verónica, parece que hay un problema de conexión a internet. ¿Lo intentamos de nuevo?" });
     renderChatMessages();
+    saveChat();
   }
 }
+
 
