@@ -628,12 +628,14 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
             "   - Incluye a veces un ejercicio de core estático por tiempo (p.ej. Plancha Isométrica de 45-60 segundos), usando la palabra 'seg' o 'segundos' en la propiedad repeticiones (ej. '45 seg').\n"
             "   - Rellena obligatoriamente una 'descripcion' corta y clara sobre la ejecución para cada ejercicio detallando el tempo (ej: 'bajada en 3 segundos') y el uso de las cintas o pesas de 5 kg.\n"
             "2. Si el tipo es 'Carrera':\n"
-            "   - Analiza en el historial de los últimos 7 días si YA figura una carrera de alta intensidad (Intervalos de velocidad o Fartlek). Si ya figura una carrera intensa en los últimos 7 días, DEBES generar un 'Rodamiento Suave' (trote continuo a ritmo cómodo en Zona 2 de 30-40 minutos de duración).\n"
-            "   - Si NO figura ninguna carrera de intensidad en los últimos 7 días, diseña un entrenamiento exigente de intervalos (ej: Calentamiento 5m + 6-8 series de 90s rápido/45s andar + Enfriamiento 5m) o un Fartlek dinámico.\n\n"
+            "   - REGLA DE ORO DE CARRERA (EVITAR LESIONES): Los entrenamientos de calidad (Fartleks, series o intervalos de velocidad) son de alta carga de intensidad y fatiga acumulada. Se permite ÚNICAMENTE una (1) sesión de calidad a la semana (últimos 7 días). Todos los demás entrenamientos de carrera de la semana deben ser obligatoriamente de **Rodamiento Suave** (running a ritmo sostenido y cómodo en Zona 2, trote continuo de 35 a 45 minutos de duración, a ritmo conversacional).\n"
+            "   - Analiza rigurosamente el historial de los últimos 7 días. Si ya figura cualquier carrera que contenga en su nombre o descripción las palabras 'fartlek', 'intervalos', 'series', 'velocidad', 'cuestas', o ritmos altos (o si hay una sesión de carrera que no esté marcada explícitamente como rodamiento suave/regenerativo), DEBES generar obligatoriamente un **Rodamiento Suave**.\n"
+            "   - Solo si NO figura ningún entrenamiento de calidad en los últimos 7 días del historial, diseña un entrenamiento exigente de intervalos (ej: Calentamiento 5m + 6-8 series de 90s rápido/45s andar + Enfriamiento 5m) o un Fartlek dinámico.\n\n"
             "INSTRUCCIÓN DE ADAPTACIÓN INTELIGENTE:\n"
             "Dosifica las cargas (menos series o ritmos más lentos) solo si el historial revela fatiga extrema o pulsaciones anormalmente elevadas. De lo contrario, genera una sesión altamente retadora.\n\n"
             "Devuelve un JSON estrictamente compatible con RutinaResponse."
         )
+
 
         
         historial_str = ""
