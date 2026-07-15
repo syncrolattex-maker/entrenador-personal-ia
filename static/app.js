@@ -206,7 +206,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v9"; // Bumped version for last workout card
+    const APP_VERSION = "v10"; // Bumped version for interactive actions fix
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
@@ -399,7 +399,6 @@ function renderWorkout(workout) {
   const isFuerza = workout.tipo_sesion === "Fuerza";
 
   if (isFuerza) {
-
     elWorkoutBadge.className = "badge fuerza";
     elWorkoutBadge.textContent = "Fuerza • Glúteos y Piernas";
 
@@ -417,6 +416,19 @@ function renderWorkout(workout) {
     });
     html += "</div>";
     elWorkoutContent.innerHTML = html;
+
+    elWorkoutActions.innerHTML = `
+      <button id="btn-empezar-fuerza" class="btn btn-primary guided-action-btn">
+        <i data-lucide="play" style="width: 20px; height: 20px;"></i>
+        Comenzar Sesión Guiada
+      </button>
+      <button id="btn-volver" class="btn btn-secondary">
+        Atrás
+      </button>
+    `;
+
+    document.getElementById("btn-empezar-fuerza").addEventListener("click", startGuidedSession);
+    document.getElementById("btn-volver").addEventListener("click", mostrarPantallaSeleccion);
 
   } else {
     elWorkoutBadge.className = "badge carrera";
@@ -459,9 +471,87 @@ function renderWorkout(workout) {
         </p>
         ${stepsHtml}
       </div>`;
+
+    elWorkoutActions.innerHTML = `
+      <button id="btn-sync-watch" class="btn btn-primary guided-action-btn carrera" style="background-color: #FC5200; margin-bottom: 8px;">
+        <i data-lucide="watch" style="width: 20px; height: 20px;"></i>
+        Sincronizar Apple Watch
+      </button>
+      <button id="btn-empezar-carrera" class="btn btn-primary guided-action-btn carrera" style="background-color: #FC5200;">
+        <i data-lucide="play" style="width: 20px; height: 20px;"></i>
+        Comenzar Carrera (Timer)
+      </button>
+      <button id="btn-volver" class="btn btn-secondary">
+        Atrás
+      </button>
+    `;
+
+    document.getElementById("btn-sync-watch").addEventListener("click", sincronizarAppleWatch);
+    document.getElementById("btn-empezar-carrera").addEventListener("click", startGuidedSession);
+    document.getElementById("btn-volver").addEventListener("click", mostrarPantallaSeleccion);
   }
 
   lucide.createIcons();
+}
+
+// ============================================================
+// WORKOUT GENERATION AND ACTIONS
+// ============================================================
+async function iniciarGeneracionEntrenamiento(tipo) {
+  showLoading(true, "La IA está diseñando tu entrenamiento...");
+  try {
+    const res = await fetch("/generar-entrenamiento", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tipo: tipo })
+    });
+    if (res.ok) {
+      state.currentWorkout = await res.json();
+      localStorage.setItem("cached_workout", JSON.stringify(state.currentWorkout));
+      localStorage.setItem("cached_workout_date", new Date().toDateString());
+      renderWorkout(state.currentWorkout);
+    } else {
+      showError("No pudimos generar el entrenamiento de la IA.");
+    }
+  } catch (err) {
+    console.error("Generar entreno error:", err);
+    showError("Error de conexión al generar entrenamiento.");
+  } finally {
+    showLoading(false);
+  }
+}
+
+async function sincronizarAppleWatch() {
+  const workout = state.currentWorkout;
+  if (!workout || !workout.phases) return;
+  
+  showLoading(true, "Sincronizando con Apple Watch...");
+  try {
+    const res = await fetch("/sincronizar-carrera", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phases: workout.phases })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      alert(data.msg);
+      // Mark as synchronized
+      workout.enviado_al_reloj = true;
+      localStorage.setItem("cached_workout", JSON.stringify(workout));
+      renderWorkout(workout);
+    } else {
+      alert("Error de red al sincronizar con Watchletic.");
+    }
+  } catch (err) {
+    console.error("Sync error:", err);
+    alert("Error de conexión al sincronizar.");
+  } finally {
+    showLoading(false);
+  }
+}
+
+function registrarDescansoHoy() {
+  handleRest();
 }
 
 // ============================================================
@@ -474,27 +564,24 @@ async function handleRest() {
     // Clear today's cache on rest so tomorrow is a fresh choice
     localStorage.removeItem("cached_workout");
     localStorage.removeItem("cached_workout_date");
+    localStorage.removeItem("cached_recommendation");
+    localStorage.removeItem("cached_recommendation_date");
 
     const res = await fetch("/webhook-iphone", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tipo: state.db.siguiente_bloque, completado: false })
+      body: JSON.stringify({ tipo: "Descanso", completado: true })
     });
     if (res.ok) {
       const data = await res.json();
       state.db = data.db;
       updateStatsBanner();
       showSuccessBanner(false);
-      const r2 = await fetch("/rutina-hoy");
-      if (r2.ok) {
-        state.currentWorkout = await r2.json();
-        // Save new mock/routine to cache
-        localStorage.setItem("cached_workout", JSON.stringify(state.currentWorkout));
-        localStorage.setItem("cached_workout_date", new Date().toDateString());
-        renderWorkout(state.currentWorkout);
-      }
+      
+      // Reload recommendation for the next day
+      await initApp();
     } else {
-      showError("No pudimos actualizar tu estado.");
+      showError("No pudimos registrar tu descanso.");
     }
   } catch (err) {
     showError("Error de conexión.");
@@ -502,6 +589,7 @@ async function handleRest() {
     showLoading(false);
   }
 }
+
 
 // ============================================================
 // GUIDED SESSION — START
@@ -840,17 +928,13 @@ async function onGuardarSesion() {
       // Clear today's cache as the session is completed successfully
       localStorage.removeItem("cached_workout");
       localStorage.removeItem("cached_workout_date");
+      localStorage.removeItem("cached_recommendation");
+      localStorage.removeItem("cached_recommendation_date");
 
       showLoading(true);
-      const r = await fetch("/rutina-hoy");
-      if (r.ok) {
-        state.currentWorkout = await r.json();
-        // Pre-cache tomorrow's or the next queued routine
-        localStorage.setItem("cached_workout", JSON.stringify(state.currentWorkout));
-        localStorage.setItem("cached_workout_date", new Date().toDateString());
-        renderWorkout(state.currentWorkout);
-      }
+      await initApp();
       showLoading(false);
+
     } else {
       elBtnGuardarSesion.textContent = "Error. Reintentar";
       elBtnGuardarSesion.removeAttribute("disabled");
