@@ -86,6 +86,16 @@ const elChatMessages      = document.getElementById("chat-messages");
 const elChatInput         = document.getElementById("chat-input");
 const elBtnSendChat       = document.getElementById("btn-send-chat");
 
+// Last Workout DOM
+const elLastWorkoutBox    = document.getElementById("last-workout-box");
+const elLastWorkoutIcon   = document.getElementById("last-workout-icon");
+const elLastWorkoutTipo   = document.getElementById("last-workout-tipo");
+const elLastWorkoutName   = document.getElementById("last-workout-name");
+const elLastWorkoutDate   = document.getElementById("last-workout-date");
+const elLastWorkoutStats  = document.getElementById("last-workout-stats");
+const elLastWorkoutDesc   = document.getElementById("last-workout-desc");
+
+
 
 // ============================================================
 // DOM — Guided Session Overlay
@@ -196,7 +206,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v8"; // Bumped version for fix
+    const APP_VERSION = "v9"; // Bumped version for last workout card
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
@@ -295,6 +305,58 @@ function renderRecommendation(rec) {
   elRecRazonText.textContent = rec.razon;
   elRecSemanalText.textContent = rec.explicacion_semanal || "";
 
+  // Render Last Completed Workout details
+  if (rec.ultimo_entreno_detalles && elLastWorkoutBox) {
+    const last = rec.ultimo_entreno_detalles;
+    elLastWorkoutTipo.textContent = last.tipo;
+    elLastWorkoutName.textContent = last.nombre || "Sesión de " + last.tipo;
+    
+    // Format Date
+    let dateLabel = last.fecha;
+    try {
+      const parts = last.fecha.split("-");
+      if (parts.length === 3) {
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        dateLabel = d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+      }
+    } catch(e) {}
+    elLastWorkoutDate.textContent = `(${dateLabel})`;
+    
+    // Set Icon & BG based on type
+    if (last.tipo === "Fuerza") {
+      elLastWorkoutIcon.textContent = "🏋️‍♂️";
+      elLastWorkoutBox.style.backgroundColor = "var(--bg-fuerza)";
+    } else {
+      elLastWorkoutIcon.textContent = "🏃‍♀️";
+      elLastWorkoutBox.style.backgroundColor = "var(--bg-carrera)";
+    }
+    
+    // Build stats HTML
+    let statsHtml = `<span>⏱️ ${Math.round(last.duracion_minutos)} min</span>`;
+    if (last.frecuencia_cardiaca_media) {
+      statsHtml += `<span>❤️ ${Math.round(last.frecuencia_cardiaca_media)} ppm</span>`;
+    }
+    if (last.distancia_km) {
+      statsHtml += `<span>📏 ${last.distancia_km.toFixed(1)} km</span>`;
+    }
+    if (last.calorias_activas) {
+      statsHtml += `<span>🔥 ${Math.round(last.calorias_activas)} kcal</span>`;
+    }
+    elLastWorkoutStats.innerHTML = statsHtml;
+    
+    // Description
+    if (last.descripcion && last.descripcion.trim()) {
+      elLastWorkoutDesc.innerHTML = last.descripcion.replace(/\n/g, "<br>");
+      elLastWorkoutDesc.style.display = "block";
+    } else {
+      elLastWorkoutDesc.style.display = "none";
+    }
+    
+    elLastWorkoutBox.style.display = "flex";
+  } else if (elLastWorkoutBox) {
+    elLastWorkoutBox.style.display = "none";
+  }
+
   // Show chat card
   if (elCoachChatCard) elCoachChatCard.style.display = "flex";
 
@@ -307,6 +369,7 @@ function renderRecommendation(rec) {
   ];
   renderChatMessages();
 }
+
 
 // ============================================================
 // RENDER WORKOUT CARD

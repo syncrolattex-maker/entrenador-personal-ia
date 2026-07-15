@@ -71,10 +71,28 @@ class RutinaResponse(BaseModel):
     phases: Optional[List[FaseCarrera]] = None
     mensaje_adaptacion: Optional[str] = None
 
+class UltimoEntrenoDetalles(BaseModel):
+    tipo: str
+    nombre: str
+    fecha: str
+    duracion_minutos: float
+    frecuencia_cardiaca_media: Optional[float] = None
+    calorias_activas: Optional[float] = None
+    distancia_km: Optional[float] = None
+    descripcion: Optional[str] = None
+
 class RecomendacionResponse(BaseModel):
     recomendacion: Literal["Fuerza", "Carrera", "Descanso"]
     razon: str
     explicacion_semanal: str
+    ultimo_entreno_detalles: Optional[UltimoEntrenoDetalles] = None
+
+class GeminiRecomendacionResponse(BaseModel):
+    recomendacion: Literal["Fuerza", "Carrera", "Descanso"]
+    razon: str
+    explicacion_semanal: str
+
+
 
 class GenerarEntrenamientoPayload(BaseModel):
     tipo: Literal["Fuerza", "Carrera"]
@@ -507,26 +525,76 @@ async def get_recomendacion_hoy():
         Genera la recomendación inteligente de hoy para Verónica.
         """
         
+        # Determine the last completed workout to display to Verónica
+        ultimo_entreno_detalles = None
+        if real_history:
+            # Sort real history to get the newest
+            sorted_history = sorted(real_history, key=lambda x: x["fecha"], reverse=True)
+            newest = sorted_history[0]
+            ultimo_entreno_detalles = {
+                "tipo": newest["tipo"],
+                "nombre": newest["nombre"],
+                "fecha": newest["fecha"],
+                "duracion_minutos": newest["duracion_minutos"],
+                "frecuencia_cardiaca_media": newest["frecuencia_cardiaca_media"],
+                "calorias_activas": newest["calorias_activas"],
+                "distancia_km": newest["distancia_km"],
+                "descripcion": newest["descripcion"]
+            }
+        else:
+            if db["historial_entrenamientos"]:
+                newest = next((x for x in reversed(db["historial_entrenamientos"]) if x.get("completado")), None)
+                if newest:
+                    ultimo_entreno_detalles = {
+                        "tipo": newest["tipo"],
+                        "nombre": newest["tipo"],
+                        "fecha": newest.get("fecha", "Ayer"),
+                        "duracion_minutos": newest.get("duracion_minutos", 0.0),
+                        "frecuencia_cardiaca_media": newest.get("frecuencia_cardiaca_media"),
+                        "calorias_activas": newest.get("calorias_activas"),
+                        "distancia_km": newest.get("distancia_km"),
+                        "descripcion": ""
+                    }
+
         response = client.models.generate_content(
             model="gemini-flash-latest",
             contents=prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
                 response_mime_type="application/json",
-                response_schema=RecomendacionResponse,
+                response_schema=GeminiRecomendacionResponse,
                 temperature=0.7,
             )
         )
         
-        return json.loads(response.text)
+        rec_data = json.loads(response.text)
+        rec_data["ultimo_entreno_detalles"] = ultimo_entreno_detalles
+        return rec_data
         
     except Exception as e:
         print("Gemini recommendation error:", e)
+        # Fallback details
+        ultimo_entreno_detalles = None
+        if db["historial_entrenamientos"]:
+            newest = next((x for x in reversed(db["historial_entrenamientos"]) if x.get("completado")), None)
+            if newest:
+                ultimo_entreno_detalles = {
+                    "tipo": newest["tipo"],
+                    "nombre": newest["tipo"],
+                    "fecha": newest.get("fecha", "Ayer"),
+                    "duracion_minutos": newest.get("duracion_minutos", 0.0),
+                    "frecuencia_cardiaca_media": newest.get("frecuencia_cardiaca_media"),
+                    "calorias_activas": newest.get("calorias_activas"),
+                    "distancia_km": newest.get("distancia_km"),
+                    "descripcion": ""
+                }
         return {
             "recomendacion": "Fuerza",
             "razon": f"Error conectando con la IA: {str(e)}",
-            "explicacion_semanal": "No se pudo obtener el análisis semanal debido a un error de conexión."
+            "explicacion_semanal": "No se pudo obtener el análisis semanal debido a un error de conexión.",
+            "ultimo_entreno_detalles": ultimo_entreno_detalles
         }
+
 
 
 @app.post("/generar-entrenamiento")
