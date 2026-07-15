@@ -557,7 +557,7 @@ async def get_recomendacion_hoy():
                     }
 
         response = client.models.generate_content(
-            model="gemini-flash-latest",
+            model="gemini-1.5-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
@@ -657,7 +657,7 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
         """
         
         response = client.models.generate_content(
-            model="gemini-flash-latest",
+            model="gemini-1.5-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
@@ -751,7 +751,7 @@ async def post_chat_coach(payload: ChatCoachRequest):
         )
         
         response = client.models.generate_content(
-            model="gemini-flash-latest",
+            model="gemini-1.5-flash",
             contents=contents,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction + "\n\n" + intro_prompt,
