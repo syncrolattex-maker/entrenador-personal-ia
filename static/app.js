@@ -229,7 +229,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v13"; // Bumped version for global error boundary
+    const APP_VERSION = "v14"; // Bumped version for quota fix cache purge
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
@@ -256,8 +256,11 @@ async function initApp() {
     if (recRes.ok) {
       const recommendation = await recRes.json();
       
-      localStorage.setItem("cached_recommendation", JSON.stringify(recommendation));
-      localStorage.setItem("cached_recommendation_date", todayStr);
+      // Only cache if it's a valid recommendation (no API error fallback)
+      if (recommendation.razon && !recommendation.razon.includes("Error conectando")) {
+        localStorage.setItem("cached_recommendation", JSON.stringify(recommendation));
+        localStorage.setItem("cached_recommendation_date", todayStr);
+      }
       
       renderRecommendation(recommendation);
     } else {
@@ -267,6 +270,7 @@ async function initApp() {
         explicacion_semanal: "Verifica tu conexión."
       });
     }
+
   } catch (err) {
     console.error("Fetch recommendation error:", err);
     renderRecommendation({
