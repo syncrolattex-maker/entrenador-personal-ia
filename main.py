@@ -82,6 +82,15 @@ class GenerarEntrenamientoPayload(BaseModel):
 class SincronizarCarreraPayload(BaseModel):
     phases: List[FaseCarrera]
 
+class ChatMessage(BaseModel):
+    role: str  # "user" or "model"
+    parts: str  # message content
+
+class ChatCoachRequest(BaseModel):
+    mensaje: str
+    historial: List[ChatMessage] = []
+
+
 # --- Helpers ---
 
 async def get_intervals_history() -> List[dict]:
@@ -449,15 +458,16 @@ async def post_registrar_actividad(payload: ActividadCompletadaPayload):
 
 @app.get("/recomendacion-hoy")
 async def get_recomendacion_hoy():
+
     """
-    Generates a simple, lightweight recommendation for today's session (Fuerza, Carrera, or Descanso)
-    by evaluating the actual activity history from Intervals.icu.
+    Generates today's personalized recommendation for Verónica (43, 1.77m, 59kg, Alcàsser)
+    evaluating her actual activity history from Intervals.icu.
     """
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         return {
             "recomendacion": "Fuerza",
-            "razon": "IA local offline. Te recomendamos Fuerza para mantener el balance semanal.",
+            "razon": "Hola Verónica. IA local offline. Te recomendamos Fuerza para mantener el balance semanal.",
             "explicacion_semanal": "Modo offline."
         }
         
@@ -466,15 +476,17 @@ async def get_recomendacion_hoy():
         client = genai.Client(api_key=api_key)
         
         system_instruction = (
-            "Eres el entrenador personal de una atleta avanzada. Tu tarea de hoy es únicamente RECOMENDAR "
-            "cuál debe ser su sesión de hoy: 'Fuerza', 'Carrera' o 'Descanso'.\n\n"
+            "Eres el entrenador personal y coach de fitness de **Verónica**, una atleta de 43 años, "
+            "de Alcàsser (Valencia), que mide 1.77 m y pesa 59 kg (cuerpo atlético y magro, extremidades largas).\n\n"
             "INSTRUCCIONES DE PLANIFICACIÓN:\n"
-            "Examina el historial de actividades de los últimos 10 días provisto (de su reloj e Intervals.icu):\n"
-            "- Fuerza: Meta ideal de 2 a 3 veces por semana, con alta intensidad.\n"
-            "- Carrera: Meta de 1 a 2 veces por semana. Máximo 1 sesión de alta intensidad (intervalos/fartleks) a la semana. Las demás deben ser rodamientos suaves (aeróbicos continuos).\n"
-            "- Descanso: Fundamental para asimilar el esfuerzo. Debe descansar 1 o 2 días completos.\n\n"
-            "Analiza si entrenó ayer y el tipo de entrenamiento para aconsejar lo que corresponde hoy. "
-            "Devuelve un JSON estrictamente según el esquema RecomendacionResponse. Sé claro, profesional y motivador."
+            "1. Dirígete a ella de forma cálida, profesional y motivadora llamándola siempre por su nombre ('Verónica').\n"
+            "2. Examina el historial de actividades de los últimos 10 días provisto (de su reloj e Intervals.icu):\n"
+            "   - Fuerza: Meta ideal de 2 a 3 veces por semana, con alta intensidad.\n"
+            "   - Carrera: Meta de 1 a 2 veces por semana. Máximo 1 sesión de alta intensidad (intervalos/fartleks) a la semana. Las demás deben ser rodamientos suaves (aeróbicos continuos).\n"
+            "   - Descanso: Fundamental para asimilar el esfuerzo. Debe descansar 1 o 2 días completos.\n"
+            "3. Explica de forma motivadora y científica (biomecánica o fisiológicamente, ej. asimilación de cargas, supercompensación) tu decisión.\n"
+            "4. Ten en cuenta el clima cálido/húmedo mediterráneo de Alcàsser para aconsejar sobre hidratación o momento del día si corre hoy.\n"
+            "5. Devuelve un JSON estrictamente según el esquema RecomendacionResponse."
         )
         
         historial_str = ""
@@ -492,7 +504,7 @@ async def get_recomendacion_hoy():
         Días acumulados sin entrenar: {db['dias_sin_entrenar']}.
         {historial_str}
         
-        Genera la recomendación inteligente de hoy.
+        Genera la recomendación inteligente de hoy para Verónica.
         """
         
         response = client.models.generate_content(
@@ -512,7 +524,7 @@ async def get_recomendacion_hoy():
         print("Gemini recommendation error:", e)
         return {
             "recomendacion": "Fuerza",
-            "razon": "Error conectando con la IA. Te aconsejamos Fuerza para el día de hoy.",
+            "razon": "Error conectando con la IA. Te aconsejamos Fuerza para el día de hoy, Verónica.",
             "explicacion_semanal": "No se pudo obtener el análisis semanal debido a un error de conexión."
         }
 
@@ -520,7 +532,7 @@ async def get_recomendacion_hoy():
 async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
     """
     Generates a detailed workout routine (exercises for Strength, or phases for Running)
-    adapted in volume and intensity based on the Intervals.icu history.
+    adapted in volume and intensity based on the Intervals.icu history for Verónica.
     """
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
@@ -531,10 +543,12 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
         client = genai.Client(api_key=api_key)
         
         system_instruction = (
-            "Eres el entrenador personal experto de una mujer con nivel físico avanzado y alta tolerancia al esfuerzo. "
+            "Eres el entrenador personal experto de **Verónica**, una atleta de 43 años, de Alcàsser (Valencia), "
+            "que mide 1.77 m y pesa 59 kg (cuerpo atlético, extremidades largas y excelente palanca para fuerza/carrera). "
             "Ella busca rutinas intensas, retadoras y de mayor duración.\n\n"
             f"Tu tarea hoy es generar la sesión detallada para el tipo seleccionado: '{payload.tipo}'.\n\n"
             "INSTRUCCIONES DE ESTRUCTURA Y VOLUMEN:\n"
+            "Dirígete a ella por su nombre ('Verónica') en las explicaciones y adaptaciones.\n"
             "1. Si el tipo es 'Fuerza':\n"
             "   - Genera una rutina exigente enfocada en tren inferior, piernas y glúteos de entre 45 y 60 minutos de duración.\n"
             "   - Diseña entre 5 y 6 ejercicios, especificando 4 o 5 series de 10-15 repeticiones pesadas.\n"
@@ -564,7 +578,7 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
         Días sin entrenar: {db['dias_sin_entrenar']}.
         {historial_str}
         
-        Genera la sesión adaptada y detallada de {payload.tipo}.
+        Genera la sesión adaptada y detallada de {payload.tipo} para Verónica.
         """
         
         response = client.models.generate_content(
@@ -597,6 +611,84 @@ async def post_sincronizar_carrera(payload: SincronizarCarreraPayload):
         "msg": "Sincronizado correctamente con Apple Watch (Watchletic)" if success else "No se pudo sincronizar. Verifica las credenciales de Intervals.icu."
     }
 
+@app.post("/chat-coach")
+async def post_chat_coach(payload: ChatCoachRequest):
+    """
+    Handles interactive messaging with the AI Coach (Verónica's personalized trainer).
+    Provides context-aware athletic guidance and dynamically adapts recommendations.
+    """
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return {"respuesta": "Hola Verónica. En este momento el modo chat de IA está desconectado. ¿En qué puedo ayudarte con tu rutina local?"}
+        
+    try:
+        real_history = await get_intervals_history()
+        client = genai.Client(api_key=api_key)
+        
+        system_instruction = (
+            "Eres el Coach y Entrenador de Fitness personal de **Verónica**, una atleta de 43 años, "
+            "de Alcàsser (Valencia), que mide 1.77 m y pesa 59 kg (cuerpo atlético y magro, de raza blanca).\n\n"
+            "DIRECTRICES DE PERSONALIDAD Y COACHING:\n"
+            "1. Tono: Súper cercano, motivador, profesional y empático. Dirígete a ella siempre como 'Verónica'.\n"
+            "2. Contexto físico: Tiene 43 años, es alta (1.77m) y delgada/atlética (59kg), lo que le da una buena zancada y excelente rango de movimiento. Tenlo en cuenta al dar consejos de técnica.\n"
+            "3. Contexto geográfico y clima: Alcàsser (Valencia) tiene inviernos suaves pero veranos calurosos y muy húmedos. Si te pregunta por correr o entrenar con calor, menciónalo y dale consejos de hidratación y horarios.\n"
+            "4. Análisis de Datos: Tienes acceso a su historial reciente de Intervals.icu y su reloj. Úsalo para justificar científicamente tus respuestas (ej. 'Vi que en tu carrera de ayer tu pulso medio fue de 158 ppm...', 'Llevas 2 sesiones de fuerza esta semana...').\n"
+            "5. Peticiones de Adaptación: Si Verónica te dice que está cansada, que le duele alguna zona (ej. lumbares, rodillas, tendones) o que tiene poco tiempo, adáptale el enfoque del día. Explícale qué modificaciones hacer en los ejercicios (ej. cambiar zancadas búlgaras por sentadillas libres, reducir peso, acortar rodamiento, etc.) para entrenar de forma segura.\n"
+            "6. Concisión: Mantén tus respuestas relativamente cortas y al grano (máximo 3-4 párrafos) para que se lean cómodamente en una pantalla de móvil."
+        )
+        
+        historial_str = ""
+        if real_history:
+            historial_str = "Historial de entrenamientos de Verónica (últimos 10 días de su reloj):\n"
+            for log in real_history:
+                dist_str = f", Distancia: {log['distancia_km']} km" if log['distancia_km'] else ""
+                fc_str = f", FC Media: {log['frecuencia_cardiaca_media']} ppm" if log['frecuencia_cardiaca_media'] else ""
+                historial_str += f"- {log['fecha']}: {log['tipo']} ({log['nombre']}). {log['duracion_minutos']} min{dist_str}{fc_str}\n"
+        else:
+            historial_str = "No hay historial disponible todavía en Intervals.icu."
+
+        contents = []
+        
+        intro_prompt = f"""
+        Perfil del atleta:
+        - Nombre: Verónica
+        - Edad: 43 años
+        - Ubicación: Alcàsser (Valencia)
+        - Estatura: 1.77 m | Peso: 59 kg (Cuerpo atlético)
+        - Historial físico real:
+        {historial_str}
+        """
+        
+        for msg in payload.historial:
+            contents.append(
+                types.Content(
+                    role=msg.role,
+                    parts=[types.Part.from_text(text=msg.parts)]
+                )
+            )
+            
+        contents.append(
+            types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=payload.mensaje)]
+            )
+        )
+        
+        response = client.models.generate_content(
+            model="gemini-flash-latest",
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction + "\n\n" + intro_prompt,
+                temperature=0.7,
+            )
+        )
+        
+        return {"respuesta": response.text}
+        
+    except Exception as e:
+        print("Chat Coach error:", e)
+        return {"respuesta": f"Lo siento Verónica, he tenido un pequeño problema de conexión al procesar tu mensaje. ¿Me lo puedes repetir?"}
+
 # Create static folder if it doesn't exist
 os.makedirs("static", exist_ok=True)
 
@@ -607,3 +699,4 @@ if __name__ == "__main__":
     import uvicorn
     # Run the server on port 8000
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+

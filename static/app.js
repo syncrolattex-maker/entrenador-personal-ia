@@ -50,6 +50,7 @@ let state = {
   },
   currentWorkout: null
 };
+let chatHistory = [];
 
 // ============================================================
 // DOM — Main UI
@@ -78,6 +79,13 @@ const elAdaptationBanner  = document.getElementById("adaptation-banner");
 const elAdaptationText    = document.getElementById("adaptation-text");
 const elDecisionBanner    = document.getElementById("decision-banner");
 const elDecisionText      = document.getElementById("decision-text");
+
+// Coach Chat DOM
+const elCoachChatCard     = document.getElementById("coach-chat-card");
+const elChatMessages      = document.getElementById("chat-messages");
+const elChatInput         = document.getElementById("chat-input");
+const elBtnSendChat       = document.getElementById("btn-send-chat");
+
 
 // ============================================================
 // DOM — Guided Session Overlay
@@ -137,6 +145,12 @@ document.addEventListener("DOMContentLoaded", () => {
   elBtnSelectCarrera.addEventListener("click", () => iniciarGeneracionEntrenamiento("Carrera"));
   elBtnSelectDescanso.addEventListener("click", registrarDescansoHoy);
 
+  // Chat events
+  elBtnSendChat.addEventListener("click", enviarMensajeChat);
+  elChatInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") enviarMensajeChat();
+  });
+
   // Online/offline status
   window.addEventListener("online",  updateOnlineStatus);
   window.addEventListener("offline", updateOnlineStatus);
@@ -149,6 +163,7 @@ document.addEventListener("DOMContentLoaded", () => {
   elBtnSkipRest.addEventListener("click",     onSkipRest);
   elBtnPauseCarrera.addEventListener("click", onPauseCarrera);
   elBtnGuardarSesion.addEventListener("click", onGuardarSesion);
+
 
   elGuidedFeedbackBtns.forEach(btn => {
     btn.addEventListener("click", () => {
@@ -181,7 +196,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v6"; // Bumped version for design update
+    const APP_VERSION = "v7"; // Bumped version for Coach chat & Veronica profile
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
@@ -256,13 +271,51 @@ function showError(msg) {
     </div>`;
   elWorkoutNote.textContent = "";
   elAdaptationBanner.style.display = "none";
+  elDecisionBanner.style.display = "none";
   lucide.createIcons();
+}
+
+function mostrarPantallaSeleccion() {
+  elSelectionCard.style.display = "flex";
+  elWorkoutCard.style.display = "none";
+  elLoadingState.style.display = "none";
+  if (elCoachChatCard) elCoachChatCard.style.display = "flex";
+}
+
+function renderRecommendation(rec) {
+  elRecTipoLabel.textContent = rec.recomendacion;
+  if (rec.recomendacion === "Fuerza") {
+    elRecTipoLabel.style.color = "var(--accent-fuerza)";
+  } else if (rec.recomendacion === "Carrera") {
+    elRecTipoLabel.style.color = "var(--accent-carrera)";
+  } else {
+    elRecTipoLabel.style.color = "var(--accent-success)";
+  }
+  
+  elRecRazonText.textContent = rec.razon;
+  elRecSemanalText.textContent = rec.explicacion_semanal || "";
+
+  // Show chat card
+  if (elCoachChatCard) elCoachChatCard.style.display = "flex";
+
+  // Initialize chat history with coach welcome message
+  chatHistory = [
+    {
+      role: "model",
+      parts: `¡Hola Verónica! He analizado tu historial de entrenamientos en tu reloj. Para hoy te recomiendo una sesión de **${rec.recomendacion}**.\n\n${rec.razon}\n\n¿Quieres que adaptemos algo de los ejercicios o estás lista para empezar?`
+    }
+  ];
+  renderChatMessages();
 }
 
 // ============================================================
 // RENDER WORKOUT CARD
 // ============================================================
 function renderWorkout(workout) {
+  elSelectionCard.style.display = "none";
+  elWorkoutCard.style.display = "flex";
+  if (elCoachChatCard) elCoachChatCard.style.display = "none";
+
   elWorkoutContent.innerHTML = "";
   elWorkoutNote.textContent = workout.mensaje || "";
 
@@ -919,3 +972,77 @@ function showSuccessBanner(completado, synced = false) {
 }
 
 function hideSuccessBanner() { elSuccessBanner.style.display = "none"; }
+
+// ============================================================
+// COACH CHAT LOGIC (VERÓNICA CHAT)
+// ============================================================
+function renderChatMessages() {
+  elChatMessages.innerHTML = "";
+  
+  chatHistory.forEach(msg => {
+    const isCoach = msg.role === "model";
+    const bubble = document.createElement("div");
+    bubble.className = `chat-message-bubble ${isCoach ? "coach" : "user"}`;
+    // Replace markdown double asterisks with bold and newlines with br
+    let formattedText = msg.parts
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>');
+    bubble.innerHTML = formattedText;
+    elChatMessages.appendChild(bubble);
+  });
+  
+  // Scroll to bottom
+  elChatMessages.scrollTop = elChatMessages.scrollHeight;
+}
+
+async function enviarMensajeChat() {
+  const text = elChatInput.value.trim();
+  if (!text) return;
+  
+  elChatInput.value = "";
+  
+  // 1. Add user message to state and render
+  chatHistory.push({ role: "user", parts: text });
+  renderChatMessages();
+  
+  // 2. Show typing indicator
+  const indicator = document.createElement("div");
+  indicator.className = "chat-typing-indicator";
+  indicator.id = "chat-typing-indicator";
+  indicator.innerHTML = `
+    <span class="chat-typing-dot"></span>
+    <span class="chat-typing-dot"></span>
+    <span class="chat-typing-dot"></span>
+  `;
+  elChatMessages.appendChild(indicator);
+  elChatMessages.scrollTop = elChatMessages.scrollHeight;
+  
+  try {
+    const res = await fetch("/chat-coach", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mensaje: text, historial: chatHistory.slice(0, -1) }) // send history without the last user message to avoid duplication
+    });
+    
+    // Remove typing indicator
+    const existingIndicator = document.getElementById("chat-typing-indicator");
+    if (existingIndicator) existingIndicator.remove();
+    
+    if (res.ok) {
+      const data = await res.json();
+      chatHistory.push({ role: "model", parts: data.respuesta });
+      renderChatMessages();
+    } else {
+      chatHistory.push({ role: "model", parts: "Disculpa Verónica, he tenido un problema al procesar tu mensaje. ¿Puedes repetirlo?" });
+      renderChatMessages();
+    }
+  } catch (err) {
+    console.error("Chat error:", err);
+    const existingIndicator = document.getElementById("chat-typing-indicator");
+    if (existingIndicator) existingIndicator.remove();
+    
+    chatHistory.push({ role: "model", parts: "Verónica, parece que hay un problema de conexión a internet. ¿Lo intentamos de nuevo?" });
+    renderChatMessages();
+  }
+}
+

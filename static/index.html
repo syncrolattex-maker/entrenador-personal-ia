@@ -133,6 +133,38 @@
     </div>
 
 
+    <!-- Coach Chat Card -->
+    <div id="coach-chat-card" class="workout-card coach-chat-card" style="margin-top: 16px; display: none;">
+      <div class="card-header" style="flex-direction: row; justify-content: space-between; align-items: center; width: 100%; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 38px; height: 38px; border-radius: 50%; background: #FFEBE0; border: 1.5px solid #FC5200; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
+            🏃‍♀️
+          </div>
+          <div>
+            <h3 style="font-size: 0.95rem; font-weight: 900; text-transform: uppercase; color: var(--text-primary); letter-spacing: -0.01em;">Coach Verónica</h3>
+            <span style="font-size: 0.7rem; color: var(--accent-success); font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+              <span class="pulse-dot"></span> Activa ahora
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Messages Area -->
+      <div id="chat-messages" class="chat-messages-container">
+        <!-- Initial message will be injected dynamically -->
+      </div>
+
+      <!-- Input Area -->
+      <div class="chat-input-container">
+        <input type="text" id="chat-input" placeholder="Pregunta algo o pide una adaptación..." autocomplete="off">
+        <button id="btn-send-chat" class="btn btn-primary" style="padding: 12px; width: 44px; height: 44px; border-radius: 8px; flex-shrink: 0; background-color: #FC5200;">
+          <i data-lucide="send" style="width: 18px; height: 18px;"></i>
+        </button>
+      </div>
+    </div>
+
+
+
     <!-- Success Message Overlay -->
     <div id="success-banner" class="rest-banner" style="display: none; animation: slideIn 0.3s ease-out;">
       <span class="rest-icon">✨</span>
