@@ -30,13 +30,19 @@ const elStatusUltimo      = document.getElementById("status-ultimo");
 const elStatusSiguiente   = document.getElementById("status-siguiente");
 const elStatusDias        = document.getElementById("status-dias");
 const elLoadingState      = document.getElementById("loading-state");
+const elLoadingText       = document.getElementById("loading-text");
+const elSelectionCard     = document.getElementById("selection-card");
+const elRecTipoLabel      = document.getElementById("rec-tipo-label");
+const elRecRazonText      = document.getElementById("rec-razon-text");
+const elRecSemanalText    = document.getElementById("rec-semanal-text");
+const elBtnSelectFuerza   = document.getElementById("btn-select-fuerza");
+const elBtnSelectCarrera  = document.getElementById("btn-select-carrera");
+const elBtnSelectDescanso = document.getElementById("btn-select-descanso");
 const elWorkoutCard       = document.getElementById("workout-card");
 const elWorkoutBadge      = document.getElementById("workout-badge");
 const elWorkoutContent    = document.getElementById("workout-content");
 const elWorkoutNote       = document.getElementById("workout-note");
 const elWorkoutActions    = document.getElementById("workout-actions");
-const elBtnEmpezar        = document.getElementById("btn-empezar");
-const elBtnDescansar      = document.getElementById("btn-descansar");
 const elSuccessBanner     = document.getElementById("success-banner");
 const elSuccessText       = document.getElementById("success-text");
 const elOfflineNotif      = document.getElementById("offline-notification");
@@ -65,8 +71,6 @@ const elGuidedActionsFuerza = document.getElementById("guided-actions-fuerza");
 const elGuidedActionsRest   = document.getElementById("guided-actions-rest");
 const elGuidedActionsCarrera= document.getElementById("guided-actions-carrera");
 const elGuidedActionsDone   = document.getElementById("guided-actions-done");
-const elBtnSerieDone        = document.getElementById("btn-serie-done");
-const elBtnSkipExercise     = document.getElementById("btn-skip-exercise");
 const elBtnSkipRest         = document.getElementById("btn-skip-rest");
 const elBtnPauseCarrera     = document.getElementById("btn-pause-carrera");
 const elBtnGuardarSesion    = document.getElementById("btn-guardar-sesion");
@@ -100,20 +104,20 @@ const CIRCUMFERENCE = 2 * Math.PI * 54; // r=54
 document.addEventListener("DOMContentLoaded", () => {
   initApp();
 
-  // Main UI events
-  elBtnEmpezar.addEventListener("click", startGuidedSession);
-  elBtnDescansar.addEventListener("click", handleRest);
+  // Selection events
+  elBtnSelectFuerza.addEventListener("click", () => iniciarGeneracionEntrenamiento("Fuerza"));
+  elBtnSelectCarrera.addEventListener("click", () => iniciarGeneracionEntrenamiento("Carrera"));
+  elBtnSelectDescanso.addEventListener("click", registrarDescansoHoy);
 
-  // Online/offline
+  // Online/offline status
   window.addEventListener("online",  updateOnlineStatus);
   window.addEventListener("offline", updateOnlineStatus);
   updateOnlineStatus();
 
-  // Guided session events
+  // Guided session close & feedback
   elGuidedClose.addEventListener("click", () => {
     if (confirm("¿Salir de la sesión? El progreso no se guardará.")) closeGuided();
   });
-  // Event listeners for Fuerza done and skip buttons are bound dynamically inside showFuerzaExercise
   elBtnSkipRest.addEventListener("click",     onSkipRest);
   elBtnPauseCarrera.addEventListener("click", onPauseCarrera);
   elBtnGuardarSesion.addEventListener("click", onGuardarSesion);
@@ -136,53 +140,64 @@ function updateOnlineStatus() {
 }
 
 // ============================================================
-// FETCH ROUTINES
+// BOOT — FETCH RECOMMENDATION
 // ============================================================
 async function initApp() {
-  showLoading(true);
+  showLoading(true, "Consultando plan semanal con la IA...");
   hideSuccessBanner();
+  mostrarPantallaSeleccion();
 
   try {
+    // 1. Get database status
     const dbRes = await fetch("/estado-db");
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
-    // Clear cache if version changed (cache buster)
-    const APP_VERSION = "v5";
+    // 2. Clear cache if version changed (cache buster)
+    const APP_VERSION = "v6"; // Bumped version for design update
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
+      localStorage.removeItem("cached_recommendation");
+      localStorage.removeItem("cached_recommendation_date");
       localStorage.removeItem("cached_workout");
       localStorage.removeItem("cached_workout_date");
       localStorage.setItem("cached_version", APP_VERSION);
     }
 
-    // Check local cache first to avoid abusing Gemini API
+    // 3. Read cached recommendation for today
     const todayStr = new Date().toDateString();
-    const cachedWorkout = localStorage.getItem("cached_workout");
-    const cachedDate = localStorage.getItem("cached_workout_date");
+    const cachedRec = localStorage.getItem("cached_recommendation");
+    const cachedRecDate = localStorage.getItem("cached_recommendation_date");
 
-    if (cachedWorkout && cachedDate === todayStr) {
-      console.log("[Cache] Serving today's workout from localStorage.");
-      state.currentWorkout = JSON.parse(cachedWorkout);
-      renderWorkout(state.currentWorkout);
+    if (cachedRec && cachedRecDate === todayStr) {
+      console.log("[Cache] Serving today's recommendation from localStorage.");
+      renderRecommendation(JSON.parse(cachedRec));
       showLoading(false);
       return;
     }
 
-    const routineRes = await fetch("/rutina-hoy");
-    if (routineRes.ok) {
-      state.currentWorkout = await routineRes.json();
+    // 4. Fetch new recommendation from server
+    const recRes = await fetch("/recomendacion-hoy");
+    if (recRes.ok) {
+      const recommendation = await recRes.json();
       
-      // Save to cache
-      localStorage.setItem("cached_workout", JSON.stringify(state.currentWorkout));
-      localStorage.setItem("cached_workout_date", todayStr);
+      localStorage.setItem("cached_recommendation", JSON.stringify(recommendation));
+      localStorage.setItem("cached_recommendation_date", todayStr);
       
-      renderWorkout(state.currentWorkout);
+      renderRecommendation(recommendation);
     } else {
-      showError("No pudimos cargar la rutina de hoy. Inténtalo de nuevo.");
+      renderRecommendation({
+        recomendacion: "Fuerza",
+        razon: "No se pudo conectar con la IA de planificación. Te aconsejamos Fuerza hoy.",
+        explicacion_semanal: "Verifica tu conexión."
+      });
     }
   } catch (err) {
-    console.error("Fetch Error:", err);
-    showError("Error de conexión con el servidor.");
+    console.error("Fetch recommendation error:", err);
+    renderRecommendation({
+      recomendacion: "Fuerza",
+      razon: "Error de red. Te recomendamos Fuerza para mantener el balance semanal.",
+      explicacion_semanal: "Modo de recuperación offline."
+    });
   } finally {
     showLoading(false);
   }
@@ -196,9 +211,13 @@ function updateStatsBanner() {
   dias > 0 ? elStatusDias.classList.add("highlight") : elStatusDias.classList.remove("highlight");
 }
 
-function showLoading(on) {
+function showLoading(on, text = "Cargando...") {
   elLoadingState.style.display = on ? "flex" : "none";
-  elWorkoutCard.style.display  = on ? "none"  : "flex";
+  elLoadingText.textContent = text;
+  if (on) {
+    elSelectionCard.style.display = "none";
+    elWorkoutCard.style.display = "none";
+  }
 }
 
 function showError(msg) {

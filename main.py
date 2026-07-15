@@ -71,6 +71,17 @@ class RutinaResponse(BaseModel):
     phases: Optional[List[FaseCarrera]] = None
     mensaje_adaptacion: Optional[str] = None
 
+class RecomendacionResponse(BaseModel):
+    recomendacion: Literal["Fuerza", "Carrera", "Descanso"]
+    razon: str
+    explicacion_semanal: str
+
+class GenerarEntrenamientoPayload(BaseModel):
+    tipo: Literal["Fuerza", "Carrera"]
+
+class SincronizarCarreraPayload(BaseModel):
+    phases: List[FaseCarrera]
+
 # --- Helpers ---
 
 async def get_intervals_history() -> List[dict]:
@@ -163,18 +174,14 @@ async def enviar_a_intervals(phases: List[FaseCarrera]):
     
     for p in phases:
         icu_type = "Active"
-        target_hr = "65-75% HR"
         
         if p.type == "WARMUP":
             icu_type = "Warmup"
-            target_hr = "55-65% HR"
             warmup_steps.append(p)
         elif p.type == "COOLDOWN":
             icu_type = "Cooldown"
-            target_hr = "50-60% HR"
             cooldown_steps.append(p)
         else:
-            target_hr = "80-85% HR"
             work_steps.append(p)
             
         steps.append({
@@ -203,7 +210,9 @@ async def enviar_a_intervals(phases: List[FaseCarrera]):
             dur_str = f"{mins}m"
             if secs > 0:
                 dur_str += f"{secs}s"
-            desc_lines.append(f"- {p.name} {dur_str} 80-85% HR")
+            # High intensity check
+            hr_range = "80-85% HR" if "interval" in p.name.lower() or "rápido" in p.name.lower() or "fartlek" in p.name.lower() else "65-75% HR"
+            desc_lines.append(f"- {p.name} {dur_str} {hr_range}")
         desc_lines.append("")
         
     if cooldown_steps:
@@ -245,7 +254,7 @@ async def enviar_a_intervals(phases: List[FaseCarrera]):
         print(f"Failed to connect to Intervals.icu: {str(e)}")
         return False
 
-async def generar_rutina_mock(mensaje_warning: str = None) -> dict:
+async def generar_rutina_mock(tipo: str, mensaje_warning: str = None) -> dict:
     """
     Generates a localized offline mock routine with fatigue adaptation support.
     Conforms to the new unified RutinaResponse schema.
@@ -256,10 +265,9 @@ async def generar_rutina_mock(mensaje_warning: str = None) -> dict:
         if last_workout.get("esfuerzo_subjetivo") == "agotador" or (last_workout.get("frecuencia_cardiaca_media") or 0) > 165:
             is_fatigued = True
 
-    tipo_sesion = db["siguiente_bloque"]
-    explicacion = "Hemos alternado al bloque correspondiente según el plan de tonificación y balance semanal."
+    explicacion = f"Hemos generado esta sesión de {tipo} en modo offline debido a un problema con la API de Gemini."
     
-    if tipo_sesion == "Fuerza":
+    if tipo == "Fuerza":
         ejercicios = [
             {"nombre": "Sentadillas Goblet", "series": 4, "repeticiones": "12", "descripcion": "Baja lentamente empujando el suelo con talones. Trabaja glúteos y piernas."},
             {"nombre": "Hip Thrust con banda", "series": 4, "repeticiones": "15", "descripcion": "Eleva cadera contrayendo fuertemente los glúteos arriba. Enfocado en zona posterior."},
@@ -284,28 +292,21 @@ async def generar_rutina_mock(mensaje_warning: str = None) -> dict:
     else:
         phases = [
             {"name": "Calentamiento: Trote suave", "duration_seconds": 300, "type": "WARMUP"},
-            {"name": "Intervalos: 5x (90s rápido + 60s caminata)", "duration_seconds": 750, "type": "WORK"},
+            {"name": "Rodamiento Continuo Aeróbico", "duration_seconds": 1800, "type": "WORK"},
             {"name": "Enfriamiento: Caminata ligera", "duration_seconds": 300, "type": "COOLDOWN"}
         ]
         
         msg_adapt = None
         if is_fatigued:
-            phases[1]["name"] = "Trote continuo y suave regenerativo"
-            phases[1]["duration_seconds"] = 600
-            msg_adapt = "Hoy rebajamos la intensidad a trote suave continuo sin intervalos por fatiga previa."
-
-        # Sync event in mock mode if keys are present
-        enviado = False
-        if os.getenv("INTERVALS_API_KEY") and os.getenv("INTERVALS_API_KEY") != "YOUR_INTERVALS_API_KEY":
-            phases_objs = [FaseCarrera(**p) for p in phases]
-            enviado = await enviar_a_intervals(phases_objs)
+            phases[1]["duration_seconds"] = 1200
+            msg_adapt = "Reducimos la duración del rodamiento por fatiga previa detectada."
 
         return {
             "tipo_sesion": "Carrera",
             "explicacion_tipo": explicacion,
             "phases": phases,
             "mensaje_adaptacion": msg_adapt,
-            "enviado_al_reloj": enviado,
+            "enviado_al_reloj": False,
             "mensaje": mensaje_warning
         }
 
@@ -421,7 +422,6 @@ async def post_registrar_actividad(payload: ActividadCompletadaPayload):
     Called by the PWA guided session on completion.
     Registers the activity in Intervals.icu and updates local DB history.
     """
-    # Update in-memory db
     db["dias_sin_entrenar"] = 0
     db["ultimo_entreno"] = payload.tipo
     db["siguiente_bloque"] = "Carrera" if payload.tipo == "Fuerza" else "Fuerza"
@@ -439,7 +439,6 @@ async def post_registrar_actividad(payload: ActividadCompletadaPayload):
         "fecha": "Hoy"
     })
 
-    # Register real activity in Intervals.icu
     registrado = await registrar_en_intervals(payload)
 
     return {
@@ -448,44 +447,34 @@ async def post_registrar_actividad(payload: ActividadCompletadaPayload):
         "db": db
     }
 
-@app.get("/rutina-hoy")
-async def get_rutina_hoy():
+@app.get("/recomendacion-hoy")
+async def get_recomendacion_hoy():
     """
-    Generates today's personalized workout using Gemini 1.5 Flash (high free limits),
-    deciding dynamically between Strength (Fuerza) and Running (Carrera) based on the athlete's real
-    Intervals.icu activity history.
+    Generates a simple, lightweight recommendation for today's session (Fuerza, Carrera, or Descanso)
+    by evaluating the actual activity history from Intervals.icu.
     """
     api_key = os.getenv("GEMINI_API_KEY")
-    
     if not api_key:
-        print("Warning: GEMINI_API_KEY is empty. Serving mock workout data.")
-        return await generar_rutina_mock()
+        return {
+            "recomendacion": "Fuerza",
+            "razon": "IA local offline. Te recomendamos Fuerza para mantener el balance semanal.",
+            "explicacion_semanal": "Modo offline."
+        }
         
     try:
-        # Fetch real history from Intervals.icu
         real_history = await get_intervals_history()
-        
         client = genai.Client(api_key=api_key)
         
         system_instruction = (
-            "Eres el entrenador personal experto de una mujer con nivel físico avanzado y con alta tolerancia al esfuerzo (acostumbrada a entrenamientos intensivos, no se fatiga con facilidad). "
-            "Ella quiere una rutina retadora, de alta intensidad y con sesiones más largas. Tu tarea principal hoy es DECIDIR si hoy le corresponde una sesión de 'Fuerza' o de 'Carrera' y estructurarla.\n\n"
-            "INSTRUCCIONES DE DECISIÓN:\n"
-            "Analiza el historial de actividades reales de los últimos 10 días provisto en el prompt (proviene de su reloj/intervals.icu).\n"
-            "1. Distribución Semanal: La meta ideal es realizar entre 2 y 3 sesiones de Fuerza de alta intensidad (enfocadas en tren inferior/glúteos y glúteo medio) y de 1 a 2 sesiones de Carrera por semana, con al menos 1-2 días completos de descanso.\n"
-            "2. Evita sesgar: Si el historial muestra que hizo Fuerza ayer, hoy dale Carrera (o viceversa si corresponde) para equilibrar la semana.\n"
-            "3. En el campo 'explicacion_tipo' explica breve y amistosamente por qué elegiste esta sesión hoy.\n\n"
-            "INSTRUCCIÓN DE INTENSIDAD Y DURACIÓN:\n"
-            "- Las sesiones de Fuerza deben ser exigentes y durar entre 45 y 60 minutos. Estructura entre 5 y 6 ejercicios exigentes de tren inferior/glúteo (con 4-5 series de 10-15 repeticiones pesadas). Utiliza ejercicios demandantes como Zancadas Búlgaras con peso, Peso Muerto Rumano unilateral, Hip Thrust pesado con banda de resistencia y Sentadillas Goblet profundas. Incluye a veces ejercicios de core con contracción por tiempo (ej: Plancha Isométrica de 45-60 segundos, especificando '45 seg' o '60 seg' en las repeticiones).\n"
-            "- Los descansos entre series en Fuerza son de MÁXIMO 45 segundos.\n"
-            "- Las sesiones de Carrera deben ser dosificadas inteligentemente para prevenir lesiones:\n"
-            "  * Las sesiones de alta intensidad (Intervalos de velocidad o Fartleks) se limitarán a un **MÁXIMO de UNA VEZ por semana (cada 7 días)**. Debes examinar el historial del prompt. Si en los últimos 7 días ya figura una sesión de intervalos o fartlek, el entrenamiento de carrera de hoy **DEBE SER obligatoriamente un 'Rodamiento Suave'** (trote continuo a ritmo cómodo y sostenido en zona aeróbica pura, p.ej. 30-40 minutos al 60-70% de FC, Zona 2).\n"
-            "  * Si no hay ninguna sesión de intensidad de running en los últimos 7 días, puedes estructurar un entrenamiento exigente de intervalos (ej: 6-8 series de 90s rápido + 45s de recuperación activa trotando) o un Fartlek dinámico.\n\n"
-            "INSTRUCCIÓN DE ADAPTACIÓN INTELIGENTE:\n"
-            "Solo si el historial muestra datos de fatiga extrema o pulsaciones medias anormalmente elevadas, baja un poco la intensidad. Si viene de varios días sin entrenar, no la culpes y dale una sesión intensa para reactivarla con fuerza.\n\n"
-            "INSTRUCCIÓN DE DESCRIPCIONES DE EJERCICIO:\n"
-            "Para cada ejercicio de Fuerza, debes obligatoriamente rellenar el campo 'descripcion' con 1-2 frases claras y simples explicando la postura de inicio, el movimiento y qué músculo siente trabajar. Sé empático, descriptivo y evita tecnicismos complicados.\n\n"
-            "Toda la respuesta debe ser estrictamente en JSON y seguir el esquema de RutinaResponse."
+            "Eres el entrenador personal de una atleta avanzada. Tu tarea de hoy es únicamente RECOMENDAR "
+            "cuál debe ser su sesión de hoy: 'Fuerza', 'Carrera' o 'Descanso'.\n\n"
+            "INSTRUCCIONES DE PLANIFICACIÓN:\n"
+            "Examina el historial de actividades de los últimos 10 días provisto (de su reloj e Intervals.icu):\n"
+            "- Fuerza: Meta ideal de 2 a 3 veces por semana, con alta intensidad.\n"
+            "- Carrera: Meta de 1 a 2 veces por semana. Máximo 1 sesión de alta intensidad (intervalos/fartleks) a la semana. Las demás deben ser rodamientos suaves (aeróbicos continuos).\n"
+            "- Descanso: Fundamental para asimilar el esfuerzo. Debe descansar 1 o 2 días completos.\n\n"
+            "Analiza si entrenó ayer y el tipo de entrenamiento para aconsejar lo que corresponde hoy. "
+            "Devuelve un JSON estrictamente según el esquema RecomendacionResponse. Sé claro, profesional y motivador."
         )
         
         historial_str = ""
@@ -494,34 +483,90 @@ async def get_rutina_hoy():
             for log in real_history:
                 dist_str = f", Distancia: {log['distancia_km']} km" if log['distancia_km'] else ""
                 fc_str = f", FC Media: {log['frecuencia_cardiaca_media']} ppm" if log['frecuencia_cardiaca_media'] else ""
-                desc_str = f", Notas: {log['descripcion']}" if log['descripcion'] else ""
-                historial_str += (
-                    f"- Fecha {log['fecha']}: {log['tipo']} ({log['nombre']}). "
-                    f"Duración: {log['duracion_minutos']} min{dist_str}{fc_str}{desc_str}\n"
-                )
+                historial_str += f"- Fecha {log['fecha']}: {log['tipo']} ({log['nombre']}). Duración: {log['duracion_minutos']} min{dist_str}{fc_str}\n"
         else:
-            # Fallback to local DB history if Intervals.icu query returned empty
-            if db["historial_entrenamientos"]:
-                historial_str = "Historial de entrenamientos locales:\n"
-                for log in db["historial_entrenamientos"][-5:]:
-                    if log.get("completado"):
-                        historial_str += (
-                            f"- {log['tipo']} (Completado): Duración: {log.get('duracion_minutos')} min, "
-                            f"Esfuerzo: {log.get('esfuerzo_subjetivo')}\n"
-                        )
-            else:
-                historial_str = "No hay historial de entrenamientos registrado todavía."
+            historial_str = "No hay historial disponible. Recomienda Fuerza para reactivar."
 
         prompt = f"""
-        Días sin entrenar acumulados: {db['dias_sin_entrenar']}.
-        Último entrenamiento en base local: {db['ultimo_entreno']}.
-        
+        Último entreno local trackeado: {db['ultimo_entreno']}.
+        Días acumulados sin entrenar: {db['dias_sin_entrenar']}.
         {historial_str}
         
-        Decide dinámicamente si hoy corresponde 'Fuerza' o 'Carrera' y diseña la sesión personalizada.
+        Genera la recomendación inteligente de hoy.
         """
         
-        # Switch model to gemini-flash-latest (1.5 Flash) for high free tier limits (1500 RPD)
+        response = client.models.generate_content(
+            model="gemini-flash-latest",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                response_mime_type="application/json",
+                response_schema=RecomendacionResponse,
+                temperature=0.7,
+            )
+        )
+        
+        return json.loads(response.text)
+        
+    except Exception as e:
+        print("Gemini recommendation error:", e)
+        return {
+            "recomendacion": "Fuerza",
+            "razon": "Error conectando con la IA. Te aconsejamos Fuerza para el día de hoy.",
+            "explicacion_semanal": "No se pudo obtener el análisis semanal debido a un error de conexión."
+        }
+
+@app.post("/generar-entrenamiento")
+async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
+    """
+    Generates a detailed workout routine (exercises for Strength, or phases for Running)
+    adapted in volume and intensity based on the Intervals.icu history.
+    """
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return await generar_rutina_mock(payload.tipo, "Modo local offline.")
+        
+    try:
+        real_history = await get_intervals_history()
+        client = genai.Client(api_key=api_key)
+        
+        system_instruction = (
+            "Eres el entrenador personal experto de una mujer con nivel físico avanzado y alta tolerancia al esfuerzo. "
+            "Ella busca rutinas intensas, retadoras y de mayor duración.\n\n"
+            f"Tu tarea hoy es generar la sesión detallada para el tipo seleccionado: '{payload.tipo}'.\n\n"
+            "INSTRUCCIONES DE ESTRUCTURA Y VOLUMEN:\n"
+            "1. Si el tipo es 'Fuerza':\n"
+            "   - Genera una rutina exigente enfocada en tren inferior, piernas y glúteos de entre 45 y 60 minutos de duración.\n"
+            "   - Diseña entre 5 y 6 ejercicios, especificando 4 o 5 series de 10-15 repeticiones pesadas.\n"
+            "   - Utiliza ejercicios potentes como Zancadas Búlgaras, Peso Muerto Rumano unilateral, Hip Thrust pesado con banda de resistencia y Sentadillas Goblet profundas.\n"
+            "   - Incluye a veces un ejercicio de core estático por tiempo (p.ej. Plancha Isométrica de 45-60 segundos), usando la palabra 'seg' o 'segundos' en la propiedad repeticiones (ej. '45 seg').\n"
+            "   - Rellena obligatoriamente una 'descripcion' corta y clara sobre la ejecución para cada ejercicio.\n"
+            "2. Si el tipo es 'Carrera':\n"
+            "   - Analiza en el historial de los últimos 7 días si YA figura una carrera de alta intensidad (Intervalos de velocidad o Fartlek). Si ya figura una carrera intensa en los últimos 7 días, DEBES generar un 'Rodamiento Suave' (trote continuo a ritmo cómodo en Zona 2 de 30-40 minutos de duración).\n"
+            "   - Si NO figura ninguna carrera de intensidad en los últimos 7 días, diseña un entrenamiento exigente de intervalos (ej: Calentamiento 5m + 6-8 series de 90s rápido/45s andar + Enfriamiento 5m) o un Fartlek dinámico.\n\n"
+            "INSTRUCCIÓN DE ADAPTACIÓN INTELIGENTE:\n"
+            "Dosifica las cargas (menos series o ritmos más lentos) solo si el historial revela fatiga extrema o pulsaciones anormalmente elevadas. De lo contrario, genera una sesión altamente retadora.\n\n"
+            "Devuelve un JSON estrictamente compatible con RutinaResponse."
+        )
+        
+        historial_str = ""
+        if real_history:
+            historial_str = "Historial de entrenamientos reales (últimos 10 días de Intervals.icu):\n"
+            for log in real_history:
+                dist_str = f", Distancia: {log['distancia_km']} km" if log['distancia_km'] else ""
+                fc_str = f", FC Media: {log['frecuencia_cardiaca_media']} ppm" if log['frecuencia_cardiaca_media'] else ""
+                historial_str += f"- Fecha {log['fecha']}: {log['tipo']} ({log['nombre']}). Duración: {log['duracion_minutos']} min{dist_str}{fc_str}\n"
+        else:
+            historial_str = "No hay historial reciente."
+
+        prompt = f"""
+        Tipo de entrenamiento solicitado: {payload.tipo}.
+        Días sin entrenar: {db['dias_sin_entrenar']}.
+        {historial_str}
+        
+        Genera la sesión adaptada y detallada de {payload.tipo}.
+        """
+        
         response = client.models.generate_content(
             model="gemini-flash-latest",
             contents=prompt,
@@ -534,25 +579,23 @@ async def get_rutina_hoy():
         )
         
         workout = json.loads(response.text)
-        
-        # If Carrera is chosen, sync structured event (Watchletic syntax)
-        if workout.get("tipo_sesion") == "Carrera":
-            phases = [FaseCarrera(**p) for p in workout.get("phases", [])]
-            enviado = await enviar_a_intervals(phases)
-            workout["enviado_al_reloj"] = enviado
-
-        # Update local db tracking just in case
-        db["siguiente_bloque"] = "Carrera" if workout.get("tipo_sesion") == "Fuerza" else "Fuerza"
-
         return workout
-
+        
     except Exception as e:
-        err_msg = str(e)
-        print(f"Gemini API Error: {err_msg}. Falling back to mock workout.")
-        short_err = "cuota agotada" if "RESOURCE_EXHAUSTED" in err_msg else "error de conexión"
-        return await generar_rutina_mock(
-            mensaje_warning=f"Nota: Tu clave de Gemini está temporalmente inactiva o sin cuota ({short_err}). Usando rutina local de recuperación."
-        )
+        print("Gemini generation error:", e)
+        return await generar_rutina_mock(payload.tipo, f"Error conectando con la IA: {str(e)}")
+
+@app.post("/sincronizar-carrera")
+async def post_sincronizar_carrera(payload: SincronizarCarreraPayload):
+    """
+    Explicitly triggered by the user to sync their generated Carrera workout to Intervals.icu
+    so that it flows to Watchletic on the Apple Watch.
+    """
+    success = await enviar_a_intervals(payload.phases)
+    return {
+        "status": "ok" if success else "error",
+        "msg": "Sincronizado correctamente con Apple Watch (Watchletic)" if success else "No se pudo sincronizar. Verifica las credenciales de Intervals.icu."
+    }
 
 # Create static folder if it doesn't exist
 os.makedirs("static", exist_ok=True)

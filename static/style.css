@@ -1,40 +1,43 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 :root {
-  --bg-primary: #FAF9F6;
+  --bg-primary: #F7F7FA;
   --bg-card: #FFFFFF;
-  --text-primary: #18181B;
-  --text-secondary: #52525B;
-  --accent-fuerza: #F43F5E;
-  --accent-carrera: #3B82F6;
-  --accent-success: #10B981;
-  --bg-fuerza: #FFF1F2;
-  --bg-carrera: #EFF6FF;
-  --border-radius: 24px;
-  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  --shadow: 0 10px 30px -10px rgba(24, 24, 27, 0.04), 0 1px 3px rgba(24, 24, 27, 0.02);
+  --text-primary: #242428;
+  --text-secondary: #6E6E73;
+  --accent-fuerza: #242428;
+  --accent-carrera: #FC5200; /* Strava Orange */
+  --accent-success: #00B060; /* Strava Green */
+  --bg-fuerza: #EBEBEF;
+  --bg-carrera: #FFEBE0;
+  --border-radius: 16px; /* Sporty, less rounded borders */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --shadow: 0 4px 12px rgba(36, 36, 40, 0.04), 0 1px 3px rgba(36, 36, 40, 0.02);
+  --border-color: #E6E6EB;
 
   /* Guided session tokens */
-  --guided-bg: #09090B;
-  --guided-card: #18181B;
-  --guided-text: #F4F4F5;
-  --guided-text-dim: #A1A1AA;
+  --guided-bg: #121212;
+  --guided-card: #1E1E1F;
+  --guided-text: #F5F5F7;
+  --guided-text-dim: #8E8E93;
   --guided-border: rgba(255,255,255,0.08);
-  --guided-accent-fuerza: #FB7185;
-  --guided-accent-carrera: #60A5FA;
-  --guided-accent-rest: #34D399;
+  --guided-accent-fuerza: #F5F5F7;
+  --guided-accent-carrera: #FC5200;
+  --guided-accent-rest: #00B060;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg-primary: #09090B;
-    --bg-card: #18181B;
-    --text-primary: #F4F4F5;
-    --text-secondary: #A1A1AA;
-    --bg-fuerza: #2E1018;
-    --bg-carrera: #0C1E36;
-    --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3);
+    --bg-primary: #121212;
+    --bg-card: #1E1E1F;
+    --text-primary: #F5F5F7;
+    --text-secondary: #8E8E93;
+    --bg-fuerza: #2D2D2E;
+    --bg-carrera: #3D1C0C;
+    --shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    --border-color: #2D2D2E;
+    --accent-fuerza: #F5F5F7;
   }
 }
 
@@ -69,127 +72,138 @@ body {
 
 /* Header */
 header {
-  margin-top: 20px;
+  margin-top: 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .brand-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%; /* Circle profile photo look */
   object-fit: cover;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1.5px solid #FC5200;
 }
 
 .brand-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--text-primary);
-  opacity: 0.8;
+  font-size: 0.95rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em; /* Sporty tracked look */
+  color: #FC5200; /* Strava Orange */
 }
 
 .main-heading {
-  font-size: 2.2rem;
-  font-weight: 800;
-  line-height: 1.15;
-  letter-spacing: -0.03em;
-  background: linear-gradient(135deg, var(--text-primary) 30%, var(--text-secondary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-size: 2rem;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+  color: var(--text-primary);
+  text-transform: uppercase;
 }
+
 
 /* Status Banner */
 .status-banner {
   background: var(--bg-card);
   border-radius: var(--border-radius);
-  padding: 20px;
+  padding: 16px;
   display: flex;
-  justify-content: space-around;
   box-shadow: var(--shadow);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
 }
 
 .status-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  flex: 1;
   text-align: center;
 }
 
+.status-item:not(:last-child) {
+  border-right: 1px solid var(--border-color);
+}
+
 .status-label {
-  font-size: 0.75rem;
-  font-weight: 500;
+  order: 2; /* Visual reverse order */
+  font-size: 0.68rem;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-secondary);
 }
 
 .status-value {
-  font-size: 1.1rem;
-  font-weight: 700;
+  order: 1; /* Visual reverse order */
+  font-size: 1.2rem;
+  font-weight: 800; /* Extra bold like Strava */
   color: var(--text-primary);
 }
 
 .status-value.highlight {
-  color: var(--accent-fuerza);
+  color: var(--accent-carrera); /* Highlight running / next training in Strava Orange */
 }
+
 
 /* Main Cards */
 .workout-card {
   background: var(--bg-card);
   border-radius: var(--border-radius);
-  padding: 30px;
+  padding: 24px;
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  gap: 20px;
+  border: 1px solid var(--border-color);
+  animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .card-header {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .badge {
-  padding: 8px 16px;
-  border-radius: 100px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
+  padding: 4px 10px;
+  border-radius: 4px; /* Sporty, crisp borders */
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
 .badge.fuerza {
   background-color: var(--bg-fuerza);
-  color: var(--accent-fuerza);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
 
 .badge.carrera {
   background-color: var(--bg-carrera);
   color: var(--accent-carrera);
+  border: 1px solid rgba(252, 82, 0, 0.15);
 }
 
 .card-title {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.4rem;
+  font-weight: 800;
+
   letter-spacing: -0.02em;
 }
 
@@ -398,9 +412,9 @@ header {
 
 .btn {
   width: 100%;
-  padding: 18px 24px;
-  border-radius: 18px;
-  font-size: 1rem;
+  padding: 16px 24px;
+  border-radius: 8px; /* Crisp, athletic border radius */
+  font-size: 0.95rem;
   font-weight: 700;
   border: none;
   cursor: pointer;
@@ -409,38 +423,51 @@ header {
   justify-content: center;
   gap: 10px;
   transition: var(--transition);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
   font-family: var(--font-sans);
 }
 
 .btn-primary {
-  background-color: var(--text-primary);
-  color: var(--bg-primary);
+  background-color: #FC5200; /* Strava Orange */
+  color: #FFFFFF;
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-  opacity: 0.9;
+  background-color: #E34A00;
 }
 
-.btn-primary:active { transform: translateY(0); }
+.btn-primary:active {
+  background-color: #C74100;
+}
 
 .btn-secondary {
   background-color: var(--bg-card);
-  color: var(--text-secondary);
-  border: 1px solid rgba(24, 24, 27, 0.08);
-}
-
-@media (prefers-color-scheme: dark) {
-  .btn-secondary { border-color: rgba(244, 244, 245, 0.08); }
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
 
 .btn-secondary:hover {
   background-color: var(--bg-primary);
-  color: var(--text-primary);
-  transform: translateY(-1px);
 }
+
+.btn-fuerza {
+  background-color: var(--accent-fuerza);
+  color: var(--bg-card);
+}
+
+.btn-fuerza:hover {
+  opacity: 0.9;
+}
+
+.btn-carrera {
+  background-color: var(--accent-carrera);
+  color: #FFFFFF;
+}
+
+.btn-carrera:hover {
+  background-color: #E34A00;
+}
+
+
 
 /* Offline Banner */
 .offline-banner {

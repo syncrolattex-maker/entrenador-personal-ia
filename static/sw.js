@@ -1,4 +1,4 @@
-const CACHE_NAME = "ai-flow-cache-v5";
+const CACHE_NAME = "ai-flow-cache-v6";
 const ASSETS = [
   "/",
   "/index.html",
@@ -12,7 +12,7 @@ self.addEventListener("install", (e) => {
   self.skipWaiting(); // activate immediately
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log("[Service Worker] Caching all static assets v5");
+      console.log("[Service Worker] Caching all static assets v6");
       return cache.addAll(ASSETS);
     })
   );
