@@ -1,7 +1,30 @@
+// Global Error Boundary for Mobile Debugging
+window.addEventListener("error", (event) => {
+  const bannerId = "js-error-debug-banner";
+  if (document.getElementById(bannerId)) return;
+  const banner = document.createElement("div");
+  banner.id = bannerId;
+  banner.style.position = "fixed";
+  banner.style.top = "0";
+  banner.style.left = "0";
+  banner.style.width = "100%";
+  banner.style.background = "#FEF2F2";
+  banner.style.borderBottom = "2px solid #EF4444";
+  banner.style.color = "#991B1B";
+  banner.style.padding = "16px";
+  banner.style.zIndex = "999999";
+  banner.style.fontSize = "0.78rem";
+  banner.style.fontFamily = "monospace";
+  banner.style.lineHeight = "1.4";
+  banner.innerHTML = `<strong>Error de JS detectado:</strong><br>${event.message}<br>en ${event.filename.split('/').pop()}:${event.lineno}:${event.colno}`;
+  document.body.appendChild(banner);
+});
+
 // ============================================================
 // SERVICE WORKER
 // ============================================================
 if ("serviceWorker" in navigator) {
+
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("/sw.js")
@@ -206,7 +229,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v12"; // Bumped version for chat persistence
+    const APP_VERSION = "v13"; // Bumped version for global error boundary
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
