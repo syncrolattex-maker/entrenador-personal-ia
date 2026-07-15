@@ -196,7 +196,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v7"; // Bumped version for Coach chat & Veronica profile
+    const APP_VERSION = "v8"; // Bumped version for fix
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
@@ -335,10 +335,8 @@ function renderWorkout(workout) {
 
   const isFuerza = workout.tipo_sesion === "Fuerza";
 
-  // Update "Empezar" button style
-  elBtnEmpezar.className = `btn btn-primary guided-action-btn${isFuerza ? "" : " carrera"}`;
-
   if (isFuerza) {
+
     elWorkoutBadge.className = "badge fuerza";
     elWorkoutBadge.textContent = "Fuerza • Glúteos y Piernas";
 
