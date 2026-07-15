@@ -524,9 +524,10 @@ async def get_recomendacion_hoy():
         print("Gemini recommendation error:", e)
         return {
             "recomendacion": "Fuerza",
-            "razon": "Error conectando con la IA. Te aconsejamos Fuerza para el día de hoy, Verónica.",
+            "razon": f"Error conectando con la IA: {str(e)}",
             "explicacion_semanal": "No se pudo obtener el análisis semanal debido a un error de conexión."
         }
+
 
 @app.post("/generar-entrenamiento")
 async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
@@ -687,7 +688,8 @@ async def post_chat_coach(payload: ChatCoachRequest):
         
     except Exception as e:
         print("Chat Coach error:", e)
-        return {"respuesta": f"Lo siento Verónica, he tenido un pequeño problema de conexión al procesar tu mensaje. ¿Me lo puedes repetir?"}
+        return {"respuesta": f"Lo siento Verónica, he tenido un problema de conexión: {str(e)}"}
+
 
 # Create static folder if it doesn't exist
 os.makedirs("static", exist_ok=True)
