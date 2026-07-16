@@ -219,9 +219,18 @@ function updateOnlineStatus() {
 // BOOT — FETCH RECOMMENDATION
 // ============================================================
 async function initApp() {
-  showLoading(true, "Consultando plan semanal con la IA...");
   hideSuccessBanner();
   mostrarPantallaSeleccion();
+
+  const elRecommendationBox = document.getElementById("recommendation-box");
+  const elRecTipoLabel = document.getElementById("rec-tipo-label");
+  const elRecRazonText = document.getElementById("rec-razon-text");
+  
+  if (elRecommendationBox) {
+    elRecommendationBox.classList.add("loading-pulse");
+    if (elRecTipoLabel) elRecTipoLabel.textContent = "...";
+    if (elRecRazonText) elRecRazonText.textContent = "Analizando tu actividad con la Coach Verónica...";
+  }
 
   try {
     // 1. Get database status
@@ -229,7 +238,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v14"; // Bumped version for quota fix cache purge
+    const APP_VERSION = "v15"; // Bumped version for server cache and non-blocking dashboard
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
@@ -247,7 +256,7 @@ async function initApp() {
     if (cachedRec && cachedRecDate === todayStr) {
       console.log("[Cache] Serving today's recommendation from localStorage.");
       renderRecommendation(JSON.parse(cachedRec));
-      showLoading(false);
+      if (elRecommendationBox) elRecommendationBox.classList.remove("loading-pulse");
       return;
     }
 
@@ -279,9 +288,10 @@ async function initApp() {
       explicacion_semanal: "Modo de recuperación offline."
     });
   } finally {
-    showLoading(false);
+    if (elRecommendationBox) elRecommendationBox.classList.remove("loading-pulse");
   }
 }
+
 
 function updateStatsBanner() {
   elStatusUltimo.textContent    = state.db.ultimo_entreno || "Ninguno";

@@ -952,3 +952,14 @@ header {
   50% { transform: translateY(-4px); }
 }
 
+.loading-pulse {
+  animation: pulse-bg 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse-bg {
+  0% { opacity: 0.55; }
+  50% { opacity: 0.95; }
+  100% { opacity: 0.55; }
+}
+
+

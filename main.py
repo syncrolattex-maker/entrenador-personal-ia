@@ -31,6 +31,13 @@ db = {
     "historial_entrenamientos": []
 }
 
+# Server-side cache for daily recommendation
+cached_recommendation_data = {
+    "date": "",
+    "data": None
+}
+
+
 # --- Pydantic Models for Webhook ---
 class WebhookPayload(BaseModel):
     tipo: Literal["Fuerza", "Carrera"]
@@ -416,7 +423,12 @@ def webhook_iphone(payload: WebhookPayload):
     Endpoint for iOS shortcut webhook.
     Updates the simulated database and appends metrics to the history log.
     """
+    global cached_recommendation_data
+    cached_recommendation_data["date"] = ""
+    cached_recommendation_data["data"] = None
+
     if payload.completado:
+
         db["dias_sin_entrenar"] = 0
         db["ultimo_entreno"] = payload.tipo
         db["siguiente_bloque"] = "Carrera" if payload.tipo == "Fuerza" else "Fuerza"
@@ -449,7 +461,12 @@ async def post_registrar_actividad(payload: ActividadCompletadaPayload):
     Called by the PWA guided session on completion.
     Registers the activity in Intervals.icu and updates local DB history.
     """
+    global cached_recommendation_data
+    cached_recommendation_data["date"] = ""
+    cached_recommendation_data["data"] = None
+
     db["dias_sin_entrenar"] = 0
+
     db["ultimo_entreno"] = payload.tipo
     db["siguiente_bloque"] = "Carrera" if payload.tipo == "Fuerza" else "Fuerza"
 
@@ -481,6 +498,13 @@ async def get_recomendacion_hoy():
     Generates today's personalized recommendation for Verónica (43, 1.77m, 59kg, Alcàsser)
     evaluating her actual activity history from Intervals.icu.
     """
+    global cached_recommendation_data
+    from datetime import date
+    today_str = date.today().isoformat()
+    if cached_recommendation_data["date"] == today_str and cached_recommendation_data["data"] is not None:
+        print("[Cache Server] Returning cached recommendation for today.")
+        return cached_recommendation_data["data"]
+
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         return {
@@ -491,6 +515,7 @@ async def get_recomendacion_hoy():
         
     try:
         real_history = await get_intervals_history()
+
         client = genai.Client(api_key=api_key)
         
         system_instruction = (
@@ -569,7 +594,13 @@ async def get_recomendacion_hoy():
         
         rec_data = json.loads(response.text)
         rec_data["ultimo_entreno_detalles"] = ultimo_entreno_detalles
+        
+        # Save to server-side cache
+        cached_recommendation_data["date"] = today_str
+        cached_recommendation_data["data"] = rec_data
+        
         return rec_data
+
         
     except Exception as e:
         print("Gemini recommendation error:", e)
