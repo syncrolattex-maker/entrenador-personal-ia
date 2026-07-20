@@ -1457,6 +1457,49 @@ body {
   margin-bottom: 6px;
 }
 
+/* MuscleWiki Explorer Styles */
+.mw-chip {
+  background: var(--surface-container-highest, #282827);
+  color: var(--on-surface-variant, #C5C6C0);
+  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
+  border-radius: var(--rounded-full, 9999px);
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mw-chip:hover {
+  background: var(--surface-container-high, #353534);
+  color: var(--on-surface, #E5E2E1);
+}
+
+.mw-chip.active {
+  background: rgba(195, 244, 0, 0.15);
+  color: var(--primary, #C3F400);
+  border-color: var(--primary, #C3F400);
+  box-shadow: 0 0 12px rgba(195, 244, 0, 0.2);
+}
+
+.musclewiki-exercise-card {
+  background: var(--surface-container-lowest, #141413);
+  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
+  border-radius: var(--rounded-md, 12px);
+  padding: 12px;
+  margin-bottom: 10px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.musclewiki-exercise-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(195, 244, 0, 0.3);
+}
+
 
 
 

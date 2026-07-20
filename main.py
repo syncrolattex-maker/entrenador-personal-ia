@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 import exercisedb
+import musclewiki
 
 load_dotenv()
 
@@ -919,6 +920,26 @@ async def get_ejercicios_catalog():
     return {
         "status": "ok",
         "ejercicios": exercisedb.get_all_fallback_exercises()
+    }
+
+
+@app.get("/api/musclewiki/categorias")
+async def get_musclewiki_categories_endpoint():
+    """Returns MuscleWiki muscle group categories"""
+    return {
+        "status": "ok",
+        "categorias": musclewiki.MUSCLEWIKI_CATEGORIES
+    }
+
+
+@app.get("/api/musclewiki/ejercicios")
+async def get_musclewiki_ejercicios_endpoint(categoria: Optional[str] = "all"):
+    """Returns MuscleWiki exercises filtered by muscle category"""
+    ejercicios = musclewiki.get_musclewiki_exercises_by_category(categoria)
+    return {
+        "status": "ok",
+        "categoria": categoria,
+        "ejercicios": ejercicios
     }
 
 
