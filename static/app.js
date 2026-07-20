@@ -1343,6 +1343,15 @@ function switchTab(tabId) {
 }
 
 
+function getMondayOfCurrentWeek() {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(now.setDate(diff));
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+}
+
 function renderMetricsTab(history, coachText) {
   const elMetricsHistoryList = document.getElementById("metrics-history-list");
   const elMetricFuerzaCount = document.getElementById("metric-fuerza-count");
@@ -1359,9 +1368,23 @@ function renderMetricsTab(history, coachText) {
   let carreraCount = 0;
   
   if (history && history.length > 0) {
+    const monday = getMondayOfCurrentWeek();
+    
     history.forEach(act => {
-      if (act.tipo === "Fuerza") fuerzaCount++;
-      if (act.tipo === "Carrera") carreraCount++;
+      let actDate = null;
+      if (act.fecha === "Hoy") {
+        actDate = new Date();
+      } else if (act.fecha === "Ayer") {
+        actDate = new Date();
+        actDate.setDate(actDate.getDate() - 1);
+      } else if (act.fecha) {
+        actDate = new Date(act.fecha);
+      }
+      
+      if (actDate && actDate >= monday) {
+        if (act.tipo === "Fuerza") fuerzaCount++;
+        if (act.tipo === "Carrera") carreraCount++;
+      }
     });
   }
   

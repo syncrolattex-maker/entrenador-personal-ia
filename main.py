@@ -653,6 +653,9 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict) -> dict:
         last_type = ultimo_detalles.get("tipo", last_type)
         
         today_date = datetime.now().date()
+        monday_date = today_date - timedelta(days=today_date.weekday())
+        monday_str = monday_date.strftime("%Y-%m-%d")
+        
         try:
             last_date = datetime.strptime(ultimo_detalles["fecha"], "%Y-%m-%d").date()
             diff_days = (today_date - last_date).days
@@ -662,20 +665,22 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict) -> dict:
         except Exception:
             pass
             
-        for act in sorted_history[:7]:
-            t = act.get("tipo", "")
-            if t == "Fuerza":
-                fuerza_count_7d += 1
-            elif t == "Carrera":
-                carrera_count_7d += 1
-                name_lower = (act.get("nombre") or "").lower()
-                if any(q in name_lower for q in ["fartlek", "interval", "serie", "velocidad", "calidad"]):
-                    has_quality_run_7d = True
+        for act in sorted_history:
+            act_date_str = act.get("fecha", "")
+            if act_date_str >= monday_str:
+                t = act.get("tipo", "")
+                if t == "Fuerza":
+                    fuerza_count_7d += 1
+                elif t == "Carrera":
+                    carrera_count_7d += 1
+                    name_lower = (act.get("nombre") or "").lower()
+                    if any(q in name_lower for q in ["fartlek", "interval", "serie", "velocidad", "calidad"]):
+                        has_quality_run_7d = True
 
     # Apply Athletic Directives for Verónica (43a, 1.77m, 59kg, 5kg dumbbells, bands, Alcàsser)
     rec_tipo = "Fuerza"
     razon = ""
-    explicacion_semanal = f"Historial semanal de tu reloj: {fuerza_count_7d}/3 Fuerza • {carrera_count_7d}/2 Carrera."
+    explicacion_semanal = f"Esta semana (Lunes-Domingo): {fuerza_count_7d}/3 Fuerza • {carrera_count_7d}/2 Carrera."
 
     if days_inactive >= 2:
         if last_type == "Fuerza":
