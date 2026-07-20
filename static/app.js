@@ -238,7 +238,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v17"; // Bumped version for real-time unified chat workout reconfiguration
+    const APP_VERSION = "v18"; // Bumped version for PERFORMANCE designer mockups implementation
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
@@ -1272,6 +1272,23 @@ function enviarTextoChat(texto) {
     enviarMensajeChat();
   }
 }
+
+function switchTab(tabId) {
+  const tabs = document.querySelectorAll(".tab-view");
+  tabs.forEach(t => t.classList.remove("active"));
+  
+  const navBtns = document.querySelectorAll(".nav-tab-btn");
+  navBtns.forEach(b => b.classList.remove("active"));
+  
+  const targetTab = document.getElementById(tabId);
+  if (targetTab) targetTab.classList.add("active");
+  
+  const activeBtn = document.querySelector(`.nav-tab-btn[data-target="${tabId}"]`);
+  if (activeBtn) activeBtn.classList.add("active");
+  
+  if (window.lucide) lucide.createIcons();
+}
+
 
 
 
