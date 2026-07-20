@@ -1477,12 +1477,7 @@ function guardarPreferenciasEntrenamiento() {
   localStorage.setItem("user_workout_preferences", JSON.stringify(userPrefs));
   
   // Update metrics bars target count with new goals
-  const elMetricFuerzaSub = document.getElementById("metric-fuerza-sub");
-  const elMetricCarreraSub = document.getElementById("metric-carrera-sub");
-  if (elMetricFuerzaSub) elMetricFuerzaSub.textContent = `META SEMANAL CONFIGURADA: ${state.prefFuerzaDays} SESIONES`;
-  if (elMetricCarreraSub) elMetricCarreraSub.textContent = `META SEMANAL CONFIGURADA: ${state.prefCarreraDays} SESIONES`;
-
-  if (state.history) {
+      if (state.history) {
     renderMetricsTab(state.history, state.lastCoachText || "");
   }
 
@@ -1493,55 +1488,47 @@ function guardarPreferenciasEntrenamiento() {
 const EXERCISE_MEDIA_MAP = [
   {
     keywords: ["zancada", "lunge"],
-    gif: "https://upload.wikimedia.org/wikipedia/commons/1/18/Lunges_1.gif",
+    gif: "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Lunges/0.jpg",
     animClass: "anim-lunge",
     muscle: "CUÁDRICEPS Y GLÚTEOS",
     tempo: "3s Bajada • 1s Pausa • 1s Empuje",
     cues: "Mantén el torso erguido. La rodilla trasera desciende rozando el suelo."
   },
   {
-    keywords: ["sentadilla", "squat"],
-    gif: "https://upload.wikimedia.org/wikipedia/commons/8/82/Squats.gif",
+    keywords: ["sentadilla", "squat", "goblet"],
+    gif: "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Goblet_Squat/0.jpg",
     animClass: "anim-squat",
     muscle: "TREN INFERIOR • GLÚTEOS",
     tempo: "3s Bajar • 1s Pausa • 1s Subir",
     cues: "Peso en talones, rodillas alineadas con las puntas de los pies."
   },
   {
-    keywords: ["peso muerto", "deadlift"],
-    gif: "https://upload.wikimedia.org/wikipedia/commons/a/a2/Barbell_Deadlift.gif",
+    keywords: ["peso muerto", "deadlift", "puente", "hip thrust"],
+    gif: "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Glute_Bridge/0.jpg",
     animClass: "anim-squat",
     muscle: "CADENA POSTERIOR • GLÚTEO",
     tempo: "3s Bajar • 1s Apretar Glúteo",
     cues: "Empuja la cadera atrás manteniendo la columna totalmente neutra."
   },
   {
-    keywords: ["hip thrust", "puente"],
-    gif: "https://upload.wikimedia.org/wikipedia/commons/8/82/Squats.gif",
-    animClass: "anim-squat",
-    muscle: "GLÚTEO MAYOR Y CORE",
-    tempo: "2s Subir • 2s Pausa Arriba",
-    cues: "Espalda apoyada, contrae fuertemente glúteos arriba."
-  },
-  {
-    keywords: ["press", "hombro", "militar"],
-    gif: "https://upload.wikimedia.org/wikipedia/commons/9/91/Shoulder_press.gif",
+    keywords: ["press", "hombro", "militar", "elevaciones"],
+    gif: "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Shoulder_Press/0.jpg",
     animClass: "anim-press",
     muscle: "EMPUJE • DELTOIDES Y TRÍCEPS",
     tempo: "1s Empujar • 3s Controlar Bajada",
     cues: "Abdomen tenso, empuja vertical sin arquear la zona lumbar."
   },
   {
-    keywords: ["remo", "row"],
-    gif: "https://upload.wikimedia.org/wikipedia/commons/a/a0/Dumbbell_Row.gif",
+    keywords: ["remo", "row", "pull"],
+    gif: "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Bent_Over_Two-Dumbbell_Row/0.jpg",
     animClass: "anim-row",
     muscle: "TRACCIÓN • DORSAL Y ESCÁPULAS",
     tempo: "1s Tirar • 1s Apretar Escápulas",
     cues: "Tracciona el codo hacia la cadera apretando las escápulas atrás."
   },
   {
-    keywords: ["plancha", "plank", "core", "bicho"],
-    gif: "https://upload.wikimedia.org/wikipedia/commons/a/a6/Plank.gif",
+    keywords: ["plancha", "plank", "core", "bicho", "escaladores"],
+    gif: "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Plank/0.jpg",
     animClass: "anim-plank",
     muscle: "CORE • ESTABILIZACIÓN ABDOMINAL",
     tempo: "Tensión Isométrica Constante",
@@ -1566,7 +1553,7 @@ function updateGuidedVideo(exerciseName, exerciseDesc) {
 
   if (!match) {
     match = {
-      gif: "",
+      gif: "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Goblet_Squat/0.jpg",
       animClass: "anim-squat",
       muscle: "FULL-BODY • RESISTENCIA",
       tempo: "3s Bajada • 1s Pausa • 1s Empuje",
@@ -1579,6 +1566,7 @@ function updateGuidedVideo(exerciseName, exerciseDesc) {
   if (muscleEl) muscleEl.textContent = match.muscle;
 
   if (canvasEl) {
+    canvasEl.style.display = "flex";
     canvasEl.className = `biomechanics-canvas ${match.animClass}`;
   }
 
@@ -1631,36 +1619,35 @@ function openExerciseVideoModal(arg1, arg2, arg3) {
 
   if (titleEl) titleEl.textContent = name;
 
-  const gifUrl = exData?.gif_url;
-  const targetMuscle = exData?.target_muscle || exData?.equipment || "TREN INFERIOR Y SUPERIOR";
-  const instructions = exData?.instructions;
-  const tips = exData?.tips || desc;
-
-  if (muscleEl) muscleEl.textContent = `🎯 MÚSCULO: ${targetMuscle.toUpperCase()}`;
-
   const nameLower = (name || "").toLowerCase();
   let match = EXERCISE_MEDIA_MAP.find(item => item.keywords.some(k => nameLower.includes(k)));
 
-  if (tempoEl) {
-    tempoEl.textContent = match ? match.tempo : "3s Bajada • 1s Pausa • 1s Empuje";
+  const gifUrl = exData?.gif_url || (match ? match.gif : "");
+  const targetMuscle = exData?.target_muscle || (match ? match.muscle : "TREN INFERIOR Y SUPERIOR");
+  const instructions = exData?.instructions;
+  const tips = exData?.tips || desc || (match ? match.cues : "");
+
+  if (muscleEl) muscleEl.textContent = `🎯 MÚSCULO: ${targetMuscle.toUpperCase()}`;
+  if (tempoEl) tempoEl.textContent = match ? match.tempo : "3s Bajada • 1s Pausa • 1s Empuje";
+
+  if (canvasEl) {
+    canvasEl.style.display = "flex";
+    canvasEl.className = `biomechanics-canvas ${match ? match.animClass : 'anim-squat'}`;
   }
 
   if (gifUrl && imgEl) {
     imgEl.src = gifUrl;
     imgEl.style.display = "block";
-    imgEl.onload = () => { imgEl.style.display = "block"; };
-    imgEl.onerror = () => { imgEl.style.display = "none"; };
-    if (canvasEl) canvasEl.style.display = "none";
-  } else if (match && match.gif && imgEl) {
-    imgEl.src = match.gif;
-    imgEl.style.display = "block";
-    if (canvasEl) canvasEl.style.display = "none";
+    imgEl.onload = () => {
+      imgEl.style.display = "block";
+    };
+    imgEl.onerror = () => {
+      imgEl.style.display = "none";
+      if (canvasEl) canvasEl.style.display = "flex";
+    };
   } else if (imgEl) {
     imgEl.style.display = "none";
-    if (canvasEl) {
-      canvasEl.style.display = "flex";
-      canvasEl.className = `biomechanics-canvas ${match ? match.animClass : 'anim-squat'}`;
-    }
+    if (canvasEl) canvasEl.style.display = "flex";
   }
 
   if (instructions && instructions.length > 0) {
@@ -1672,7 +1659,7 @@ function openExerciseVideoModal(arg1, arg2, arg3) {
     }
     if (cuesEl) cuesEl.innerHTML = stepsHtml;
   } else {
-    if (cuesEl) cuesEl.textContent = desc || "Mantén la postura erguida y tensión constante con tus pesas de 5kg o cintas.";
+    if (cuesEl) cuesEl.textContent = tips || "Mantén la postura erguida y tensión constante con tus pesas de 5kg o cintas.";
   }
 
   modal.style.display = "flex";
