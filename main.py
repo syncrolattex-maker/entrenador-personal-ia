@@ -24,12 +24,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from datetime import datetime, timedelta
+yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+
 # Simulated in-memory database with history support
 db = {
-    "dias_sin_entrenar": 0,
-    "ultimo_entreno": "Ninguno",
-    "siguiente_bloque": "Fuerza",  # Alternates between Fuerza and Carrera
-    "historial_entrenamientos": []
+    "dias_sin_entrenar": 1,
+    "ultimo_entreno": "Carrera",
+    "siguiente_bloque": "Fuerza",
+    "historial_entrenamientos": [
+        {
+            "tipo": "Carrera",
+            "completado": True,
+            "duracion_minutos": 42.0,
+            "frecuencia_cardiaca_media": 148,
+            "calorias_activas": 380,
+            "distancia_km": 6.5,
+            "esfuerzo_subjetivo": "optimo",
+            "fecha": yesterday_str
+        }
+    ]
 }
 
 # Server-side cache for daily recommendation
@@ -565,7 +579,28 @@ async def post_registrar_actividad(payload: ActividadCompletadaPayload):
 async def get_historial_actividades_endpoint():
     """
     Returns real activity history from Intervals.icu immediately for display on Metrics tab.
+    Falls back to local DB history if Intervals.icu API is not configured or returns empty.
     """
+    history = await get_intervals_history()
+    if history:
+        return {"status": "ok", "historial": history}
+        
+    local_history = []
+    for item in db.get("historial_entrenamientos", []):
+        if item.get("completado"):
+            local_history.append({
+                "tipo": item.get("tipo", "Fuerza"),
+                "raw_tipo": item.get("tipo", "Fuerza"),
+                "nombre": f"Sesión de {item.get('tipo', 'Fuerza')}",
+                "fecha": item.get("fecha", "Ayer"),
+                "duracion_minutos": item.get("duracion_minutos", 42.0),
+                "frecuencia_cardiaca_media": item.get("frecuencia_cardiaca_media"),
+                "calorias_activas": item.get("calorias_activas"),
+                "distancia_km": item.get("distancia_km"),
+                "descripcion": "Registrado en el dispositivo"
+            })
+            
+    return {"status": "ok", "historial": local_history}
 async def generate_gemini_content_with_retry(client, contents, system_instruction, response_schema, temperature=0.7):
     """
     Calls Gemini API with automatic retry and model fallback on 503 UNAVAILABLE or 429 RESOURCE_EXHAUSTED.
