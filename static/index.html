@@ -524,7 +524,44 @@
     </div>
   </div>
 
+  <!-- ===================== EXERCISE VIDEO DEMO MODAL ===================== -->
+  <div id="exercise-video-modal" class="guided-overlay" style="display: none; justify-content: center; align-items: center; padding: 20px; z-index: 9999;">
+    <div class="glass-card" style="width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; position: relative; padding: 20px;">
+      <button onclick="closeExerciseVideoModal()" class="guided-close-btn" style="position: absolute; top: 14px; right: 14px;" aria-label="Cerrar">
+        <i data-lucide="x" style="width:20px;height:20px;"></i>
+      </button>
+
+      <span class="label-caps" style="color: var(--primary);">VÍDEO DEMOSTRATIVO DE TÉCNICA</span>
+      <h3 id="modal-video-title" class="headline-sm" style="margin: 6px 0 14px 0;">-</h3>
+
+      <div class="video-container" style="border-radius: var(--rounded-md); overflow: hidden; margin-bottom: 14px; height: 210px;">
+        <video id="modal-exercise-video" class="guided-video-element" autoplay loop muted playsinline>
+          <source id="modal-video-source" src="" type="video/mp4">
+        </video>
+        <div id="modal-video-fallback" class="video-fallback-animation">
+          <div class="exercise-anim-icon" id="modal-exercise-icon">🏋️‍♀️</div>
+          <span class="label-caps" style="color: var(--primary); margin-top: 6px;">ASISTENTE VEROFIT</span>
+        </div>
+      </div>
+
+      <div class="technique-tempo-bar" style="border-radius: var(--rounded-md); margin-bottom: 12px;">
+        <span class="label-caps" style="color: var(--secondary);">TEMPO Y RITMO:</span>
+        <span id="modal-video-tempo" class="label-caps" style="color: var(--primary);">3s Bajada • 1s Pausa • 1s Empuje</span>
+      </div>
+
+      <div style="background: var(--surface-container-lowest); padding: 12px; border-radius: var(--rounded-md); border: 1px solid var(--border-glass);">
+        <span class="label-caps" style="color: var(--secondary); display: block; margin-bottom: 4px;">CONSEJOS DE POSTURA Y FORM:</span>
+        <p id="modal-video-cues" class="body-sm" style="color: var(--on-surface); line-height: 1.5; margin: 0;"></p>
+      </div>
+
+      <button onclick="closeExerciseVideoModal()" class="btn btn-primary" style="width: 100%; margin-top: 16px;">
+        Entendido
+      </button>
+    </div>
+  </div>
+
   <!-- App Logic script -->
-  <script src="/app.js?v=22"></script>
+  <script src="/app.js?v=30"></script>
 </body>
 </html>
+

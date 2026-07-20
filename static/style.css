@@ -1164,6 +1164,29 @@ body {
   color: var(--on-surface);
 }
 
+.btn-video-demo-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(195, 244, 0, 0.12);
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: var(--rounded-full);
+  cursor: pointer;
+  margin-top: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-video-demo-chip:hover {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+
 /* Assisted Video Player in Guided Workout Screen */
 .guided-video-card {
   width: 100%;

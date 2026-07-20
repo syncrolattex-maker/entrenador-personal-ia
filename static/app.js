@@ -238,7 +238,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v29"; // Autonomous Plan B Sports Science Diagnostic & Planning Engine
+    const APP_VERSION = "v30"; // Interactive Video Demonstration Cards & Exercise Preview Modals
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
@@ -477,18 +477,24 @@ function renderWorkout(workout) {
 
     let html = '<div class="exercise-list">';
     workout.ejercicios.forEach(ex => {
+      const safeName = encodeURIComponent(ex.nombre || '');
+      const safeDesc = encodeURIComponent(ex.descripcion || '');
       html += `
-        <div class="exercise-item">
-          <div class="exercise-info">
+        <div class="exercise-item" style="flex-wrap: wrap;">
+          <div class="exercise-info" style="flex: 1; min-width: 200px;">
             <span class="exercise-name">${ex.nombre}</span>
             <span class="exercise-sets">${ex.series} series</span>
             ${ex.descripcion ? `<span class="exercise-desc">${ex.descripcion}</span>` : ""}
+            <button class="btn-video-demo-chip" onclick="openExerciseVideoModal('${safeName}', '${safeDesc}')">
+              <i data-lucide="play-circle" style="width:14px;height:14px;"></i> Ver Vídeo Demostrativo
+            </button>
           </div>
           <span class="exercise-reps">${ex.repeticiones}</span>
         </div>`;
     });
     html += "</div>";
     elWorkoutContent.innerHTML = html;
+
 
     elWorkoutActions.innerHTML = `
       <button id="btn-empezar-fuerza" class="btn btn-primary guided-action-btn">
@@ -1496,10 +1502,64 @@ function updateGuidedVideo(exerciseName, exerciseDesc) {
     videoEl.style.display = "block";
     if (fallbackEl) fallbackEl.style.display = "none";
   } else {
+  }
+}
+
+function openExerciseVideoModal(encodedName, encodedDesc) {
+  const name = decodeURIComponent(encodedName || '');
+  const desc = decodeURIComponent(encodedDesc || '');
+
+  const modal = document.getElementById("exercise-video-modal");
+  const titleEl = document.getElementById("modal-video-title");
+  const videoEl = document.getElementById("modal-exercise-video");
+  const videoSrc = document.getElementById("modal-video-source");
+  const fallbackEl = document.getElementById("modal-video-fallback");
+  const iconEl = document.getElementById("modal-exercise-icon");
+  const tempoEl = document.getElementById("modal-video-tempo");
+  const cuesEl = document.getElementById("modal-video-cues");
+
+  if (!modal) return;
+
+  if (titleEl) titleEl.textContent = name;
+
+  const nameLower = (name || "").toLowerCase();
+  let match = EXERCISE_MEDIA_MAP.find(item => item.keywords.some(k => nameLower.includes(k)));
+
+  if (!match) {
+    match = {
+      video: "",
+      icon: "🏋️‍♀️",
+      tempo: "3s Bajada • 1s Pausa • 1s Empuje",
+      cues: desc || "Mantén la postura erguida y tensión constante con tus pesas o cintas."
+    };
+  }
+
+  if (iconEl) iconEl.textContent = match.icon;
+  if (tempoEl) tempoEl.textContent = match.tempo;
+  if (cuesEl) cuesEl.textContent = desc || match.cues;
+
+  if (match.video && videoEl && videoSrc) {
+    videoSrc.src = match.video;
+    videoEl.load();
+    videoEl.play().catch(() => {});
+    videoEl.style.display = "block";
+    if (fallbackEl) fallbackEl.style.display = "none";
+  } else {
     if (videoEl) videoEl.style.display = "none";
     if (fallbackEl) fallbackEl.style.display = "flex";
   }
+
+  modal.style.display = "flex";
+  if (window.lucide) lucide.createIcons();
 }
+
+function closeExerciseVideoModal() {
+  const modal = document.getElementById("exercise-video-modal");
+  const videoEl = document.getElementById("modal-exercise-video");
+  if (videoEl) videoEl.pause();
+  if (modal) modal.style.display = "none";
+}
+
 
 
 
