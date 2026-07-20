@@ -15,7 +15,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
   
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="/style.css?v=20">
+  <link rel="stylesheet" href="/style.css?v=21">
 
   <!-- Icons & Kinetic Fonts (Hanken Grotesk & JetBrains Mono) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -33,7 +33,7 @@
           <span>🏃‍♀️</span>
         </div>
         <span class="app-brand-name">PERFORMANCE</span>
-        <span class="version-tag">v20</span>
+        <span class="version-tag">v21</span>
       </div>
       <div class="topbar-right">
         <div class="athlete-pill">
@@ -47,7 +47,7 @@
     <main class="tab-content-area">
       
       <!-- ================================================================= -->
-      <!-- TAB 1: DASHBOARD (PANEL DE ENTRENAMIENTO DE VERÓNICA) -->
+      <!-- TAB 1: DASHBOARD -->
       <!-- ================================================================= -->
       <section id="tab-dashboard" class="tab-view active">
         
@@ -88,7 +88,7 @@
             </svg>
             <div class="ring-text-center">
               <span id="daily-goal-percent" class="metric-xl">85<small>%</small></span>
-              <span class="label-caps">ESTADO OPTIMO</span>
+              <span class="label-caps">ESTADO ÓPTIMO</span>
             </div>
           </div>
 
@@ -116,19 +116,17 @@
               <span id="last-workout-tipo" class="pill-tag">-</span>
             </div>
             <div id="last-workout-stats" class="last-workout-stats">
-              <!-- Injected dynamically: Duración, FC, Distancia, Calorías -->
+              <!-- Injected dynamically -->
             </div>
             <p id="last-workout-desc" class="body-sm-muted" style="display: none; border-top: 1px solid var(--border-glass); padding-top: 6px; margin-top: 4px;"></p>
           </div>
         </div>
 
-        <!-- Main Selection Container (Always visible for non-blocking start) -->
+        <!-- Main Selection Container -->
         <div id="selection-card" class="workout-selector-wrap">
           <span class="label-caps" style="text-align: center; display: block; margin-bottom: 8px;">¿QUÉ VAS A ENTRENAR HOY?</span>
           
           <div class="selection-grid">
-            
-            <!-- Fuerza Full-Body -->
             <button id="btn-select-fuerza" class="selection-btn">
               <div class="btn-icon-wrap lime-glow">
                 <i data-lucide="dumbbell" style="width: 22px; height: 22px;"></i>
@@ -140,7 +138,6 @@
               <i data-lucide="chevron-right" class="arrow-icon"></i>
             </button>
 
-            <!-- Carrera / Running -->
             <button id="btn-select-carrera" class="selection-btn">
               <div class="btn-icon-wrap cyan-glow">
                 <i data-lucide="footprints" style="width: 22px; height: 22px;"></i>
@@ -152,7 +149,6 @@
               <i data-lucide="chevron-right" class="arrow-icon"></i>
             </button>
 
-            <!-- Día de Descanso -->
             <button id="btn-select-descanso" class="selection-btn">
               <div class="btn-icon-wrap rest-glow">
                 <i data-lucide="coffee" style="width: 22px; height: 22px;"></i>
@@ -163,11 +159,10 @@
               </div>
               <i data-lucide="chevron-right" class="arrow-icon"></i>
             </button>
-
           </div>
         </div>
 
-        <!-- Routine Display Card (Populated dynamically when Fuerza or Carrera is selected or reconfigured) -->
+        <!-- Routine Display Card -->
         <div id="workout-card" class="glass-card workout-display-card" style="display: none;">
           <div class="workout-display-header">
             <span id="workout-badge" class="upcoming-badge">SESIÓN DESIGNADA</span>
@@ -182,15 +177,11 @@
             <span id="decision-text" class="body-md"></span>
           </div>
 
-          <div id="workout-content" class="workout-content-area">
-            <!-- Injected Exercise List or Running Phases -->
-          </div>
+          <div id="workout-content" class="workout-content-area"></div>
 
           <p id="workout-note" class="workout-note-text body-sm-muted"></p>
 
-          <div id="workout-actions" class="workout-actions-container">
-            <!-- Injected Action Buttons: Start Guided Session, Sync Watchletic, etc. -->
-          </div>
+          <div id="workout-actions" class="workout-actions-container"></div>
         </div>
 
         <!-- Loading State Overlay -->
@@ -202,97 +193,61 @@
       </section>
 
       <!-- ================================================================= -->
-      <!-- TAB 2: METRICS (MÉTRICAS Y RENDIMIENTO REAL) -->
+      <!-- TAB 2: METRICS (MÉTRICAS Y HISTORIAL REAL EN VIVO DE VERÓNICA) -->
       <!-- ================================================================= -->
       <section id="tab-metrics" class="tab-view">
         <div class="greeting-header">
-          <span class="label-caps">WEEKLY PERFORMANCE</span>
-          <h1 class="greeting-title">Rendimiento Físico</h1>
+          <span class="label-caps">RENDIMIENTO REAL • INTERVALS.ICU</span>
+          <h1 class="greeting-title">Historial de Verónica</h1>
+          <p class="body-sm-muted">Actividades reales registradas por tu Apple Watch / Reloj</p>
         </div>
 
-        <!-- Output Velocity Chart Card -->
-        <div class="glass-card metrics-chart-card">
-          <div class="chart-header">
-            <span class="label-caps">CARGA Y ASIMILACIÓN</span>
-            <span class="time-pill">ÚLTIMOS 14 DÍAS</span>
-          </div>
-          <h2 class="headline-md">Volumen Semanal</h2>
-          
-          <div class="wave-chart-mockup">
-            <svg viewBox="0 0 300 80" class="wave-svg">
-              <path d="M0,50 Q40,45 80,55 T160,35 T240,25 T300,30 L300,80 L0,80 Z" fill="url(#limeGradient)" opacity="0.25"/>
-              <path d="M0,50 Q40,45 80,55 T160,35 T240,25 T300,30" fill="none" stroke="#c3f400" stroke-width="3"/>
-              <defs>
-                <linearGradient id="limeGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#c3f400"/>
-                  <stop offset="100%" stop-color="#c3f400" stop-opacity="0"/>
-                </linearGradient>
-              </defs>
-            </svg>
-            <div class="wave-days label-caps">
-              <span>LUN</span><span>MAR</span><span>MIÉ</span><span>JUE</span><span>VIE</span><span>SÁB</span><span>DOM</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Metric Bars -->
+        <!-- Real Balance Progress: Fuerza -->
         <div class="glass-card metric-card lime-border">
           <div class="metric-header">
             <i data-lucide="dumbbell" class="metric-icon lime"></i>
-            <span class="label-caps">FUERZA FULL-BODY (5KG & CINTAS)</span>
+            <span class="label-caps">FUERZA FULL-BODY (MANCUERNAS 5KG & CINTAS)</span>
           </div>
           <div class="metric-value-row">
-            <span class="metric-xl">84<small>%</small></span>
+            <span id="metric-fuerza-count" class="metric-xl">2<small> / 3 ses</small></span>
           </div>
           <div class="progress-bar-wrap">
-            <div class="progress-fill lime" style="width: 84%;"></div>
+            <div id="metric-fuerza-bar" class="progress-fill lime" style="width: 66%;"></div>
           </div>
-          <span class="label-caps" style="color: var(--text-muted); margin-top: 4px;">META: 2-3 SESIONES SEMANALES</span>
+          <span id="metric-fuerza-sub" class="label-caps" style="color: var(--text-muted); margin-top: 4px;">META SEMANAL: 2 A 3 SESIONES</span>
         </div>
 
+        <!-- Real Balance Progress: Carrera -->
         <div class="glass-card metric-card cyan-border">
           <div class="metric-header">
             <i data-lucide="zap" class="metric-icon cyan"></i>
-            <span class="label-caps">CARRERA AERÓBICA ZONA 2 (WATCHLETIC)</span>
+            <span class="label-caps">CARRERA (ZONA 2 & MÁX 1 CALIDAD)</span>
           </div>
           <div class="metric-value-row">
-            <span class="metric-xl">62<small>%</small></span>
+            <span id="metric-carrera-count" class="metric-xl">1<small> / 2 ses</small></span>
           </div>
           <div class="progress-bar-wrap">
-            <div class="progress-fill cyan" style="width: 62%;"></div>
+            <div id="metric-carrera-bar" class="progress-fill cyan" style="width: 50%;"></div>
           </div>
-          <span class="label-caps" style="color: var(--text-muted); margin-top: 4px;">MÁXIMO 1 SESIÓN CALIDAD / SEMANA</span>
+          <span id="metric-carrera-sub" class="label-caps" style="color: var(--text-muted); margin-top: 4px;">META SEMANAL: 1 A 2 SESIONES</span>
         </div>
 
-        <!-- System Recovery Card -->
-        <div class="glass-card recovery-card">
-          <span class="label-caps">RECUPERACIÓN DEL SISTEMA</span>
-          <div class="recovery-gauge">
-            <div class="gauge-center">
-              <span class="headline-md" style="font-size: 2.2rem; font-weight: 800;">90</span>
-              <span class="label-caps" style="color: var(--primary);">ÓPTIMO</span>
-            </div>
-          </div>
-          <div class="recovery-stats-grid">
-            <div class="rec-stat-item">
-              <span class="label-caps">Asimilación</span>
-              <span class="body-md" style="font-weight: 700;">Excelente</span>
-            </div>
-            <div class="rec-stat-item">
-              <span class="label-caps">Variabilidad FC</span>
-              <span class="body-md" style="font-weight: 700;">78 ms</span>
-            </div>
+        <!-- Real Activity Timeline List from Intervals.icu -->
+        <div class="metrics-history-wrap">
+          <span class="label-caps" style="display: block; margin-bottom: 10px;">REGISTRO DE SESIONES REALES (ÚLTIMOS 14 DÍAS)</span>
+          <div id="metrics-history-list" class="metrics-history-list">
+            <!-- Dynamically populated by renderMetricsTab() -->
           </div>
         </div>
 
-        <!-- Coach Insights Box -->
+        <!-- Dynamic Coach Diagnosis Box -->
         <div class="glass-card coach-insights-card">
           <div class="insights-header">
-            <div class="icon-circle">💡</div>
-            <h3 class="headline-md">Diagnóstico de la Coach</h3>
+            <div class="icon-circle">🧠</div>
+            <h3 class="headline-md">Diagnóstico de Asimilación</h3>
           </div>
-          <p class="body-md">
-            Verónica, tu capacidad aeróbica y fuerza muscular progresan un <strong style="color: var(--primary);">14% esta semana</strong>. Tus marcadores de recuperación en Intervals.icu indican que estás lista para tu siguiente bloque.
+          <p id="metrics-coach-text" class="body-md">
+            Analizando tu historial de actividad...
           </p>
           <button class="btn btn-primary" onclick="switchTab('tab-dashboard')">VER PLAN DE HOY</button>
         </div>
@@ -300,11 +255,11 @@
       </section>
 
       <!-- ================================================================= -->
-      <!-- TAB 3: COACH IA (CHAT & RECONFIGURACIÓN EN TIEMPO REAL) -->
+      <!-- TAB 3: COACH IA -->
       <!-- ================================================================= -->
       <section id="tab-chat" class="tab-view">
         <div class="greeting-header">
-          <span class="label-caps">ENTRENADORA PERSONAL</span>
+          <span class="label-caps">INTELLIGENT COACHING</span>
           <h1 class="greeting-title">Coach Verónica</h1>
         </div>
 
@@ -341,7 +296,7 @@
       </section>
 
       <!-- ================================================================= -->
-      <!-- TAB 4: PROFILE (PERFIL COMPLETO DE VERÓNICA) -->
+      <!-- TAB 4: PROFILE -->
       <!-- ================================================================= -->
       <section id="tab-profile" class="tab-view">
         <div class="glass-card profile-header-card">
@@ -397,7 +352,7 @@
           </div>
         </div>
 
-        <!-- Equipment & Preferences Card -->
+        <!-- Equipment Card -->
         <div class="glass-card equipment-card">
           <span class="label-caps">EQUIPAMIENTO & PREFERENCIAS DEL SISTEMA</span>
           <div class="equipment-tags">
@@ -422,7 +377,7 @@
       <i data-lucide="plus" style="width: 24px; height: 24px;"></i>
     </button>
 
-    <!-- Bottom Dock Navigation Bar (Kinetic Obsidian Specs) -->
+    <!-- Bottom Dock Navigation Bar -->
     <nav class="bottom-dock-nav">
       <button class="nav-tab-btn active" data-target="tab-dashboard" onclick="switchTab('tab-dashboard')">
         <i data-lucide="layout-grid" class="tab-icon"></i>
@@ -431,7 +386,7 @@
 
       <button class="nav-tab-btn" data-target="tab-metrics" onclick="switchTab('tab-metrics')">
         <i data-lucide="trending-up" class="tab-icon"></i>
-        <span class="label-caps tab-label">Metrics</span>
+        <span class="label-caps tab-label">Métricas</span>
       </button>
 
       <button class="nav-tab-btn" data-target="tab-chat" onclick="switchTab('tab-chat')">
@@ -441,7 +396,7 @@
 
       <button class="nav-tab-btn" data-target="tab-profile" onclick="switchTab('tab-profile')">
         <i data-lucide="user" class="tab-icon"></i>
-        <span class="label-caps tab-label">Profile</span>
+        <span class="label-caps tab-label">Perfil</span>
       </button>
     </nav>
 
@@ -521,6 +476,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=20"></script>
+  <script src="/app.js?v=21"></script>
 </body>
 </html>

@@ -591,6 +591,8 @@ async def get_recomendacion_hoy():
         
         rec_data = json.loads(response.text)
         rec_data["ultimo_entreno_detalles"] = ultimo_entreno_detalles
+        rec_data["historial_real"] = real_history
+
         
         # Save to server-side cache
         cached_recommendation_data["date"] = today_str

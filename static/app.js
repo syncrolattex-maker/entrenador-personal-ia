@@ -394,8 +394,12 @@ function renderRecommendation(rec) {
     elLastWorkoutBox.style.display = "none";
   }
 
+  // Render dynamic real metrics tab with Intervals.icu history
+  renderMetricsTab(rec.historial_real || [], rec.razon);
+
   // Show chat card
   if (elCoachChatCard) elCoachChatCard.style.display = "flex";
+
 
   // Persistent Chat History loading
   const savedChat = localStorage.getItem("coach_chat_history");
@@ -1288,6 +1292,70 @@ function switchTab(tabId) {
   
   if (window.lucide) lucide.createIcons();
 }
+
+function renderMetricsTab(history, coachText) {
+  const elMetricsHistoryList = document.getElementById("metrics-history-list");
+  const elMetricFuerzaCount = document.getElementById("metric-fuerza-count");
+  const elMetricFuerzaBar = document.getElementById("metric-fuerza-bar");
+  const elMetricCarreraCount = document.getElementById("metric-carrera-count");
+  const elMetricCarreraBar = document.getElementById("metric-carrera-bar");
+  const elMetricsCoachText = document.getElementById("metrics-coach-text");
+  
+  if (elMetricsCoachText && coachText) {
+    elMetricsCoachText.textContent = coachText;
+  }
+  
+  let fuerzaCount = 0;
+  let carreraCount = 0;
+  
+  if (history && history.length > 0) {
+    history.forEach(act => {
+      if (act.tipo === "Fuerza") fuerzaCount++;
+      if (act.tipo === "Carrera") carreraCount++;
+    });
+  }
+  
+  if (elMetricFuerzaCount) elMetricFuerzaCount.innerHTML = `${fuerzaCount}<small> / 3 ses</small>`;
+  if (elMetricFuerzaBar) elMetricFuerzaBar.style.width = `${Math.min(100, Math.round((fuerzaCount / 3) * 100))}%`;
+  if (elMetricCarreraCount) elMetricCarreraCount.innerHTML = `${carreraCount}<small> / 2 ses</small>`;
+  if (elMetricCarreraBar) elMetricCarreraBar.style.width = `${Math.min(100, Math.round((carreraCount / 2) * 100))}%`;
+
+  if (elMetricsHistoryList) {
+    if (!history || history.length === 0) {
+      elMetricsHistoryList.innerHTML = `<p class="body-sm-muted" style="text-align:center; padding: 20px 0;">No hay actividades registradas en Intervals.icu en los últimos 14 días.</p>`;
+      return;
+    }
+
+    let html = "";
+    history.forEach(act => {
+      const isFuerza = act.tipo === "Fuerza";
+      const borderClass = isFuerza ? "fuerza" : "carrera";
+      const tagClass = isFuerza ? "lime" : "cyan";
+      
+      let statsPills = `<span class="stat-chip">⏱️ ${Math.round(act.duracion_minutos)} min</span>`;
+      if (act.frecuencia_cardiaca_media) statsPills += `<span class="stat-chip">❤️ ${Math.round(act.frecuencia_cardiaca_media)} ppm</span>`;
+      if (act.distancia_km) statsPills += `<span class="stat-chip">📏 ${act.distancia_km} km</span>`;
+      if (act.calorias_activas) statsPills += `<span class="stat-chip">🔥 ${Math.round(act.calorias_activas)} kcal</span>`;
+      
+      html += `
+        <div class="history-card-item ${borderClass}">
+          <div class="history-card-header">
+            <span class="label-caps">${act.fecha}</span>
+            <span class="pill-tag ${tagClass}">${act.tipo}</span>
+          </div>
+          <div class="history-title-row">
+            <span class="headline-sm">${act.nombre || 'Sesión de ' + act.tipo}</span>
+          </div>
+          <div class="history-stat-chips">
+            ${statsPills}
+          </div>
+        </div>
+      `;
+    });
+    elMetricsHistoryList.innerHTML = html;
+  }
+}
+
 
 
 

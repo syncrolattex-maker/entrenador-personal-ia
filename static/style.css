@@ -1035,3 +1035,63 @@ body {
   stroke-width: 8;
   stroke-dasharray: 339; stroke-dashoffset: 0;
 }
+
+/* Real Activity History Cards in Metrics Tab */
+.metrics-history-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.metrics-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-card-item {
+  background: var(--surface-container-low);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--rounded-lg);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-card-item.fuerza {
+  border-left: 4px solid var(--primary);
+}
+
+.history-card-item.carrera {
+  border-left: 4px solid var(--secondary);
+}
+
+.history-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.history-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.history-stat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stat-chip {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  background: var(--surface-container-highest);
+  border: 1px solid var(--border-glass);
+  padding: 3px 8px;
+  border-radius: var(--rounded-sm);
+  color: var(--on-surface-variant);
+}
+
