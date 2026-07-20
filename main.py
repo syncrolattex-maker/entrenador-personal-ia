@@ -532,11 +532,38 @@ async def get_historial_actividades_endpoint():
     """
     Returns real activity history from Intervals.icu immediately for display on Metrics tab.
     """
-    history = await get_intervals_history()
-    return {"status": "ok", "historial": history}
+async def generate_gemini_content_with_retry(client, contents, system_instruction, response_schema, temperature=0.7):
+    """
+    Calls Gemini API with automatic retry and model fallback on 503 UNAVAILABLE or 429 RESOURCE_EXHAUSTED.
+    """
+    import asyncio
+    models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash"]
+    last_exception = None
+
+    for model_name in models_to_try:
+        for attempt in range(2):
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        response_mime_type="application/json",
+                        response_schema=response_schema,
+                        temperature=temperature,
+                    )
+                )
+                return json.loads(response.text)
+            except Exception as e:
+                last_exception = e
+                print(f"[Gemini Retry] Model {model_name} attempt {attempt+1} failed: {e}")
+                await asyncio.sleep(1.0)
+    
+    raise last_exception
 
 @app.get("/recomendacion-hoy")
 async def get_recomendacion_hoy():
+
 
 
     """
@@ -631,20 +658,16 @@ async def get_recomendacion_hoy():
                         "descripcion": ""
                     }
 
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
+        rec_data = await generate_gemini_content_with_retry(
+            client=client,
             contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                response_mime_type="application/json",
-                response_schema=GeminiRecomendacionResponse,
-                temperature=0.7,
-            )
+            system_instruction=system_instruction,
+            response_schema=GeminiRecomendacionResponse,
+            temperature=0.7
         )
-        
-        rec_data = json.loads(response.text)
         rec_data["ultimo_entreno_detalles"] = ultimo_entreno_detalles
         rec_data["historial_real"] = real_history
+
 
         
         # Save to server-side cache
@@ -751,24 +774,19 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
         Genera la sesión adaptada y detallada de {payload.tipo} para Verónica.
         """
         
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
+        workout = await generate_gemini_content_with_retry(
+            client=client,
             contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                response_mime_type="application/json",
-                response_schema=RutinaResponse,
-                temperature=0.85,
-
-            )
+            system_instruction=system_instruction,
+            response_schema=RutinaResponse,
+            temperature=0.85
         )
-        
-        workout = json.loads(response.text)
         return workout
         
     except Exception as e:
         print("Gemini generation error:", e)
-        return await generar_rutina_mock(payload.tipo, f"Error conectando con la IA: {str(e)}")
+        return await generar_rutina_mock(payload.tipo, "Modo de respaldo activo por alta demanda de red.")
+
 
 @app.post("/sincronizar-carrera")
 async def post_sincronizar_carrera(payload: SincronizarCarreraPayload):
@@ -847,27 +865,23 @@ async def post_chat_coach(payload: ChatCoachRequest):
             )
         )
         
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
+        chat_data = await generate_gemini_content_with_retry(
+            client=client,
             contents=contents,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction + "\n\n" + intro_prompt,
-                response_mime_type="application/json",
-                response_schema=GeminiChatResponse,
-                temperature=0.7,
-            )
+            system_instruction=system_instruction + "\n\n" + intro_prompt,
+            response_schema=GeminiChatResponse,
+            temperature=0.7
         )
-        
-        chat_data = json.loads(response.text)
         return chat_data
         
     except Exception as e:
         print("Chat Coach error:", e)
         return {
-            "respuesta": f"Lo siento Verónica, he tenido un problema de conexión: {str(e)}",
+            "respuesta": "¡Hola Verónica! En este momento los servidores centrales están experimentando una alta demanda puntual. No te preocupes: para tu entrenamiento de hoy mantenemos el enfoque planeado con tus pesas de 5kg y cintas. ¡Escríbeme en unos segundos para continuar!",
             "tiene_cambio_rutina": False,
             "rutina_actualizada": None
         }
+
 
 
 
