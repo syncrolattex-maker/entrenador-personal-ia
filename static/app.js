@@ -238,7 +238,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v23"; // Improved resilience & friendly fallback handling for network & quota errors
+    const APP_VERSION = "v24"; // Real-time direct sync & fetch of Apple Watch activities for Metrics tab
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
@@ -248,24 +248,38 @@ async function initApp() {
       localStorage.setItem("cached_version", APP_VERSION);
     }
 
-    // 3. Read cached recommendation for today
+    // 3. Fetch real activity history immediately for Metrics Tab
+    fetch("/historial-actividades")
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === "ok" && data.historial) {
+          state.history = data.historial;
+          renderMetricsTab(data.historial, state.lastCoachText || "");
+        }
+      })
+      .catch(e => console.error("Error fetching real history:", e));
+
+    // 4. Read cached recommendation for today
     const todayStr = new Date().toDateString();
     const cachedRec = localStorage.getItem("cached_recommendation");
     const cachedRecDate = localStorage.getItem("cached_recommendation_date");
 
     if (cachedRec && cachedRecDate === todayStr) {
       console.log("[Cache] Serving today's recommendation from localStorage.");
-      renderRecommendation(JSON.parse(cachedRec));
+      const recObj = JSON.parse(cachedRec);
+      renderRecommendation(recObj);
       if (elRecommendationBox) elRecommendationBox.classList.remove("loading-pulse");
       return;
     }
 
-    // 4. Fetch new recommendation from server
+    // 5. Fetch new recommendation from server
     const recRes = await fetch("/recomendacion-hoy");
     if (recRes.ok) {
       const recommendation = await recRes.json();
+      if (recommendation.historial_real) {
+        state.history = recommendation.historial_real;
+      }
       
-      // Only cache if it's a valid recommendation (no API error fallback)
       if (recommendation.razon && !recommendation.razon.includes("Error conectando")) {
         localStorage.setItem("cached_recommendation", JSON.stringify(recommendation));
         localStorage.setItem("cached_recommendation_date", todayStr);
@@ -273,6 +287,7 @@ async function initApp() {
       
       renderRecommendation(recommendation);
     } else {
+
       renderRecommendation({
         recomendacion: "Fuerza",
         razon: "No se pudo conectar con la IA de planificación. Te aconsejamos Fuerza hoy.",
@@ -1292,7 +1307,20 @@ function switchTab(tabId) {
   if (activeBtn) activeBtn.classList.add("active");
   
   if (window.lucide) lucide.createIcons();
+
+  if (tabId === "tab-metrics") {
+    fetch("/historial-actividades")
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === "ok" && data.historial) {
+          state.history = data.historial;
+          renderMetricsTab(data.historial, state.lastCoachText || "");
+        }
+      })
+      .catch(e => console.error("Error fetching real history on tab switch:", e));
+  }
 }
+
 
 function renderMetricsTab(history, coachText) {
   const elMetricsHistoryList = document.getElementById("metrics-history-list");

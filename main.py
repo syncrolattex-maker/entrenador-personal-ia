@@ -484,8 +484,17 @@ async def post_registrar_actividad(payload: ActividadCompletadaPayload):
         "db": db
     }
 
+@app.get("/historial-actividades")
+async def get_historial_actividades_endpoint():
+    """
+    Returns real activity history from Intervals.icu immediately for display on Metrics tab.
+    """
+    history = await get_intervals_history()
+    return {"status": "ok", "historial": history}
+
 @app.get("/recomendacion-hoy")
 async def get_recomendacion_hoy():
+
 
     """
     Generates today's personalized recommendation for Verónica (43, 1.77m, 59kg, Alcàsser)
