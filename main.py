@@ -561,14 +561,88 @@ async def generate_gemini_content_with_retry(client, contents, system_instructio
     
     raise last_exception
 
+async def generar_analisis_plan_b(real_history: List[dict], db: dict) -> dict:
+    """
+    Autonomous Athletic Diagnostic & Recommendation Engine (Plan B).
+    Evaluates Verónica's real Intervals.icu history according to sports science directives
+    without consuming Gemini API tokens.
+    """
+    from datetime import datetime
+    
+    ultimo_detalles = None
+    last_type = db.get("ultimo_entreno", "")
+    days_inactive = db.get("dias_sin_entrenar", 0)
+    
+    fuerza_count_7d = 0
+    carrera_count_7d = 0
+    has_quality_run_7d = False
+    trained_yesterday = False
+    
+    if real_history:
+        sorted_history = sorted(real_history, key=lambda x: x["fecha"], reverse=True)
+        ultimo_detalles = sorted_history[0]
+        last_type = ultimo_detalles.get("tipo", last_type)
+        
+        today_date = datetime.now().date()
+        try:
+            last_date = datetime.strptime(ultimo_detalles["fecha"], "%Y-%m-%d").date()
+            diff_days = (today_date - last_date).days
+            days_inactive = max(0, diff_days)
+            if diff_days == 1:
+                trained_yesterday = True
+        except Exception:
+            pass
+            
+        for act in sorted_history[:7]:
+            t = act.get("tipo", "")
+            if t == "Fuerza":
+                fuerza_count_7d += 1
+            elif t == "Carrera":
+                carrera_count_7d += 1
+                name_lower = (act.get("nombre") or "").lower()
+                if any(q in name_lower for q in ["fartlek", "interval", "serie", "velocidad", "calidad"]):
+                    has_quality_run_7d = True
+
+    # Apply Athletic Directives for Verónica (43a, 1.77m, 59kg, 5kg dumbbells, bands, Alcàsser)
+    rec_tipo = "Fuerza"
+    razon = ""
+    explicacion_semanal = f"Historial semanal de tu reloj: {fuerza_count_7d}/3 Fuerza • {carrera_count_7d}/2 Carrera."
+
+    if days_inactive >= 2:
+        if last_type == "Fuerza":
+            rec_tipo = "Carrera"
+            razon = f"¡Hola Verónica! Llevas {days_inactive} días de reposo. Para reactivar tu sistema cardiovascular y favorecer la quema de grasas sin sobrecargar las articulaciones, hoy Verofit te recomienda una sesión de Carrera Aeróbica en Zona 2."
+        else:
+            rec_tipo = "Fuerza"
+            razon = f"¡Hola Verónica! Tras {days_inactive} días de recuperación muscular, es el momento idóneo para estimular la densidad muscular con una sesión de Fuerza Full-Body con tus mancuernas de 5kg y cintas."
+    elif trained_yesterday:
+        if last_type == "Fuerza":
+            rec_tipo = "Carrera"
+            razon = "¡Hola Verónica! Como ayer completaste un bloque de Fuerza Full-Body, hoy alternamos con Carrera Aeróbica continua en Zona 2. Esto acelera el riego sanguíneo y oxigena la musculatura en fase de recuperación."
+        else:
+            rec_tipo = "Fuerza"
+            razon = "¡Hola Verónica! Tras la sesión de Carrera de ayer, hoy cambiamos el estímulo hacia Fuerza Full-Body. Las mancuernas de 5kg y cintas te permiten trabajar la fuerza-resistencia muscular sin impacto articular."
+    else:
+        if fuerza_count_7d <= carrera_count_7d:
+            rec_tipo = "Fuerza"
+            razon = "¡Hola Verónica! Para mantener el balance semanal ideal de 2 a 3 sesiones de Fuerza, hoy prescribimos un entrenamiento de Fuerza Full-Body (Cuerpo Completo) de 45 minutos."
+        else:
+            rec_tipo = "Carrera"
+            razon = "¡Hola Verónica! Para complementar tus bloques de musculación con trabajo cardiovascular de base, hoy Verofit te recomienda una sesión de Carrera aeróbica suave en Zona 2."
+
+    return {
+        "recomendacion": rec_tipo,
+        "razon": razon,
+        "explicacion_semanal": explicacion_semanal,
+        "ultimo_entreno_detalles": ultimo_detalles,
+        "historial_real": real_history
+    }
+
 @app.get("/recomendacion-hoy")
 async def get_recomendacion_hoy():
-
-
-
     """
     Generates today's personalized recommendation for Verónica (43, 1.77m, 59kg, Alcàsser)
-    evaluating her actual activity history from Intervals.icu.
+    evaluating her actual activity history from Intervals.icu via Plan B engine.
     """
     global cached_recommendation_data
     from datetime import date
@@ -577,138 +651,18 @@ async def get_recomendacion_hoy():
         print("[Cache Server] Returning cached recommendation for today.")
         return cached_recommendation_data["data"]
 
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        return {
-            "recomendacion": "Fuerza",
-            "razon": "Hola Verónica. IA local offline. Te recomendamos Fuerza para mantener el balance semanal.",
-            "explicacion_semanal": "Modo offline."
-        }
-        
     try:
         real_history = await get_intervals_history()
-
-        client = genai.Client(api_key=api_key)
+        # PLAN B ENGINE: Fast, reliable, 0 token consumption!
+        rec_data = await generar_analisis_plan_b(real_history, db)
         
-        system_instruction = (
-            "Eres la Coach IA de **Verofit**, el entrenador personal inteligente de **Verónica**, una atleta de 43 años, "
-            "de Alcàsser (Valencia), que mide 1.77 m y pesa 59 kg (cuerpo atlético y magro, extremidades largas).\n\n"
-
-            "INSTRUCCIONES DE PLANIFICACIÓN Y BALANCE:\n"
-            "1. Dirígete a ella de forma cálida, profesional y motivadora llamándola siempre por su nombre ('Verónica').\n"
-            "2. Examina el historial de actividades de los últimos 14 días provisto (de su reloj e Intervals.icu):\n"
-            "   - Fuerza: Meta ideal de 2 a 3 veces por semana de Cuerpo Completo (Full-body).\n"
-            "   - Carrera: Meta de 1 a 2 veces por semana (máximo 1 sesión de intensidad por semana, el resto rodamientos suaves Zona 2).\n"
-            "3. REGLA DE BALANCE ACTIVO (IMPORTANTÍSIMO):\n"
-            "   - Recomienda 'Descanso' ÚNICAMENTE si en el historial figura que Verónica hizo un entrenamiento exigente AYER o si ha encadenado 3 o más días consecutivos de entrenamiento.\n"
-            "   - Si Verónica NO entrenó ayer (o si la última sesión fue hace 2 o más días), NUNCA recomiendes 'Descanso'. Recomienda obligatoriamente 'Fuerza' o 'Carrera' para mantenerla activa y progresando.\n"
-            "   - Si su última sesión fue 'Carrera', hoy recomiéndale 'Fuerza'. Si su última sesión fue 'Fuerza', hoy recomiéndale 'Carrera' (o 'Fuerza' si no ha corrido esta semana).\n"
-            "4. Explica de forma motivadora y científica (biomecánica o fisiológicamente, ej. asimilación de cargas, supercompensación) tu decisión.\n"
-            "5. Ten en cuenta el clima cálido/húmedo mediterráneo de Alcàsser para aconsejar sobre hidratación o momento del día si corre hoy.\n"
-            "6. Devuelve un JSON estrictamente según el esquema RecomendacionResponse."
-        )
-
-        
-        historial_str = ""
-        if real_history:
-            historial_str = "Historial de entrenamientos reales (últimos 10 días de Intervals.icu):\n"
-            for log in real_history:
-                dist_str = f", Distancia: {log['distancia_km']} km" if log['distancia_km'] else ""
-                fc_str = f", FC Media: {log['frecuencia_cardiaca_media']} ppm" if log['frecuencia_cardiaca_media'] else ""
-                historial_str += f"- Fecha {log['fecha']}: {log['tipo']} ({log['nombre']}). Duración: {log['duracion_minutos']} min{dist_str}{fc_str}\n"
-        else:
-            historial_str = "No hay historial disponible. Recomienda Fuerza para reactivar."
-
-        prompt = f"""
-        Último entreno local trackeado: {db['ultimo_entreno']}.
-        Días acumulados sin entrenar: {db['dias_sin_entrenar']}.
-        {historial_str}
-        
-        Genera la recomendación inteligente de hoy para Verónica.
-        """
-        
-        # Determine the last completed workout to display to Verónica
-        ultimo_entreno_detalles = None
-        if real_history:
-            # Sort real history to get the newest
-            sorted_history = sorted(real_history, key=lambda x: x["fecha"], reverse=True)
-            newest = sorted_history[0]
-            ultimo_entreno_detalles = {
-                "tipo": newest["tipo"],
-                "nombre": newest["nombre"],
-                "fecha": newest["fecha"],
-                "duracion_minutos": newest["duracion_minutos"],
-                "frecuencia_cardiaca_media": newest["frecuencia_cardiaca_media"],
-                "calorias_activas": newest["calorias_activas"],
-                "distancia_km": newest["distancia_km"],
-                "descripcion": newest["descripcion"]
-            }
-        else:
-            if db["historial_entrenamientos"]:
-                newest = next((x for x in reversed(db["historial_entrenamientos"]) if x.get("completado")), None)
-                if newest:
-                    ultimo_entreno_detalles = {
-                        "tipo": newest["tipo"],
-                        "nombre": newest["tipo"],
-                        "fecha": newest.get("fecha", "Ayer"),
-                        "duracion_minutos": newest.get("duracion_minutos", 0.0),
-                        "frecuencia_cardiaca_media": newest.get("frecuencia_cardiaca_media"),
-                        "calorias_activas": newest.get("calorias_activas"),
-                        "distancia_km": newest.get("distancia_km"),
-                        "descripcion": ""
-                    }
-
-        rec_data = await generate_gemini_content_with_retry(
-            client=client,
-            contents=prompt,
-            system_instruction=system_instruction,
-            response_schema=GeminiRecomendacionResponse,
-            temperature=0.7
-        )
-        rec_data["ultimo_entreno_detalles"] = ultimo_entreno_detalles
-        rec_data["historial_real"] = real_history
-
-
-        
-        # Save to server-side cache
         cached_recommendation_data["date"] = today_str
         cached_recommendation_data["data"] = rec_data
-        
         return rec_data
-
-        
     except Exception as e:
-        print("Gemini recommendation error:", e)
-        ultimo_entreno_detalles = None
-        if 'real_history' in locals() and real_history:
-            try:
-                newest = sorted(real_history, key=lambda x: x["fecha"], reverse=True)[0]
-                ultimo_entreno_detalles = newest
-            except Exception:
-                pass
-        elif db.get("historial_entrenamientos"):
-            newest = next((x for x in reversed(db["historial_entrenamientos"]) if x.get("completado")), None)
-            if newest:
-                ultimo_entreno_detalles = {
-                    "tipo": newest["tipo"],
-                    "nombre": newest["tipo"],
-                    "fecha": newest.get("fecha", "Ayer"),
-                    "duracion_minutos": newest.get("duracion_minutos", 0.0),
-                    "frecuencia_cardiaca_media": newest.get("frecuencia_cardiaca_media"),
-                    "calorias_activas": newest.get("calorias_activas"),
-                    "distancia_km": newest.get("distancia_km"),
-                    "descripcion": ""
-                }
-        
-        # Friendly recommendation fallback (No raw 429 error text)
-        rec_type = "Fuerza" if db.get("ultimo_entreno") == "Carrera" else "Carrera"
-        return {
-            "recomendacion": rec_type,
-            "razon": f"¡Hola Verónica! Para mantener un excelente tono muscular y balance semanal con tus mancuernas de 5kg y cintas, hoy te sugerimos una sesión de {rec_type}.",
-            "explicacion_semanal": "Modo de recuperación activa. Manteniendo tu frecuencia objetivo.",
-            "ultimo_entreno_detalles": ultimo_entreno_detalles,
-            "historial_real": real_history if 'real_history' in locals() else []
-        }
+        print("Error in recommendation engine:", e)
+        return await generar_analisis_plan_b([], db)
+
 
 
 

@@ -238,7 +238,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v28"; // Video-Assisted Guided Strength Workout Player
+    const APP_VERSION = "v29"; // Autonomous Plan B Sports Science Diagnostic & Planning Engine
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
