@@ -472,24 +472,35 @@ function renderWorkout(workout) {
   const isFuerza = workout.tipo_sesion === "Fuerza";
 
   if (isFuerza) {
+    window.currentRoutineExercises = workout.ejercicios;
     elWorkoutBadge.className = "badge fuerza";
-    elWorkoutBadge.textContent = "Fuerza • Glúteos y Piernas";
+    elWorkoutBadge.textContent = "Fuerza • Cintas & Pesas 5kg";
 
     let html = '<div class="exercise-list">';
-    workout.ejercicios.forEach(ex => {
-      const safeName = encodeURIComponent(ex.nombre || '');
-      const safeDesc = encodeURIComponent(ex.descripcion || '');
+    workout.ejercicios.forEach((ex, idx) => {
+      const targetMuscle = ex.target_muscle || "Full Body";
+      const equipment = ex.equipment || "Pesas 5kg / Cintas";
+      const gifUrl = ex.gif_url || "";
+      
       html += `
-        <div class="exercise-item" style="flex-wrap: wrap;">
-          <div class="exercise-info" style="flex: 1; min-width: 200px;">
-            <span class="exercise-name">${ex.nombre}</span>
-            <span class="exercise-sets">${ex.series} series</span>
-            ${ex.descripcion ? `<span class="exercise-desc">${ex.descripcion}</span>` : ""}
-            <button class="btn-video-demo-chip" onclick="openExerciseVideoModal('${safeName}', '${safeDesc}')">
-              <i data-lucide="play-circle" style="width:14px;height:14px;"></i> Ver Vídeo Demostrativo
+        <div class="exercise-item-enriched">
+          <div class="exercise-thumb-wrapper">
+            ${gifUrl ? `<img src="${gifUrl}" alt="${ex.nombre}" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\'exercise-thumb-icon\'>🏋️</span>'" />` : `<span class="exercise-thumb-icon">⚡</span>`}
+          </div>
+          <div class="exercise-info-content">
+            <div class="exercise-title-row">
+              <span class="exercise-name-text">${ex.nombre}</span>
+              <span class="exercise-reps-pill">${ex.series}× ${ex.repeticiones}</span>
+            </div>
+            <div class="exercise-tags-row">
+              <span class="ex-tag muscle">🎯 ${targetMuscle}</span>
+              <span class="ex-tag equipment">🏋️ ${equipment}</span>
+            </div>
+            ${ex.descripcion ? `<span class="body-sm-muted" style="margin-top:2px;">${ex.descripcion}</span>` : ""}
+            <button class="btn-video-demo-chip" onclick="openExerciseVideoModal(${idx})">
+              <i data-lucide="play-circle" style="width:14px;height:14px;"></i> Ver Técnica y Demostración
             </button>
           </div>
-          <span class="exercise-reps">${ex.repeticiones}</span>
         </div>`;
     });
     html += "</div>";
@@ -1558,9 +1569,32 @@ function updateGuidedVideo(exerciseName, exerciseDesc) {
   }
 }
 
-function openExerciseVideoModal(encodedName, encodedDesc) {
-  const name = decodeURIComponent(encodedName || '');
-  const desc = decodeURIComponent(encodedDesc || '');
+function openExerciseVideoModal(arg1, arg2, arg3) {
+  let name = "";
+  let desc = "";
+  let exData = null;
+
+  if (typeof arg1 === "number") {
+    const list = window.currentRoutineExercises || (state.currentWorkout ? state.currentWorkout.ejercicios : null);
+    if (list && list[arg1]) {
+      exData = list[arg1];
+    }
+  } else if (typeof arg1 === "object" && arg1 !== null) {
+    exData = arg1;
+  } else if (typeof arg1 === "string") {
+    name = decodeURIComponent(arg1 || '');
+    desc = decodeURIComponent(arg2 || '');
+    try {
+      if (arg3) exData = JSON.parse(decodeURIComponent(arg3));
+    } catch (e) {
+      console.error("Error parsing exercise details:", e);
+    }
+  }
+
+  if (exData) {
+    name = exData.nombre || exData.name || name;
+    desc = exData.descripcion || desc;
+  }
 
   const modal = document.getElementById("exercise-video-modal");
   const titleEl = document.getElementById("modal-video-title");
@@ -1574,34 +1608,48 @@ function openExerciseVideoModal(encodedName, encodedDesc) {
 
   if (titleEl) titleEl.textContent = name;
 
+  const gifUrl = exData?.gif_url;
+  const targetMuscle = exData?.target_muscle || exData?.equipment || "TREN INFERIOR Y SUPERIOR";
+  const instructions = exData?.instructions;
+  const tips = exData?.tips || desc;
+
+  if (muscleEl) muscleEl.textContent = `🎯 MÚSCULO: ${targetMuscle.toUpperCase()}`;
+
   const nameLower = (name || "").toLowerCase();
   let match = EXERCISE_MEDIA_MAP.find(item => item.keywords.some(k => nameLower.includes(k)));
 
-  if (!match) {
-    match = {
-      gif: "",
-      animClass: "anim-squat",
-      muscle: "FULL-BODY • RESISTENCIA",
-      tempo: "3s Bajada • 1s Pausa • 1s Empuje",
-      cues: desc || "Mantén la postura erguida y tensión constante con tus pesas o cintas."
-    };
+  if (tempoEl) {
+    tempoEl.textContent = match ? match.tempo : "3s Bajada • 1s Pausa • 1s Empuje";
   }
 
-  if (tempoEl) tempoEl.textContent = match.tempo;
-  if (cuesEl) cuesEl.textContent = desc || match.cues;
-  if (muscleEl) muscleEl.textContent = match.muscle;
-
-  if (canvasEl) {
-    canvasEl.className = `biomechanics-canvas ${match.animClass}`;
-  }
-
-  if (match.gif && imgEl) {
-    imgEl.src = match.gif;
+  if (gifUrl && imgEl) {
+    imgEl.src = gifUrl;
     imgEl.style.display = "block";
     imgEl.onload = () => { imgEl.style.display = "block"; };
     imgEl.onerror = () => { imgEl.style.display = "none"; };
+    if (canvasEl) canvasEl.style.display = "none";
+  } else if (match && match.gif && imgEl) {
+    imgEl.src = match.gif;
+    imgEl.style.display = "block";
+    if (canvasEl) canvasEl.style.display = "none";
   } else if (imgEl) {
     imgEl.style.display = "none";
+    if (canvasEl) {
+      canvasEl.style.display = "flex";
+      canvasEl.className = `biomechanics-canvas ${match ? match.animClass : 'anim-squat'}`;
+    }
+  }
+
+  if (instructions && instructions.length > 0) {
+    let stepsHtml = `<span class="label-caps" style="color: var(--secondary); display: block; margin-bottom: 6px;">TÉCNICA PASO A PASO:</span><ol class="exercise-instructions-list">`;
+    instructions.forEach(step => { stepsHtml += `<li>${step}</li>`; });
+    stepsHtml += `</ol>`;
+    if (tips) {
+      stepsHtml += `<div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-glass);"><span class="label-caps" style="color: var(--primary); display: block; margin-bottom: 2px;">CONSEJO DE TÉCNICA:</span><p class="body-sm" style="margin: 0; color: var(--on-surface); line-height:1.4;">${tips}</p></div>`;
+    }
+    if (cuesEl) cuesEl.innerHTML = stepsHtml;
+  } else {
+    if (cuesEl) cuesEl.textContent = desc || "Mantén la postura erguida y tensión constante con tus pesas de 5kg o cintas.";
   }
 
   modal.style.display = "flex";

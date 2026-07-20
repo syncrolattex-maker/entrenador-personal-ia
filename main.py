@@ -2,13 +2,14 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Any
 import os
 import json
 import httpx
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+import exercisedb
 
 load_dotenv()
 
@@ -65,6 +66,12 @@ class Ejercicio(BaseModel):
     series: int
     repeticiones: str
     descripcion: Optional[str] = None  # Brief execution tip for the user
+    gif_url: Optional[str] = None
+    equipment: Optional[str] = None
+    target_muscle: Optional[str] = None
+    secondary_muscles: Optional[List[str]] = None
+    instructions: Optional[List[str]] = None
+    tips: Optional[str] = None
 
 class FaseCarrera(BaseModel):
     name: str
@@ -281,6 +288,32 @@ async def enviar_a_intervals(phases: List[FaseCarrera]):
         print(f"Failed to connect to Intervals.icu: {str(e)}")
         return False
 
+async def enrich_routine_data(routine: Any) -> Any:
+    """Enriches strength exercises in a routine dictionary or model with ExerciseDB metadata."""
+    if not routine:
+        return routine
+        
+    routine_dict = routine if isinstance(routine, dict) else routine.dict()
+    
+    if routine_dict.get("tipo_sesion") == "Fuerza" and routine_dict.get("ejercicios"):
+        enriched_list = []
+        for ex in routine_dict["ejercicios"]:
+            ex_item = ex if isinstance(ex, dict) else ex.dict() if hasattr(ex, "dict") else dict(ex)
+            ex_name = ex_item.get("nombre", "")
+            if ex_name:
+                details = await exercisedb.get_enriched_exercise_details(ex_name)
+                ex_item["gif_url"] = details.get("gif_url")
+                ex_item["equipment"] = details.get("equipment")
+                ex_item["target_muscle"] = details.get("target_muscle")
+                ex_item["secondary_muscles"] = details.get("secondary_muscles")
+                ex_item["instructions"] = details.get("instructions")
+                ex_item["tips"] = details.get("tips")
+            enriched_list.append(ex_item)
+        routine_dict["ejercicios"] = enriched_list
+        
+    return routine_dict if isinstance(routine, dict) else routine_dict
+
+
 async def generar_rutina_mock(tipo: str, mensaje_warning: str = None) -> dict:
     """
     Generates a localized mock routine with dynamic daily rotation and fatigue adaptation.
@@ -343,13 +376,14 @@ async def generar_rutina_mock(tipo: str, mensaje_warning: str = None) -> dict:
                 ex["series"] = max(2, ex["series"] - 1)
             msg_adapt = "Notamos cansancio acumulado. Bajamos volumen de series para favorecer la recuperación celular."
 
-        return {
+        routine_res = {
             "tipo_sesion": "Fuerza",
             "explicacion_tipo": explicacion,
             "ejercicios": ejercicios,
             "mensaje_adaptacion": msg_adapt,
             "mensaje": mensaje_warning
         }
+        return await enrich_routine_data(routine_res)
     else:
         carrera_templates = [
             [
@@ -735,7 +769,7 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
             response_schema=RutinaResponse,
             temperature=0.85
         )
-        return workout
+        return await enrich_routine_data(workout)
         
     except Exception as e:
         print("Gemini generation error:", e)
@@ -826,6 +860,8 @@ async def post_chat_coach(payload: ChatCoachRequest):
             response_schema=GeminiChatResponse,
             temperature=0.7
         )
+        if isinstance(chat_data, dict) and chat_data.get("tiene_cambio_rutina") and chat_data.get("rutina_actualizada"):
+            chat_data["rutina_actualizada"] = await enrich_routine_data(chat_data["rutina_actualizada"])
         return chat_data
         
     except Exception as e:
@@ -835,6 +871,15 @@ async def post_chat_coach(payload: ChatCoachRequest):
             "tiene_cambio_rutina": False,
             "rutina_actualizada": None
         }
+
+
+@app.get("/api/ejercicios")
+async def get_ejercicios_catalog():
+    """Endpoint returning full ExerciseDB strength catalog with GIFs & technique details"""
+    return {
+        "status": "ok",
+        "ejercicios": exercisedb.get_all_fallback_exercises()
+    }
 
 
 
