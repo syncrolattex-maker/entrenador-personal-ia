@@ -712,6 +712,9 @@ function startGuidedSession() {
   elGuidedOverlay.style.display = "flex";
   lucide.createIcons();
 
+  unlockAudio();
+  playGoSound();
+
   if (guided.tipo === "Fuerza") {
     showFuerzaExercise();
   } else {
@@ -827,6 +830,7 @@ function showFuerzaExercise() {
 
 function onSerieDone() {
   guided.totalSeries++;
+  playSetCompleteSound();
   const ex = guided.exercises[guided.exIndex];
 
   if (guided.setIndex + 1 < ex.series) {
@@ -847,6 +851,7 @@ function onSerieDone() {
 
 function onSkipExercise() {
   clearTimer();
+  playSkipSound();
   guided.setIndex = 0;
   guided.exIndex++;
   if (guided.exIndex < guided.exercises.length) {
@@ -873,13 +878,15 @@ function startRest() {
   elGuidedTimerArc.className = "guided-timer-arc";
 
   startCountdown(REST_DURATION, () => {
-    // Auto-advance after rest
+    // Auto-advance after rest with sound ping
+    playGoSound();
     showFuerzaExercise();
   });
 }
 
 function onSkipRest() {
   clearTimer();
+  playSkipSound();
   showFuerzaExercise();
 }
 
@@ -943,6 +950,7 @@ function updatePauseBtn(isPaused) {
 function showDone() {
   clearTimer();
   guided.phase = "done";
+  playWorkoutCompleteSound();
 
   setPhaseLabel("¡COMPLETADO!", "done");
   updateProgress(true);
@@ -1123,31 +1131,139 @@ function updateTimerUI(remaining, total) {
 }
 
 // ============================================================
-// HELPERS — audio synthesize & time parsing
+// HELPERS — audio synthesize & time parsing (Web Audio API)
 // ============================================================
-function playBeep(frequency = 800, duration = 0.1) {
-  try {
+let _audioCtx = null;
+let _audioMuted = false;
+
+function getAudioCtx() {
+  if (_audioMuted) return null;
+  if (!_audioCtx) {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) return;
-    const audioCtx = new AudioContextClass();
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    
-    oscillator.type = "sine";
-    oscillator.frequency.value = frequency;
-    
-    // Low volume setting (0.05) to be warning but not piercing
-    gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    
-    oscillator.start();
-    oscillator.stop(audioCtx.currentTime + duration);
-  } catch (e) {
-    console.warn("Audio Context playback failed or blocked:", e);
+    if (AudioContextClass) {
+      _audioCtx = new AudioContextClass();
+    }
   }
+  if (_audioCtx && _audioCtx.state === "suspended") {
+    _audioCtx.resume();
+  }
+  return _audioCtx;
+}
+
+function unlockAudio() {
+  const ctx = getAudioCtx();
+  if (ctx && ctx.state === "suspended") {
+    ctx.resume();
+  }
+}
+
+function toggleAudioMute() {
+  _audioMuted = !_audioMuted;
+  const iconEl = document.getElementById("guided-audio-icon");
+  if (iconEl) {
+    iconEl.setAttribute("data-lucide", _audioMuted ? "volume-x" : "volume-2");
+    iconEl.style.color = _audioMuted ? "var(--text-muted)" : "var(--primary)";
+    if (window.lucide) lucide.createIcons();
+  }
+  showSuccessBanner(_audioMuted ? "🔇 Avisos sonoros desactivados" : "🔊 Avisos sonoros activados");
+}
+
+function playBeep(frequency = 800, duration = 0.12, type = "sine", volume = 0.15) {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.type = type;
+    osc.frequency.setValueAtTime(frequency, now);
+    gain.gain.setValueAtTime(volume, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + duration);
+  } catch (e) {}
+}
+
+function playSetCompleteSound() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(587.33, now); // D5
+    osc.frequency.exponentialRampToValueAtTime(880, now + 0.15); // A5
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.35);
+  } catch (e) {}
+}
+
+function playGoSound() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(880, now); // A5
+    osc.frequency.exponentialRampToValueAtTime(1318.51, now + 0.2); // E6
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.4);
+  } catch (e) {}
+}
+
+function playSkipSound() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(600, now);
+    osc.frequency.exponentialRampToValueAtTime(300, now + 0.15);
+    gain.gain.setValueAtTime(0.2, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.18);
+  } catch (e) {}
+}
+
+function playWorkoutCompleteSound() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6 Major chord
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(freq, now + i * 0.1);
+      gain.gain.setValueAtTime(0.3, now + i * 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.6);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + i * 0.1);
+      osc.stop(now + i * 0.1 + 0.6);
+    });
+  } catch (e) {}
 }
 
 function getDurationFromReps(repsStr) {
