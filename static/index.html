@@ -15,7 +15,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
   
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="/style.css?v=21">
+  <link rel="stylesheet" href="/style.css?v=22">
 
   <!-- Icons & Kinetic Fonts (Hanken Grotesk & JetBrains Mono) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -33,7 +33,7 @@
           <span>🏃‍♀️</span>
         </div>
         <span class="app-brand-name">PERFORMANCE</span>
-        <span class="version-tag">v21</span>
+        <span class="version-tag">v22</span>
       </div>
       <div class="topbar-right">
         <div class="athlete-pill">
@@ -193,7 +193,7 @@
       </section>
 
       <!-- ================================================================= -->
-      <!-- TAB 2: METRICS (MÉTRICAS Y HISTORIAL REAL EN VIVO DE VERÓNICA) -->
+      <!-- TAB 2: METRICS -->
       <!-- ================================================================= -->
       <section id="tab-metrics" class="tab-view">
         <div class="greeting-header">
@@ -235,9 +235,7 @@
         <!-- Real Activity Timeline List from Intervals.icu -->
         <div class="metrics-history-wrap">
           <span class="label-caps" style="display: block; margin-bottom: 10px;">REGISTRO DE SESIONES REALES (ÚLTIMOS 14 DÍAS)</span>
-          <div id="metrics-history-list" class="metrics-history-list">
-            <!-- Dynamically populated by renderMetricsTab() -->
-          </div>
+          <div id="metrics-history-list" class="metrics-history-list"></div>
         </div>
 
         <!-- Dynamic Coach Diagnosis Box -->
@@ -296,7 +294,7 @@
       </section>
 
       <!-- ================================================================= -->
-      <!-- TAB 4: PROFILE -->
+      <!-- TAB 4: PROFILE (CONFIGURACIÓN DE REGLAS Y OBJETIVOS INTERACTIVOS) -->
       <!-- ================================================================= -->
       <section id="tab-profile" class="tab-view">
         <div class="glass-card profile-header-card">
@@ -325,42 +323,72 @@
           </div>
         </div>
 
-        <!-- Current Goals Section -->
+        <!-- Interactive Configurable Goals & Rules Section -->
         <div class="goals-section">
-          <span class="label-caps">REGLAS Y OBJETIVOS DE ENTRENAMIENTO</span>
+          <span class="label-caps">CONFIGURACIÓN DE REGLAS Y ENTRENAMIENTOS</span>
 
+          <!-- Rule 1: Fuerza Full-Body Frequency -->
           <div class="glass-card goal-item-card lime-border">
             <div class="goal-item-top">
               <span class="headline-sm">FUERZA FULL-BODY (CUERPO COMPLETO)</span>
-              <i data-lucide="timer" class="goal-icon lime"></i>
+              <i data-lucide="dumbbell" class="goal-icon lime"></i>
             </div>
-            <span class="label-caps" style="color: var(--text-muted);">2-3 SESIONES/SEMANA • MANCUERNAS 5KG & CINTAS</span>
-            <div class="progress-bar-wrap">
-              <div class="progress-fill lime" style="width: 85%;"></div>
+            <span class="body-sm-muted">Selecciona el número de sesiones semanales de Fuerza:</span>
+            
+            <div class="pref-selector-grid">
+              <button class="pref-btn pref-fuerza-btn" data-val="2" onclick="setFuerzaPreference(2)">2 Días/Sem</button>
+              <button class="pref-btn pref-fuerza-btn active" data-val="3" onclick="setFuerzaPreference(3)">3 Días/Sem</button>
+              <button class="pref-btn pref-fuerza-btn" data-val="4" onclick="setFuerzaPreference(4)">4 Días/Sem</button>
             </div>
           </div>
 
+          <!-- Rule 2: Carrera Running Frequency & Quality Rule -->
           <div class="glass-card goal-item-card cyan-border">
             <div class="goal-item-top">
-              <span class="headline-sm">CARRERA AERÓBICA ZONA 2 (WATCHLETIC)</span>
-              <i data-lucide="activity" class="goal-icon cyan"></i>
+              <span class="headline-sm">CARRERA AERÓBICA (WATCHLETIC)</span>
+              <i data-lucide="footprints" class="goal-icon cyan"></i>
             </div>
-            <span class="label-caps" style="color: var(--text-muted);">1-2 SESIONES/SEMANA • MÁX 1 SESIÓN DE CALIDAD</span>
-            <div class="progress-bar-wrap">
-              <div class="progress-fill cyan" style="width: 70%;"></div>
+            <span class="body-sm-muted">Selecciona el número de sesiones semanales de Carrera:</span>
+            
+            <div class="pref-selector-grid">
+              <button class="pref-btn pref-carrera-btn" data-val="1" onclick="setCarreraPreference(1)">1 Día/Sem</button>
+              <button class="pref-btn pref-carrera-btn active" data-val="2" onclick="setCarreraPreference(2)">2 Días/Sem</button>
+              <button class="pref-btn pref-carrera-btn" data-val="3" onclick="setCarreraPreference(3)">3 Días/Sem</button>
             </div>
-          </div>
-        </div>
 
-        <!-- Equipment Card -->
-        <div class="glass-card equipment-card">
-          <span class="label-caps">EQUIPAMIENTO & PREFERENCIAS DEL SISTEMA</span>
-          <div class="equipment-tags">
-            <span class="equip-chip">🏋️‍♀️ Mancuernas de 5 kg</span>
-            <span class="equip-chip">🎗️ Bandas de Resistencia (Cintas)</span>
-            <span class="equip-chip">⌚ Apple Watch & Watchletic Sync</span>
-            <span class="equip-chip">📍 Alcàsser (Valencia)</span>
+            <div class="pref-toggle-box" style="margin-top: 10px;">
+              <label class="pref-toggle-label">
+                <input type="checkbox" id="pref-max-calidad" checked>
+                <span class="body-sm-muted">Limitar a <strong>máximo 1 sesión de calidad/semana</strong> (fartleks/series). Demás rodamientos suaves Zona 2.</span>
+              </label>
+            </div>
           </div>
+
+          <!-- Rule 3: Equipment Selection -->
+          <div class="glass-card equipment-card">
+            <span class="label-caps">MATERIALES DISPONIBLES</span>
+            <div class="equipment-tags">
+              <label class="equip-chip active">
+                <input type="checkbox" id="equip-mancuernas" checked hidden>
+                🏋️‍♀️ Mancuernas de 5 kg
+              </label>
+              <label class="equip-chip active">
+                <input type="checkbox" id="equip-cintas" checked hidden>
+                🎗️ Bandas de Resistencia (Cintas)
+              </label>
+              <label class="equip-chip active">
+                <input type="checkbox" id="equip-watch" checked hidden>
+                ⌚ Apple Watch & Watchletic Sync
+              </label>
+            </div>
+          </div>
+
+          <!-- Save Rules Button -->
+          <button id="btn-save-preferences" class="btn btn-primary" onclick="guardarPreferenciasEntrenamiento()">
+            <i data-lucide="save" style="width: 18px; height: 18px;"></i>
+            GUARDAR CONFIGURACIÓN DE ENTRENAMIENTO
+          </button>
+
         </div>
       </section>
 
@@ -369,10 +397,10 @@
     <!-- Success Floating Banner -->
     <div id="success-banner" class="success-banner-overlay" style="display: none;">
       <span class="success-icon">✨</span>
-      <span id="success-text" class="success-text">¡Sesión guardada con éxito!</span>
+      <span id="success-text" class="success-text">¡Preferencias guardadas con éxito!</span>
     </div>
 
-    <!-- Floating Action Button (+ Button) -->
+    <!-- Floating Action Button -->
     <button id="fab-action" class="fab-btn" aria-label="Acción rápida" onclick="switchTab('tab-chat')">
       <i data-lucide="plus" style="width: 24px; height: 24px;"></i>
     </button>
@@ -476,6 +504,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=21"></script>
+  <script src="/app.js?v=22"></script>
 </body>
 </html>

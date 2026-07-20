@@ -238,7 +238,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v20"; // Coherent Kinetic Obsidian integration with all Verónica features
+    const APP_VERSION = "v22"; // Interactive profile workout rules selection & preferences
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
@@ -1355,6 +1355,67 @@ function renderMetricsTab(history, coachText) {
     elMetricsHistoryList.innerHTML = html;
   }
 }
+
+// Profile Workout Rules & Preference Selectors
+state.prefFuerzaDays = 3;
+state.prefCarreraDays = 2;
+
+function setFuerzaPreference(days) {
+  state.prefFuerzaDays = days;
+  const btns = document.querySelectorAll(".pref-fuerza-btn");
+  btns.forEach(b => {
+    if (parseInt(b.getAttribute("data-val")) === days) {
+      b.classList.add("active");
+    } else {
+      b.classList.remove("active");
+    }
+  });
+}
+
+function setCarreraPreference(days) {
+  state.prefCarreraDays = days;
+  const btns = document.querySelectorAll(".pref-carrera-btn");
+  btns.forEach(b => {
+    if (parseInt(b.getAttribute("data-val")) === days) {
+      b.classList.add("active");
+    } else {
+      b.classList.remove("active");
+    }
+  });
+}
+
+function guardarPreferenciasEntrenamiento() {
+  const maxCalidad = document.getElementById("pref-max-calidad")?.checked ?? true;
+  const hasMancuernas = document.getElementById("equip-mancuernas")?.checked ?? true;
+  const hasCintas = document.getElementById("equip-cintas")?.checked ?? true;
+  const hasWatch = document.getElementById("equip-watch")?.checked ?? true;
+
+  const userPrefs = {
+    fuerzaDays: state.prefFuerzaDays,
+    carreraDays: state.prefCarreraDays,
+    maxCalidad: maxCalidad,
+    equipment: {
+      mancuernas5kg: hasMancuernas,
+      cintas: hasCintas,
+      appleWatch: hasWatch
+    }
+  };
+
+  localStorage.setItem("user_workout_preferences", JSON.stringify(userPrefs));
+  
+  // Update metrics bars target count with new goals
+  const elMetricFuerzaSub = document.getElementById("metric-fuerza-sub");
+  const elMetricCarreraSub = document.getElementById("metric-carrera-sub");
+  if (elMetricFuerzaSub) elMetricFuerzaSub.textContent = `META SEMANAL CONFIGURADA: ${state.prefFuerzaDays} SESIONES`;
+  if (elMetricCarreraSub) elMetricCarreraSub.textContent = `META SEMANAL CONFIGURADA: ${state.prefCarreraDays} SESIONES`;
+
+  if (state.history) {
+    renderMetricsTab(state.history, state.lastCoachText || "");
+  }
+
+  showSuccessBanner("✨ Reglas y preferencias de entrenamiento guardadas.");
+}
+
 
 
 
