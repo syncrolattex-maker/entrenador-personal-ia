@@ -20,7 +20,7 @@ FALLBACK_EXERCISES: List[Dict[str, Any]] = [
         "equipment_code": "dumbbell",
         "target_muscle": "Bíceps braquial",
         "secondary_muscles": ["Antebrazo", "Braquial anterior"],
-        "gif_url": "https://v2.exercisedb.io/image/p1JndlVlY1x3tQ",
+        "gif_url": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Bicep_Curl/0.jpg",
         "svg_icon": "biceps",
         "instructions": [
             "De pie, sostén una pesa de 5kg en cada mano con las palmas mirando hacia adelante.",
@@ -38,7 +38,7 @@ FALLBACK_EXERCISES: List[Dict[str, Any]] = [
         "equipment_code": "dumbbell",
         "target_muscle": "Deltoides (Hombros)",
         "secondary_muscles": ["Tríceps", "Trapecio"],
-        "gif_url": "https://v2.exercisedb.io/image/fM1qS9aWb1u6oQ",
+        "gif_url": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Shoulder_Press/0.jpg",
         "svg_icon": "shoulders",
         "instructions": [
             "De pie o sentada con la espalda recta, eleva las pesas a la altura de las orejas con codos a 90°.",
@@ -55,7 +55,7 @@ FALLBACK_EXERCISES: List[Dict[str, Any]] = [
         "equipment_code": "dumbbell",
         "target_muscle": "Deltoides lateral",
         "secondary_muscles": ["Trapecio superior"],
-        "gif_url": "https://v2.exercisedb.io/image/t-A6m4Gj8s5h-Q",
+        "gif_url": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Seated_Side_Lateral_Raise/0.jpg",
         "svg_icon": "shoulders",
         "instructions": [
             "De pie, sujetando las pesas a los costados con ligera flexión de codos.",
@@ -72,7 +72,7 @@ FALLBACK_EXERCISES: List[Dict[str, Any]] = [
         "equipment_code": "dumbbell",
         "target_muscle": "Cuádriceps y Glúteos",
         "secondary_muscles": ["Isquiotibiales", "Core"],
-        "gif_url": "https://v2.exercisedb.io/image/09x3B2Dk5vL2cQ",
+        "gif_url": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Goblet_Squat/0.jpg",
         "svg_icon": "legs",
         "instructions": [
             "Sostén una pesa de 5kg verticalmente frente al pecho pegada al cuerpo.",
@@ -90,7 +90,7 @@ FALLBACK_EXERCISES: List[Dict[str, Any]] = [
         "equipment_code": "dumbbell",
         "target_muscle": "Dorsal Ancho (Espalda)",
         "secondary_muscles": ["Bíceps", "Deltoides posterior"],
-        "gif_url": "https://v2.exercisedb.io/image/p9d2nN5mL3v0sQ",
+        "gif_url": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Bent_Over_Two-Dumbbell_Row/0.jpg",
         "svg_icon": "back",
         "instructions": [
             "Apoya una mano y rodilla sobre una silla o banco firme, inclinando el torso paralelo al suelo.",
@@ -108,7 +108,7 @@ FALLBACK_EXERCISES: List[Dict[str, Any]] = [
         "equipment_code": "dumbbell",
         "target_muscle": "Tríceps braquial",
         "secondary_muscles": ["Core"],
-        "gif_url": "https://v2.exercisedb.io/image/K4w8L3P9m-0s1Q",
+        "gif_url": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Standing_Dumbbell_Triceps_Extension/0.jpg",
         "svg_icon": "triceps",
         "instructions": [
             "Sostén una pesa de 5kg con ambas manos por detrás de la cabeza, codos apunto hacia arriba.",
@@ -125,7 +125,7 @@ FALLBACK_EXERCISES: List[Dict[str, Any]] = [
         "equipment_code": "band",
         "target_muscle": "Espalda Alta y Dorsales",
         "secondary_muscles": ["Bíceps", "Romboide"],
-        "gif_url": "https://v2.exercisedb.io/image/q9B2mN5mL3v0sQ",
+        "gif_url": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Band_Pull_Apart/0.jpg",
         "svg_icon": "back",
         "instructions": [
             "Sentada con las piernas extendidas, engancha la cinta elástica en la planta de los pies.",
@@ -143,7 +143,7 @@ FALLBACK_EXERCISES: List[Dict[str, Any]] = [
         "equipment_code": "band",
         "target_muscle": "Glúteo Medio y Cadera",
         "secondary_muscles": ["Cuádriceps"],
-        "gif_url": "https://v2.exercisedb.io/image/09x3B2Dk5vL8cQ",
+        "gif_url": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Lunges/0.jpg",
         "svg_icon": "legs",
         "instructions": [
             "Coloca la cinta elástica redonda justo por encima de las rodillas o en los tobillos.",
@@ -161,7 +161,7 @@ FALLBACK_EXERCISES: List[Dict[str, Any]] = [
         "equipment_code": "band",
         "target_muscle": "Pectoral Mayor",
         "secondary_muscles": ["Deltoides anterior"],
-        "gif_url": "https://v2.exercisedb.io/image/t-A6m4Gj8s5h-X",
+        "gif_url": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Band_Pull_Apart/0.jpg",
         "svg_icon": "chest",
         "instructions": [
             "Pasa la cinta por detrás de tu espalda sujetando los extremos con los brazos extendidos a los lados.",
@@ -178,7 +178,7 @@ FALLBACK_EXERCISES: List[Dict[str, Any]] = [
         "equipment_code": "body weight",
         "target_muscle": "Pectoral y Tríceps",
         "secondary_muscles": ["Core", "Deltoides anterior"],
-        "gif_url": "https://v2.exercisedb.io/image/c9B2mN5mL3v0sQ",
+        "gif_url": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pushups/0.jpg",
         "svg_icon": "chest",
         "instructions": [
             "Coloca las manos en el suelo ligeramente más anchas que los hombros (puedes apoyar rodillas).",
@@ -196,7 +196,7 @@ FALLBACK_EXERCISES: List[Dict[str, Any]] = [
         "equipment_code": "body weight",
         "target_muscle": "Glúteos y Zona Lumbar",
         "secondary_muscles": ["Isquiotibiales", "Core"],
-        "gif_url": "https://v2.exercisedb.io/image/89x3B2Dk5vL2cQ",
+        "gif_url": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Glute_Bridge/0.jpg",
         "svg_icon": "legs",
         "instructions": [
             "Tumbada boca arriba con rodillas flexionadas y pies bien apoyados en el suelo.",
@@ -214,7 +214,7 @@ FALLBACK_EXERCISES: List[Dict[str, Any]] = [
         "equipment_code": "body weight",
         "target_muscle": "Core (Recto y Transverso abdominal)",
         "secondary_muscles": ["Hombros", "Glúteos"],
-        "gif_url": "https://v2.exercisedb.io/image/x9B2mN5mL3v0sQ",
+        "gif_url": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Plank/0.jpg",
         "svg_icon": "core",
         "instructions": [
             "Apoya los antebrazos en el suelo alineando los codos con los hombros.",
@@ -232,7 +232,7 @@ FALLBACK_EXERCISES: List[Dict[str, Any]] = [
         "equipment_code": "body weight",
         "target_muscle": "Core y Cardio",
         "secondary_muscles": ["Hombros", "Cuádriceps"],
-        "gif_url": "https://v2.exercisedb.io/image/m9B2mN5mL3v0sQ",
+        "gif_url": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Mountain_Climbers/0.jpg",
         "svg_icon": "core",
         "instructions": [
             "Empieza en posición de plancha alta sobre las palmas de las manos.",
