@@ -238,7 +238,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v22"; // Interactive profile workout rules selection & preferences
+    const APP_VERSION = "v23"; // Improved resilience & friendly fallback handling for network & quota errors
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
@@ -284,9 +284,10 @@ async function initApp() {
     console.error("Fetch recommendation error:", err);
     renderRecommendation({
       recomendacion: "Fuerza",
-      razon: "Error de red. Te recomendamos Fuerza para mantener el balance semanal.",
-      explicacion_semanal: "Modo de recuperación offline."
+      razon: "¡Hola Verónica! Se ha detectado una interrupción temporal de red. Mientras reestablecemos la sincronización en vivo con tu reloj, te sugerimos una sesión de Fuerza Full-body.",
+      explicacion_semanal: "Modo offline activo. Puedes continuar entrenando normalmente."
     });
+
   } finally {
     if (elRecommendationBox) elRecommendationBox.classList.remove("loading-pulse");
   }

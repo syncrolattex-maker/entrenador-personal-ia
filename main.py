@@ -603,9 +603,14 @@ async def get_recomendacion_hoy():
         
     except Exception as e:
         print("Gemini recommendation error:", e)
-        # Fallback details
         ultimo_entreno_detalles = None
-        if db["historial_entrenamientos"]:
+        if 'real_history' in locals() and real_history:
+            try:
+                newest = sorted(real_history, key=lambda x: x["fecha"], reverse=True)[0]
+                ultimo_entreno_detalles = newest
+            except Exception:
+                pass
+        elif db.get("historial_entrenamientos"):
             newest = next((x for x in reversed(db["historial_entrenamientos"]) if x.get("completado")), None)
             if newest:
                 ultimo_entreno_detalles = {
@@ -618,12 +623,17 @@ async def get_recomendacion_hoy():
                     "distancia_km": newest.get("distancia_km"),
                     "descripcion": ""
                 }
+        
+        # Friendly recommendation fallback (No raw 429 error text)
+        rec_type = "Fuerza" if db.get("ultimo_entreno") == "Carrera" else "Carrera"
         return {
-            "recomendacion": "Fuerza",
-            "razon": f"Error conectando con la IA: {str(e)}",
-            "explicacion_semanal": "No se pudo obtener el análisis semanal debido a un error de conexión.",
-            "ultimo_entreno_detalles": ultimo_entreno_detalles
+            "recomendacion": rec_type,
+            "razon": f"¡Hola Verónica! Para mantener un excelente tono muscular y balance semanal con tus mancuernas de 5kg y cintas, hoy te sugerimos una sesión de {rec_type}.",
+            "explicacion_semanal": "Modo de recuperación activa. Manteniendo tu frecuencia objetivo.",
+            "ultimo_entreno_detalles": ultimo_entreno_detalles,
+            "historial_real": real_history if 'real_history' in locals() else []
         }
+
 
 
 
