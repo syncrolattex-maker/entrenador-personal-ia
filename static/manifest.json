@@ -1,12 +1,12 @@
 {
-  "name": "Fitness AI Flow",
-  "short_name": "AI Flow",
-  "description": "Tu entrenador personal diario sin presiones ni culpa.",
+  "name": "Verofit — Entrenador Personal IA",
+  "short_name": "Verofit",
+  "description": "Tu entrenador personal inteligente de fuerza y carrera para Verónica.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#FAF9F6",
-  "theme_color": "#18181B",
+  "background_color": "#131313",
+  "theme_color": "#131313",
   "icons": [
     {
       "src": "/icons/icon-192.png",

@@ -398,10 +398,10 @@ async def registrar_en_intervals(payload: ActividadCompletadaPayload) -> bool:
     from datetime import datetime
     now_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
-    activity_type = "WeightTraining" if payload.tipo == "Fuerza" else "Run"
-    name = f"{'💪 Fuerza' if payload.tipo == 'Fuerza' else '🏃 Carrera'} — Entrenador IA"
+    name = f"{'💪 Fuerza' if payload.tipo == 'Fuerza' else '🏃 Carrera'} — Verofit AI"
 
-    description_lines = ["Sesión generada y guiada por tu Entrenador Personal IA."]
+    description_lines = ["Sesión generada y guiada por Verofit — Entrenador Personal IA."]
+
     if payload.esfuerzo_subjetivo:
         emoji = {"facil": "😊", "optimo": "⚡", "agotador": "🥵"}.get(payload.esfuerzo_subjetivo, "")
         description_lines.append(f"Esfuerzo percibido: {emoji} {payload.esfuerzo_subjetivo.capitalize()}")
@@ -564,8 +564,9 @@ async def get_recomendacion_hoy():
         client = genai.Client(api_key=api_key)
         
         system_instruction = (
-            "Eres el entrenador personal y coach de fitness de **Verónica**, una atleta de 43 años, "
+            "Eres la Coach IA de **Verofit**, el entrenador personal inteligente de **Verónica**, una atleta de 43 años, "
             "de Alcàsser (Valencia), que mide 1.77 m y pesa 59 kg (cuerpo atlético y magro, extremidades largas).\n\n"
+
             "INSTRUCCIONES DE PLANIFICACIÓN Y BALANCE:\n"
             "1. Dirígete a ella de forma cálida, profesional y motivadora llamándola siempre por su nombre ('Verónica').\n"
             "2. Examina el historial de actividades de los últimos 14 días provisto (de su reloj e Intervals.icu):\n"
@@ -704,8 +705,9 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
         client = genai.Client(api_key=api_key)
         
         system_instruction = (
-            "Eres el entrenador personal experto de **Verónica**, una atleta de 43 años, de Alcàsser (Valencia), "
+            "Eres la Coach IA de **Verofit**, la aplicación de entrenamiento personal exclusiva de **Verónica**, una atleta de 43 años, de Alcàsser (Valencia), "
             "que mide 1.77 m y pesa 59 kg (cuerpo atlético, extremidades largas, excelente palanca). "
+
             "Ella busca rutinas intensas, retadoras y de mayor duración.\n\n"
             f"Tu tarea hoy es generar la sesión detallada para el tipo seleccionado: '{payload.tipo}'.\n\n"
             "INSTRUCCIONES DE MATERIALES Y ENFOQUE DE FUERZA:\n"
