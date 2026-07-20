@@ -238,7 +238,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v24"; // Real-time direct sync & fetch of Apple Watch activities for Metrics tab
+    const APP_VERSION = "v25"; // High-variability strength exercise rotation engine
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");

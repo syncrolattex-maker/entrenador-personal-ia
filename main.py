@@ -283,25 +283,59 @@ async def enviar_a_intervals(phases: List[FaseCarrera]):
 
 async def generar_rutina_mock(tipo: str, mensaje_warning: str = None) -> dict:
     """
-    Generates a localized offline mock routine with fatigue adaptation support.
-    Conforms to the new unified RutinaResponse schema.
+    Generates a localized mock routine with dynamic daily rotation and fatigue adaptation.
+    Conforms to the RutinaResponse schema.
     """
+    from datetime import datetime
+    day_seed = datetime.now().timetuple().tm_yday
+    
     is_fatigued = False
     last_workout = next((x for x in reversed(db["historial_entrenamientos"]) if x.get("completado")), None)
     if last_workout:
         if last_workout.get("esfuerzo_subjetivo") == "agotador" or (last_workout.get("frecuencia_cardiaca_media") or 0) > 165:
             is_fatigued = True
 
-    explicacion = f"Hemos generado esta sesión de {tipo} en modo offline debido a un problema con la API de Gemini."
+    explicacion = f"Sesión de {tipo} diseñada con periodización variada y retadora para Verónica."
     
     if tipo == "Fuerza":
-        ejercicios = [
-            {"nombre": "Sentadillas Goblet", "series": 4, "repeticiones": "12", "descripcion": "Baja lentamente empujando el suelo con talones. Trabaja glúteos y piernas."},
-            {"nombre": "Hip Thrust con banda", "series": 4, "repeticiones": "15", "descripcion": "Eleva cadera contrayendo fuertemente los glúteos arriba. Enfocado en zona posterior."},
-            {"nombre": "Zancadas Búlgaras", "series": 3, "repeticiones": "10 por pierna", "descripcion": "Un pie en banco o silla detrás de ti, flexiona rodilla bajando cadera. Enfoque cuádriceps y glúteos."},
-            {"nombre": "Patada de Glúteo en cuadrupedia", "series": 3, "repeticiones": "15 por pierna", "descripcion": "En 4 apoyos, empuja talón al techo activando glúteo. Mantén espalda neutra."},
-            {"nombre": "Core: Plancha con rotación", "series": 3, "repeticiones": "45 seg", "descripcion": "En apoyo de antebrazos, rota cadera suavemente lado a lado manteniendo abdomen tenso."}
+        # 4 Diverse Full-Body Templates to guarantee complete daily variety
+        fuerza_templates = [
+            # Template A: Glúteo & Unilateral Focus
+            [
+                {"nombre": "Zancadas Búlgaras con Mancuernas (5 kg)", "series": 4, "repeticiones": "15 por pierna", "descripcion": "Un pie apoyado atrás. Bajada lenta en 3 segundos manteniendo el torso erguido."},
+                {"nombre": "Peso Muerto Rumano a una pierna (5 kg)", "series": 4, "repeticiones": "15 por pierna", "descripcion": "Flexiona ligeramente la rodilla y lleva la cadera atrás apretando isquio y glúteo."},
+                {"nombre": "Press Militar de Hombros con Banda", "series": 4, "repeticiones": "18", "descripcion": "Pisa la banda de resistencia y empuja fuerte arriba manteniendo el abdomen contraído."},
+                {"nombre": "Remo Unilateral con Mancuerna de 5 kg", "series": 4, "repeticiones": "15 por brazo", "descripcion": "Espalda neutra, tracciona el codo hacia la cadera apretando la escápula."},
+                {"nombre": "Core: Plancha Isométrica con toque de hombros", "series": 3, "repeticiones": "50 seg", "descripcion": "Plancha alta sin balancear la cadera, tocando alternativamente cada hombro."}
+            ],
+            # Template B: Empujes & Tracciones metabólicas
+            [
+                {"nombre": "Sentadilla Goblet Isométrica + Bote con 5 kg", "series": 4, "repeticiones": "20", "descripcion": "Sostén la mancuerna en el pecho, realiza 3 rebotes abajo y sube explosivo."},
+                {"nombre": "Hip Thrust con Banda de Resistencia", "series": 4, "repeticiones": "20", "descripcion": "Espalda sobre sofá/banco, banda sobre rodillas. Empuja cadera apretando 2 seg arriba."},
+                {"nombre": "Flexiones de Pecho con Pausa en Suelo", "series": 3, "repeticiones": "12-15", "descripcion": "Apoyo de rodillas o puntas. Pausa de 1 segundo abajo y empuje fuerte."},
+                {"nombre": "Remo Horizontal en Bipedestación con Cintas", "series": 4, "repeticiones": "18", "descripcion": "Sostén la cinta tensa, tracciona codos hacia atrás sintiendo la parte media de la espalda."},
+                {"nombre": "Core: Bicho Muerto (Deadbug) con Mancuerna", "series": 3, "repeticiones": "16 totales", "descripcion": "Boca arriba, extiende pierna y brazo contrario manteniendo la zona lumbar pegada al suelo."}
+            ],
+            # Template C: Resistencia Muscular y Piernas
+            [
+                {"nombre": "Zancadas Caminando con Pesas de 5 kg", "series": 4, "repeticiones": "16 totales", "descripcion": "Paso amplio buscando ángulo de 90º en ambas rodillas."},
+                {"nombre": "Puente de Glúteo a una Pierna", "series": 3, "repeticiones": "15 por pierna", "descripcion": "Una pierna elevada, desclava la cadera del suelo apretando fuertemente el glúteo activo."},
+                {"nombre": "Elevaciones Laterales + Press Frontal con 5 kg", "series": 4, "repeticiones": "15", "descripcion": "Trabajo de hombro y parte superior del tórax con tensión constante."},
+                {"nombre": "Remo al Pecho con Cintas (Agarre Neutro)", "series": 4, "repeticiones": "18", "descripcion": "Codos pegados al cuerpo, junta escápulas al final de la trayectoria."},
+                {"nombre": "Core: Plancha Lateral con Elevación de Cadera", "series": 3, "repeticiones": "40 seg por lado", "descripcion": "Codo apoyado bajo el hombro, eleva y baja cadera de forma controlada."}
+            ],
+            # Template D: Full-Body Escuadrón Métrico
+            [
+                {"nombre": "Sentadillas Sumo con Mancuerna de 5 kg", "series": 4, "repeticiones": "20", "descripcion": "Pies más abiertos que el ancho de hombros, puntas hacia afuera. Énfasis en aductores y glúteos."},
+                {"nombre": "Zancadas Posteriores (Reverse Lunges) con 5 kg", "series": 4, "repeticiones": "14 por pierna", "descripcion": "Paso largo atrás bajando rodilla casi a rozar el suelo."},
+                {"nombre": "Aperturas de Pecho en Suelo con Pesas (Floor Press)", "series": 4, "repeticiones": "16", "descripcion": "Tumbada en esterilla, empuja las pesas de 5 kg arriba juntándolas en el punto alto."},
+                {"nombre": "Pulls de Espalda y Tríceps con Banda", "series": 4, "repeticiones": "18", "descripcion": "Brazos extendidos, abre la cinta hasta tocar el pecho alto."},
+                {"nombre": "Core: Escaladores (Mountain Climbers) Controlados", "series": 3, "repeticiones": "45 seg", "descripcion": "En plancha alta, lleva rodillas al pecho sin perder la alineación."}
+            ]
         ]
+        
+        template_index = day_seed % len(fuerza_templates)
+        ejercicios = fuerza_templates[template_index]
         
         msg_adapt = None
         if is_fatigued:
@@ -317,11 +351,19 @@ async def generar_rutina_mock(tipo: str, mensaje_warning: str = None) -> dict:
             "mensaje": mensaje_warning
         }
     else:
-        phases = [
-            {"name": "Calentamiento: Trote suave", "duration_seconds": 300, "type": "WARMUP"},
-            {"name": "Rodamiento Continuo Aeróbico", "duration_seconds": 1800, "type": "WORK"},
-            {"name": "Enfriamiento: Caminata ligera", "duration_seconds": 300, "type": "COOLDOWN"}
+        carrera_templates = [
+            [
+                {"name": "Calentamiento: Trote suave y movilidad", "duration_seconds": 300, "type": "WARMUP"},
+                {"name": "Rodamiento Continuo Aeróbico Zona 2", "duration_seconds": 2100, "type": "WORK"},
+                {"name": "Enfriamiento: Caminata y estiramientos", "duration_seconds": 300, "type": "COOLDOWN"}
+            ],
+            [
+                {"name": "Calentamiento: Trote paulatino", "duration_seconds": 300, "type": "WARMUP"},
+                {"name": "Rodamiento Suave de Asimilación", "duration_seconds": 1800, "type": "WORK"},
+                {"name": "Enfriamiento: Caminata ligera", "duration_seconds": 300, "type": "COOLDOWN"}
+            ]
         ]
+        phases = carrera_templates[day_seed % len(carrera_templates)]
         
         msg_adapt = None
         if is_fatigued:
@@ -336,6 +378,7 @@ async def generar_rutina_mock(tipo: str, mensaje_warning: str = None) -> dict:
             "enviado_al_reloj": False,
             "mensaje": mensaje_warning
         }
+
 
 async def registrar_en_intervals(payload: ActividadCompletadaPayload) -> bool:
     """
@@ -671,11 +714,12 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
             "INSTRUCCIONES DE ESTRUCTURA Y VOLUMEN:\n"
             "Dirígete a ella por su nombre ('Verónica') en las explicaciones y adaptaciones.\n"
             "1. Si el tipo es 'Fuerza':\n"
+            "   - REGLA DE VARIEDAD Y DIVERSIFICACIÓN: NUNCA repitas la misma rutina o combinación exacta que la última sesión. Alterna entre enfoques de fuerza (Enfoque A: Predominio de cadera y glúteo con Peso muerto rumano unilateral y Hip thrust; Enfoque B: Cuádriceps y empujes con Sentadilla sumo isométrica y Press militar; Enfoque C: Tracciones y unilaterales con Zancadas caminadas y Remos con cinta).\n"
             "   - Genera una rutina exigente de Cuerpo Completo (Full-Body) de entre 45 y 60 minutos de duración.\n"
-            "   - Diseña entre 5 y 6 ejercicios exigentes, especificando 4 o 5 series de 15-20 repeticiones (el rango de repeticiones debe ser alto, ej: '15-20', dado que las pesas son de 5 kg y buscamos intensidad metabólica y muscular).\n"
-            "   - Utiliza ejercicios que aprovechen al máximo las pesas de 5 kg y las cintas para generar intensidad mediante movimientos unilaterales y tensión constante: Zancadas búlgaras con mancuernas, Peso muerto rumano a una pierna con mancuernas, Sentadillas goblet lentas con mancuerna de 5 kg, Remo unilateral con mancuerna, Flexiones con pausa abajo, y Press militar con banda de resistencia.\n"
-            "   - Incluye a veces un ejercicio de core estático por tiempo (p.ej. Plancha Isométrica de 45-60 segundos), usando la palabra 'seg' o 'segundos' en la propiedad repeticiones (ej. '45 seg').\n"
+            "   - Diseña entre 5 y 6 ejercicios exigentes, especificando 4 o 5 series de 15-22 repeticiones (el rango de repeticiones debe ser alto dada la carga de 5 kg).\n"
+            "   - Incluye siempre un ejercicio de core estático o dinámico por tiempo (ej. Plancha isométrica, Bicho muerto, o Escaladores de 45-60 segundos).\n"
             "   - Rellena obligatoriamente una 'descripcion' corta y clara sobre la ejecución para cada ejercicio detallando el tempo (ej: 'bajada en 3 segundos') y el uso de las cintas o pesas de 5 kg.\n"
+
             "2. Si el tipo es 'Carrera':\n"
             "   - REGLA DE ORO DE CARRERA (EVITAR LESIONES): Los entrenamientos de calidad (Fartleks, series o intervalos de velocidad) son de alta carga de intensidad y fatiga acumulada. Se permite ÚNICAMENTE una (1) sesión de calidad a la semana (últimos 7 días). Todos los demás entrenamientos de carrera de la semana deben ser obligatoriamente de **Rodamiento Suave** (running a ritmo sostenido y cómodo en Zona 2, trote continuo de 35 a 45 minutos de duración, a ritmo conversacional).\n"
             "   - Analiza rigurosamente el historial de los últimos 7 días. Si ya figura cualquier carrera que contenga en su nombre o descripción las palabras 'fartlek', 'intervalos', 'series', 'velocidad', 'cuestas', o ritmos altos (o si hay una sesión de carrera que no esté marcada explícitamente como rodamiento suave/regenerativo), DEBES generar obligatoriamente un **Rodamiento Suave**.\n"
@@ -712,7 +756,8 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
                 system_instruction=system_instruction,
                 response_mime_type="application/json",
                 response_schema=RutinaResponse,
-                temperature=0.7,
+                temperature=0.85,
+
             )
         )
         
