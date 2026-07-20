@@ -238,7 +238,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v15"; // Bumped version for server cache and non-blocking dashboard
+    const APP_VERSION = "v16"; // Bumped version for design overhaul and Watchletic fix
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
@@ -1254,5 +1254,14 @@ async function enviarMensajeChat() {
     saveChat();
   }
 }
+
+function enviarTextoChat(texto) {
+  const elChatInput = document.getElementById("chat-input");
+  if (elChatInput) {
+    elChatInput.value = texto;
+    enviarMensajeChat();
+  }
+}
+
 
 

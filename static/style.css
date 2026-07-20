@@ -1,938 +1,836 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+/* ==========================================================================
+   FITNESS AI FLOW — MODERN DARK GLASSMORPHIC DESIGN SYSTEM (v16)
+   ========================================================================== */
 
 :root {
-  --bg-primary: #F7F7FA;
-  --bg-card: #FFFFFF;
-  --text-primary: #242428;
-  --text-secondary: #6E6E73;
-  --accent-fuerza: #242428;
-  --accent-carrera: #FC5200; /* Strava Orange */
-  --accent-success: #00B060; /* Strava Green */
-  --bg-fuerza: #EBEBEF;
-  --bg-carrera: #FFEBE0;
-  --border-radius: 16px; /* Sporty, less rounded borders */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  --shadow: 0 4px 12px rgba(36, 36, 40, 0.04), 0 1px 3px rgba(36, 36, 40, 0.02);
-  --border-color: #E6E6EB;
-
-  /* Guided session tokens */
-  --guided-bg: #121212;
-  --guided-card: #1E1E1F;
-  --guided-text: #F5F5F7;
-  --guided-text-dim: #8E8E93;
-  --guided-border: rgba(255,255,255,0.08);
-  --guided-accent-fuerza: #F5F5F7;
-  --guided-accent-carrera: #FC5200;
-  --guided-accent-rest: #00B060;
+  /* Color Tokens */
+  --bg-main: #0B0E14;
+  --bg-card: #151A24;
+  --bg-card-glass: rgba(21, 26, 36, 0.75);
+  --bg-card-subtle: rgba(255, 255, 255, 0.03);
+  
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-color-glow: rgba(99, 102, 241, 0.25);
+  
+  --text-primary: #F3F4F6;
+  --text-secondary: #9CA3AF;
+  --text-muted: #6B7280;
+  
+  /* Brand & Accent Colors */
+  --accent-orange: #FF5500;
+  --accent-orange-glow: rgba(255, 85, 0, 0.25);
+  --accent-indigo: #6366F1;
+  --accent-indigo-glow: rgba(99, 102, 241, 0.25);
+  --accent-emerald: #10B981;
+  --accent-emerald-glow: rgba(16, 185, 129, 0.2);
+  --accent-cyan: #06B6D4;
+  
+  --bg-fuerza: rgba(99, 102, 241, 0.12);
+  --accent-fuerza: #818CF8;
+  --bg-carrera: rgba(255, 85, 0, 0.12);
+  --accent-carrera: #FF7733;
+  --bg-descanso: rgba(16, 185, 129, 0.12);
+  --accent-descanso: #34D399;
+  
+  --font-family: 'Outfit', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --radius-xl: 24px;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  
+  --shadow-main: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 30px rgba(99, 102, 241, 0.15);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-primary: #121212;
-    --bg-card: #1E1E1F;
-    --text-primary: #F5F5F7;
-    --text-secondary: #8E8E93;
-    --bg-fuerza: #2D2D2E;
-    --bg-carrera: #3D1C0C;
-    --shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-    --border-color: #2D2D2E;
-    --accent-fuerza: #F5F5F7;
-  }
-}
-
+/* Reset & Base */
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  background-color: var(--bg-primary);
+  font-family: var(--font-family);
+  background-color: var(--bg-main);
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.12) 0%, transparent 60%),
+    radial-gradient(circle at 100% 100%, rgba(255, 85, 0, 0.08) 0%, transparent 50%);
   color: var(--text-primary);
-  font-family: var(--font-sans);
   min-height: 100vh;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  padding: 20px;
-  transition: var(--transition);
-  -webkit-tap-highlight-color: transparent;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0;
+  margin: 0;
+  line-height: 1.5;
+  overflow-x: hidden;
 }
 
 .app-container {
   width: 100%;
-  max-width: 500px;
+  max-width: 480px;
+  min-height: 100vh;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  padding-bottom: 40px;
+  gap: 14px;
+  position: relative;
 }
 
 /* Header */
-header {
-  margin-top: 16px;
+.app-header {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  padding: 8px 4px 4px 4px;
 }
 
-.brand {
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.brand-wrapper {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.brand-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%; /* Circle profile photo look */
-  object-fit: cover;
-  border: 1.5px solid #FC5200;
+.brand-logo-icon {
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, var(--accent-orange), var(--accent-indigo));
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  box-shadow: 0 4px 12px var(--accent-orange-glow);
 }
 
 .brand-title {
-  font-size: 0.95rem;
+  font-size: 1.1rem;
   font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.08em; /* Sporty tracked look */
-  color: #FC5200; /* Strava Orange */
-}
-
-.main-heading {
-  font-size: 2rem;
-  font-weight: 900;
-  line-height: 1.1;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.02em;
   color: var(--text-primary);
-  text-transform: uppercase;
 }
 
+.brand-highlight {
+  color: var(--accent-orange);
+}
 
-/* Status Banner */
-.status-banner {
-  background: var(--bg-card);
-  border-radius: var(--border-radius);
-  padding: 16px;
+.version-tag {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--accent-indigo);
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid var(--border-color-glow);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.athlete-pill {
   display: flex;
-  box-shadow: var(--shadow);
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card-glass);
+  backdrop-filter: blur(12px);
   border: 1px solid var(--border-color);
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.athlete-dot {
+  width: 8px;
+  height: 8px;
+  background-color: var(--accent-emerald);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--accent-emerald);
+}
+
+.athlete-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.header-subtitle {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  opacity: 0.8;
+  padding-left: 2px;
+}
+
+/* Offline Banner */
+.offline-banner {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #FCA5A5;
+  font-size: 0.8rem;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Stats Banner */
+.status-banner {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  background: var(--bg-card-glass);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 10px;
 }
 
 .status-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  flex: 1;
-  text-align: center;
+  justify-content: center;
+  padding: 6px 4px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
 }
 
-.status-item:not(:last-child) {
-  border-right: 1px solid var(--border-color);
+.status-item.highlight-box {
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.2);
 }
 
 .status-label {
-  order: 2; /* Visual reverse order */
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 0.65rem;
   color: var(--text-secondary);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .status-value {
-  order: 1; /* Visual reverse order */
-  font-size: 1.2rem;
-  font-weight: 800; /* Extra bold like Strava */
+  font-size: 0.9rem;
+  font-weight: 800;
   color: var(--text-primary);
 }
 
 .status-value.highlight {
-  color: var(--accent-carrera); /* Highlight running / next training in Strava Orange */
+  color: var(--accent-orange);
 }
 
-
-/* Main Cards */
+/* Card General */
 .workout-card {
-  background: var(--bg-card);
-  border-radius: var(--border-radius);
-  padding: 24px;
-  box-shadow: var(--shadow);
+  background: var(--bg-card-glass);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: 18px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  border: 1px solid var(--border-color);
-  animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes slideIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  gap: 16px;
+  box-shadow: var(--shadow-main);
+  position: relative;
 }
 
 .card-header {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.badge {
-  padding: 4px 10px;
-  border-radius: 4px; /* Sporty, crisp borders */
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.badge.fuerza {
-  background-color: var(--bg-fuerza);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-}
-
-.badge.carrera {
-  background-color: var(--bg-carrera);
-  color: var(--accent-carrera);
-  border: 1px solid rgba(252, 82, 0, 0.15);
-}
-
-.card-title {
-  font-size: 1.4rem;
-  font-weight: 800;
-
-  letter-spacing: -0.02em;
-}
-
-/* Loading state */
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 0;
-  gap: 20px;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid rgba(0, 0, 0, 0.05);
-  border-left-color: var(--text-primary);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.loading-text {
-  font-size: 0.95rem;
-  color: var(--text-secondary);
-  font-weight: 500;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
-}
-
-/* Exercise Cards List */
-.exercise-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.exercise-item {
-  background-color: var(--bg-primary);
-  border-radius: 18px;
-  padding: 16px 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  transition: var(--transition);
-  border: 1px solid transparent;
-}
-
-.exercise-item:hover {
-  transform: translateY(-2px);
-  border-color: rgba(24, 24, 27, 0.05);
-}
-
-.exercise-info {
-  display: flex;
-  flex-direction: column;
   gap: 4px;
 }
 
-.exercise-name {
-  font-weight: 600;
-  font-size: 1rem;
+.badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: 6px;
+  width: fit-content;
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--accent-fuerza);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
+.card-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: var(--text-primary);
 }
 
-.exercise-sets {
-  font-size: 0.85rem;
+/* IA Recommendation Card */
+.recommendation-card {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.06));
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rec-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rec-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--accent-fuerza);
+  letter-spacing: 0.04em;
+}
+
+.rec-type-pill {
+  font-size: 0.75rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--accent-orange);
+  color: #FFF;
+  box-shadow: 0 2px 10px var(--accent-orange-glow);
+}
+
+.rec-reason {
+  font-size: 0.88rem;
   font-weight: 500;
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+.rec-weekly-summary {
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  line-height: 1.4;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 8px;
+}
+
+/* Last Workout Card */
+.last-workout-card {
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.last-workout-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.last-workout-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+}
+
+.last-workout-date {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.last-workout-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.last-workout-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.last-workout-type-pill {
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--accent-orange);
+}
+
+.last-workout-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.stat-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.last-workout-desc {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  border-top: 1px solid var(--border-color);
+  padding-top: 6px;
+}
+
+/* Selection Cards Grid */
+.selection-title-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.selection-heading {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.selection-subtext {
+  font-size: 0.75rem;
   color: var(--text-secondary);
 }
 
-/* Exercise description tip in the routine card */
+.selection-cards-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.option-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.03);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--text-primary);
+  width: 100%;
+}
+
+.option-card:hover, .option-card:active {
+  transform: translateY(-2px);
+  border-color: var(--border-color-glow);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.option-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.strength-glow {
+  background: var(--bg-fuerza);
+  color: var(--accent-fuerza);
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+}
+
+.run-glow {
+  background: var(--bg-carrera);
+  color: var(--accent-carrera);
+  box-shadow: 0 0 15px var(--accent-orange-glow);
+}
+
+.rest-glow {
+  background: var(--bg-descanso);
+  color: var(--accent-descanso);
+  box-shadow: 0 0 15px var(--accent-emerald-glow);
+}
+
+.option-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-grow: 1;
+}
+
+.option-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.option-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.option-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.strength-tag { background: var(--bg-fuerza); color: var(--accent-fuerza); }
+.run-tag { background: var(--bg-carrera); color: var(--accent-carrera); }
+.rest-tag { background: var(--bg-descanso); color: var(--accent-descanso); }
+
+.option-desc {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.option-chips {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.chip {
+  font-size: 0.62rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--text-muted);
+}
+
+.option-arrow {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* Banners inside workout view */
+.adaptation-card, .decision-card {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.adaptation-card {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: #A7F3D0;
+}
+
+.decision-card {
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  color: #C7D2FE;
+}
+
+/* Workout Items Display */
+.exercise-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exercise-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.exercise-name {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.exercise-sets-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  background: var(--bg-fuerza);
+  color: var(--accent-fuerza);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
 .exercise-desc {
   font-size: 0.78rem;
   color: var(--text-secondary);
   line-height: 1.4;
-  margin-top: 2px;
-  opacity: 0.8;
-  font-style: italic;
-  max-width: 220px;
 }
 
-.exercise-reps {
-  background: var(--bg-card);
-  padding: 6px 12px;
-  border-radius: 100px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--accent-fuerza);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
-}
-
-/* Carrera Info Box */
-.carrera-container {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  text-align: center;
-  align-items: center;
-  padding: 10px 0;
-}
-
-.watch-icon-wrapper {
-  width: 80px;
-  height: 80px;
-  background: var(--bg-carrera);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* Running Phases Display */
+.phase-item {
+  background: rgba(255, 85, 0, 0.05);
+  border: 1px solid rgba(255, 85, 0, 0.2);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
   margin-bottom: 8px;
-  animation: pulseWatch 2s infinite;
-}
-
-@keyframes pulseWatch {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.2); }
-  50% { transform: scale(1.05); box-shadow: 0 0 0 12px rgba(59, 130, 246, 0); }
-}
-
-.carrera-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.carrera-instructions {
-  font-size: 0.95rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  max-width: 320px;
-}
-
-.watch-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-  margin-top: 10px;
-}
-
-.watch-step {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: var(--bg-primary);
-  border-radius: 14px;
-  padding: 12px 16px;
-  font-size: 0.85rem;
-  font-weight: 500;
 }
 
-.watch-step-name {
-  font-weight: 600;
+.phase-name {
+  font-size: 0.88rem;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
-.watch-step-duration {
-  font-family: monospace;
-  font-weight: 700;
+.phase-dur {
+  font-size: 0.78rem;
+  font-weight: 800;
   color: var(--accent-carrera);
+  background: var(--bg-carrera);
+  padding: 2px 8px;
+  border-radius: 4px;
 }
 
-/* Skip/Rest Banner for rest days */
-.rest-banner {
-  background: #ECFDF5;
-  color: #065F46;
-  border-radius: var(--border-radius);
-  padding: 20px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  border: 1px solid #A7F3D0;
-}
-
-@media (prefers-color-scheme: dark) {
-  .rest-banner {
-    background: #064E3B;
-    color: #A7F3D0;
-    border: 1px solid #047857;
-  }
-}
-
-.rest-icon { font-size: 1.5rem; }
-
-.rest-message {
-  font-size: 0.9rem;
-  font-weight: 500;
-  line-height: 1.4;
-}
-
-/* Action Buttons */
-.button-container {
-  display: flex;
-  flex-direction: column;
+/* Coach Chat Card */
+.coach-chat-card {
   gap: 12px;
-  margin-top: 10px;
 }
 
-.btn {
-  width: 100%;
-  padding: 16px 24px;
-  border-radius: 8px; /* Crisp, athletic border radius */
-  font-size: 0.95rem;
-  font-weight: 700;
-  border: none;
-  cursor: pointer;
+.chat-card-header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-  transition: var(--transition);
-  font-family: var(--font-sans);
-}
-
-.btn-primary {
-  background-color: #FC5200; /* Strava Orange */
-  color: #FFFFFF;
-}
-
-.btn-primary:hover {
-  background-color: #E34A00;
-}
-
-.btn-primary:active {
-  background-color: #C74100;
-}
-
-.btn-secondary {
-  background-color: var(--bg-card);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-}
-
-.btn-secondary:hover {
-  background-color: var(--bg-primary);
-}
-
-.btn-fuerza {
-  background-color: var(--accent-fuerza);
-  color: var(--bg-card);
-}
-
-.btn-fuerza:hover {
-  opacity: 0.9;
-}
-
-.btn-carrera {
-  background-color: var(--accent-carrera);
-  color: #FFFFFF;
-}
-
-.btn-carrera:hover {
-  background-color: #E34A00;
-}
-
-
-
-/* Offline Banner */
-.offline-banner {
-  background-color: #FEF3C7;
-  color: #92400E;
-  padding: 12px 20px;
-  border-radius: 12px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid #FCD34D;
-  animation: fadeIn 0.3s ease-out;
-}
-
-@media (prefers-color-scheme: dark) {
-  .offline-banner {
-    background-color: #78350F;
-    color: #FCD34D;
-    border-color: #D97706;
-  }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-/* ============================================================
-   GUIDED SESSION OVERLAY
-   ============================================================ */
-
-.guided-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: var(--guided-bg);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: env(safe-area-inset-top, 20px) 24px env(safe-area-inset-bottom, 24px);
-  animation: guidedEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  overflow: hidden;
-}
-
-@keyframes guidedEnter {
-  from { opacity: 0; transform: translateY(30px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-/* --- Header bar --- */
-.guided-header {
-  width: 100%;
-  max-width: 480px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding-top: 16px;
-  margin-bottom: 20px;
-}
-
-.guided-close-btn {
-  background: var(--guided-card);
-  border: 1px solid var(--guided-border);
-  color: var(--guided-text-dim);
-  border-radius: 50%;
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: var(--transition);
-}
-
-.guided-close-btn:hover {
-  background: #27272A;
-  color: var(--guided-text);
-}
-
-.guided-progress-bar {
-  flex: 1;
-  height: 6px;
-  background: rgba(255,255,255,0.1);
-  border-radius: 100px;
-  overflow: hidden;
-}
-
-.guided-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--guided-accent-fuerza), #F97316);
-  border-radius: 100px;
-  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  width: 0%;
-}
-
-.guided-progress-fill.carrera {
-  background: linear-gradient(90deg, var(--guided-accent-carrera), #818CF8);
-}
-
-.guided-counter {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--guided-text-dim);
-  min-width: 36px;
-  text-align: right;
-}
-
-/* --- Phase label --- */
-.guided-phase-label {
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--guided-text-dim);
-  margin-bottom: 12px;
-  transition: color 0.3s ease;
-}
-
-.guided-phase-label.working { color: var(--guided-accent-fuerza); }
-.guided-phase-label.resting { color: var(--guided-accent-rest); }
-.guided-phase-label.running { color: var(--guided-accent-carrera); }
-.guided-phase-label.done    { color: var(--guided-accent-rest); }
-
-/* --- Main content --- */
-.guided-main {
-  flex: 1;
-  width: 100%;
-  max-width: 480px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  text-align: center;
-  padding: 0 8px;
-}
-
-.guided-exercise-name {
-  font-size: clamp(1.6rem, 6vw, 2.4rem);
-  font-weight: 800;
-  color: var(--guided-text);
-  line-height: 1.2;
-  letter-spacing: -0.02em;
-  animation: fadeSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes fadeSlideUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.guided-set-counter {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--guided-text-dim);
-}
-
-.guided-reps {
-  background: rgba(244, 63, 94, 0.12);
-  border: 1px solid rgba(244, 63, 94, 0.25);
-  color: var(--guided-accent-fuerza);
-  font-size: 1.4rem;
-  font-weight: 800;
-  padding: 14px 28px;
-  border-radius: 20px;
-  letter-spacing: -0.01em;
-}
-
-/* --- Timer ring --- */
-.guided-timer-wrap {
-  position: relative;
-  width: 180px;
-  height: 180px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.guided-timer-ring {
-  position: absolute;
-  inset: 0;
-  transform: rotate(-90deg);
-}
-
-.guided-timer-track {
-  fill: none;
-  stroke: rgba(255,255,255,0.06);
-  stroke-width: 8;
-}
-
-.guided-timer-arc {
-  fill: none;
-  stroke: var(--guided-accent-rest);
-  stroke-width: 8;
-  stroke-linecap: round;
-  stroke-dasharray: 339.29;
-  stroke-dashoffset: 0;
-  transition: stroke-dashoffset 1s linear, stroke 0.4s ease;
-}
-
-.guided-timer-arc.carrera-arc {
-  stroke: var(--guided-accent-carrera);
-}
-
-.guided-timer-display {
-  font-size: 3.2rem;
-  font-weight: 800;
-  color: var(--guided-text);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.03em;
-  position: relative;
-  z-index: 1;
-}
-
-/* --- Done screen emoji --- */
-.guided-done-emoji {
-  font-size: 5rem;
-  animation: popIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes popIn {
-  from { transform: scale(0.4); opacity: 0; }
-  to   { transform: scale(1); opacity: 1; }
-}
-
-.guided-done-title {
-  font-size: 2rem;
-  font-weight: 800;
-  color: var(--guided-text);
-  letter-spacing: -0.02em;
-}
-
-.guided-done-stats {
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-top: 4px;
-}
-
-.guided-done-stat {
-  background: var(--guided-card);
-  border: 1px solid var(--guided-border);
-  border-radius: 16px;
-  padding: 12px 20px;
-  text-align: center;
-}
-
-.guided-done-stat-value {
-  font-size: 1.4rem;
-  font-weight: 800;
-  color: var(--guided-text);
-}
-
-.guided-done-stat-label {
-  font-size: 0.75rem;
-  color: var(--guided-text-dim);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-/* --- Footer --- */
-.guided-footer {
-  width: 100%;
-  max-width: 480px;
+  gap: 12px;
   padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.coach-avatar-wrap {
+  position: relative;
+  width: 42px;
+  height: 42px;
+}
+
+.coach-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FF5500, #FF8800);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  box-shadow: 0 4px 12px var(--accent-orange-glow);
+}
+
+.coach-status-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  background-color: var(--accent-emerald);
+  border: 2px solid var(--bg-card);
+  border-radius: 50%;
+}
+
+.coach-info {
   display: flex;
   flex-direction: column;
-  align-items: center;
 }
 
-.guided-action-btn {
-  background: linear-gradient(135deg, var(--guided-accent-fuerza), #F97316) !important;
-  color: #fff !important;
-  font-size: 1.1rem !important;
-  padding: 20px 24px !important;
-  border-radius: 20px !important;
-  box-shadow: 0 8px 30px rgba(244, 63, 94, 0.3) !important;
-  border: none !important;
+.coach-name {
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: var(--text-primary);
 }
 
-.guided-action-btn:hover {
-  transform: translateY(-2px) !important;
-  box-shadow: 0 12px 40px rgba(244, 63, 94, 0.4) !important;
+.coach-subtitle {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
 }
 
-.guided-action-btn.carrera {
-  background: linear-gradient(135deg, var(--guided-accent-carrera), #818CF8) !important;
-  box-shadow: 0 8px 30px rgba(96, 165, 250, 0.3) !important;
+.chat-chips-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
 }
+.chat-chips-scroll::-webkit-scrollbar { display: none; }
 
-.guided-action-btn.carrera:hover {
-  box-shadow: 0 12px 40px rgba(96, 165, 250, 0.4) !important;
-}
-
-.guided-action-btn:disabled {
-  opacity: 0.4 !important;
-  cursor: not-allowed !important;
-  transform: none !important;
-}
-
-/* Guided secondary btn override */
-.guided-overlay .btn-secondary {
-  background: var(--guided-card) !important;
-  color: var(--guided-text-dim) !important;
-  border: 1px solid var(--guided-border) !important;
-}
-
-.guided-overlay .btn-secondary:hover {
-  background: #27272A !important;
-  color: var(--guided-text) !important;
-}
-
-/* Feedback buttons inside guided overlay */
-.guided-feedback-btn {
-  background: var(--guided-card);
-  border: 2px solid var(--guided-border);
-  color: var(--guided-text);
-  border-radius: 16px;
-  padding: 14px 10px;
-  font-size: 1.1rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: var(--transition);
-  font-family: var(--font-sans);
-  line-height: 1.4;
-}
-
-.guided-feedback-btn small {
-  display: block;
+.chat-chip {
   font-size: 0.7rem;
   font-weight: 600;
-  color: var(--guided-text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-top: 2px;
-}
-
-.guided-feedback-btn.active {
-  border-color: var(--guided-accent-rest);
-  background: rgba(52, 211, 153, 0.1);
-  transform: scale(1.04);
-}
-
-.guided-feedback-btn[data-value="facil"].active  { border-color: var(--guided-accent-rest); }
-.guided-feedback-btn[data-value="optimo"].active { border-color: var(--guided-accent-carrera); background: rgba(96,165,250,0.1); }
-.guided-feedback-btn[data-value="agotador"].active { border-color: var(--guided-accent-fuerza); background: rgba(251,113,133,0.1); }
-
-/* Description tip shown in guided session below reps */
-.guided-ex-desc {
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  padding: 12px 16px;
-  font-size: 0.88rem;
-  color: var(--guided-text-dim);
-  line-height: 1.5;
-  text-align: center;
-  max-width: 340px;
-  font-style: italic;
-  animation: fadeSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  border-radius: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-/* ============================================================
-   COACH CHAT STYLES (STRAVA LOOK)
-   ============================================================ */
-
-.pulse-dot {
-  width: 6px;
-  height: 6px;
-  background-color: var(--accent-success);
-  border-radius: 50%;
-  display: inline-block;
-  animation: pulseGreen 1.6s infinite ease-in-out;
-}
-
-@keyframes pulseGreen {
-  0%, 100% { transform: scale(0.9); opacity: 0.6; }
-  50% { transform: scale(1.3); opacity: 1; }
+.chat-chip:hover {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--text-primary);
+  border-color: var(--border-color-glow);
 }
 
 .chat-messages-container {
   max-height: 260px;
+  min-height: 120px;
   overflow-y: auto;
-  padding: 10px 4px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  scroll-behavior: smooth;
-}
-
-/* Custom Scrollbar for Chat */
-.chat-messages-container::-webkit-scrollbar {
-  width: 4px;
-}
-.chat-messages-container::-webkit-scrollbar-track {
-  background: transparent;
-}
-.chat-messages-container::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 20px;
+  gap: 10px;
+  padding-right: 4px;
 }
 
 .chat-message-bubble {
-  max-width: 80%;
-  padding: 12px 16px;
-  font-size: 0.85rem;
+  max-width: 86%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 0.84rem;
   line-height: 1.45;
-  font-weight: 500;
+  word-break: break-word;
 }
 
 .chat-message-bubble.coach {
-  align-self: flex-start;
-  background-color: var(--bg-fuerza);
-  color: var(--text-primary);
-  border-radius: 12px 12px 12px 0px;
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
 }
 
 .chat-message-bubble.user {
+  background: linear-gradient(135deg, var(--accent-orange), #E04B00);
+  color: #FFF;
+  font-weight: 500;
   align-self: flex-end;
-  background-color: #FC5200; /* Strava Orange */
-  color: #FFFFFF;
-  border-radius: 12px 12px 0px 12px;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 4px 12px var(--accent-orange-glow);
 }
 
 .chat-input-container {
   display: flex;
   gap: 8px;
-  align-items: center;
-  border-top: 1px solid var(--border-color);
-  padding-top: 12px;
+  margin-top: 4px;
 }
 
-#chat-input {
-  flex: 1;
-  padding: 12px 16px;
-  border-radius: 8px;
+.chat-input-container input {
+  flex-grow: 1;
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border-color);
-  background-color: var(--bg-primary);
+  border-radius: 12px;
+  padding: 10px 14px;
   color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: 0.88rem;
+  font-family: var(--font-family);
+  font-size: 0.85rem;
   outline: none;
-  transition: var(--transition);
 }
 
-#chat-input:focus {
-  border-color: #FC5200;
-  box-shadow: 0 0 0 2px rgba(252, 82, 0, 0.1);
+.chat-input-container input:focus {
+  border-color: var(--accent-orange);
+}
+
+.chat-send-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--accent-orange);
+  border: none;
+  color: #FFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px var(--accent-orange-glow);
+  flex-shrink: 0;
+}
+
+/* Standard Buttons */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  font-family: var(--font-family);
+  font-size: 0.95rem;
+  font-weight: 800;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-orange), #E04B00);
+  color: #FFF;
+  box-shadow: 0 6px 20px var(--accent-orange-glow);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+/* Animations */
+.loading-pulse {
+  animation: pulse-bg 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse-bg {
+  0% { opacity: 0.55; }
+  50% { opacity: 0.95; }
+  100% { opacity: 0.55; }
 }
 
 .chat-typing-indicator {
-  align-self: flex-start;
-  background-color: var(--bg-fuerza);
-  border: 1px solid var(--border-color);
-  border-radius: 12px 12px 12px 0px;
-  padding: 12px 16px;
   display: flex;
   gap: 4px;
-  align-items: center;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  border-bottom-left-radius: 4px;
+  width: fit-content;
 }
 
 .chat-typing-dot {
@@ -952,14 +850,140 @@ header {
   50% { transform: translateY(-4px); }
 }
 
-.loading-pulse {
-  animation: pulse-bg 1.5s infinite ease-in-out;
+/* Guided Overlay */
+.guided-overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background-color: #0A0D14;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 24px 20px;
 }
 
-@keyframes pulse-bg {
-  0% { opacity: 0.55; }
-  50% { opacity: 0.95; }
-  100% { opacity: 0.55; }
+.guided-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
+.guided-close-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #FFF;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
 
+.guided-progress-bar {
+  flex-grow: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.guided-progress-fill {
+  height: 100%;
+  background: var(--accent-orange);
+  width: 0%;
+  transition: width 0.3s;
+}
+
+.guided-counter {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--text-secondary);
+}
+
+.guided-phase-label {
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent-orange);
+  text-align: center;
+}
+
+.guided-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+}
+
+.guided-exercise-name {
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: #FFF;
+  line-height: 1.2;
+}
+
+.guided-set-counter {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.guided-reps {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--accent-fuerza);
+}
+
+.guided-timer-wrap {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.guided-timer-ring {
+  width: 140px;
+  height: 140px;
+  transform: rotate(-90deg);
+}
+
+.guided-timer-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 8;
+}
+
+.guided-timer-arc {
+  fill: none;
+  stroke: var(--accent-orange);
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-dasharray: 339;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1s linear;
+}
+
+.guided-timer-display {
+  position: absolute;
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #FFF;
+}
+
+.guided-feedback-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+  color: #FFF;
+  padding: 12px;
+  border-radius: 12px;
+  font-family: var(--font-family);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.guided-feedback-btn.selected {
+  border-color: var(--accent-orange);
+  background: var(--bg-carrera);
+}

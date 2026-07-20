@@ -120,7 +120,7 @@ class ChatCoachRequest(BaseModel):
 
 async def get_intervals_history() -> List[dict]:
     """
-    Fetches the last 10 days of real activities from Intervals.icu API.
+    Fetches the last 14 days of real activities from Intervals.icu API.
     Used by Gemini to decide and adapt the workout of the day.
     """
     api_key = os.getenv("INTERVALS_API_KEY")
@@ -129,16 +129,17 @@ async def get_intervals_history() -> List[dict]:
     if athlete_id.lower().startswith("i"):
         athlete_id = athlete_id[1:]
         
-    if (not api_key or api_key == "YOUR_INTERVALS_API_KEY" or 
-        not athlete_id or athlete_id == "YOUR_INTERVALS_ATHLETE_ID" or not athlete_id):
-        print("Warning: Intervals credentials missing for history fetch. Using local db.")
+    if not api_key or api_key == "YOUR_INTERVALS_API_KEY":
+        print("Warning: Intervals API key missing. Using local db.")
         return []
         
     from datetime import datetime, timedelta
-    oldest = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d")
-    newest = datetime.now().strftime("%Y-%m-%d")
+    oldest = (datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d")
+    newest = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
     
-    url = f"https://intervals.icu/api/v1/athlete/0/activities"
+    # Using 0 as athlete ID accesses the authenticated athlete's data reliably
+    target_id = "0"
+    url = f"https://intervals.icu/api/v1/athlete/{target_id}/activities"
     auth = ("API_KEY", api_key)
     params = {"oldest": oldest, "newest": newest}
     
@@ -150,10 +151,22 @@ async def get_intervals_history() -> List[dict]:
                 history = []
                 for act in activities:
                     t = act.get("type", "")
-                    tipo_mapeado = "Fuerza" if t in ["WeightTraining", "Strength"] else "Carrera" if t in ["Run"] else t
+                    t_lower = t.lower()
+                    
+                    # Robust activity type mapping for Apple Watch / Strava / Garmin
+                    if any(s in t_lower for s in ["strength", "weight", "gym", "fuerza", "fitness", "crossfit", "bodybuilding"]):
+                        tipo_mapeado = "Fuerza"
+                    elif any(r in t_lower for r in ["run", "carrera", "trote", "jogging", "treadmill"]):
+                        tipo_mapeado = "Carrera"
+                    elif any(w in t_lower for w in ["walk", "caminata", "hike", "paseo"]):
+                        tipo_mapeado = "Caminata"
+                    else:
+                        tipo_mapeado = t
+                        
                     history.append({
                         "tipo": tipo_mapeado,
-                        "nombre": act.get("name", ""),
+                        "raw_tipo": t,
+                        "nombre": act.get("name", "") or tipo_mapeado,
                         "fecha": act.get("start_date_local", "")[:10],
                         "duracion_minutos": round(act.get("moving_time", 0) / 60, 1),
                         "frecuencia_cardiaca_media": act.get("average_heartrate"),
@@ -172,17 +185,11 @@ async def get_intervals_history() -> List[dict]:
 async def enviar_a_intervals(phases: List[FaseCarrera]):
     """
     Sends structured workout phases to Intervals.icu API.
-    Also formats a plain-text structured description so that Watchletic can parse and sync it to Apple Watch.
+    Formats a plain-text structured description that Watchletic and Intervals.icu parser parse seamlessly for Apple Watch.
     """
     api_key = os.getenv("INTERVALS_API_KEY")
-    athlete_id = os.getenv("INTERVALS_ATHLETE_ID", "").strip()
-    
-    if athlete_id.lower().startswith("i"):
-        athlete_id = athlete_id[1:]
-    
-    if (not api_key or api_key == "YOUR_INTERVALS_API_KEY" or 
-        not athlete_id or athlete_id == "YOUR_INTERVALS_ATHLETE_ID" or not athlete_id):
-        print("Warning: INTERVALS_API_KEY or INTERVALS_ATHLETE_ID is not configured. Skipping Intervals.icu sync.")
+    if not api_key or api_key == "YOUR_INTERVALS_API_KEY":
+        print("Warning: INTERVALS_API_KEY is not configured. Skipping Intervals.icu sync.")
         return False
 
     from datetime import datetime
@@ -192,78 +199,58 @@ async def enviar_a_intervals(phases: List[FaseCarrera]):
         "Content-Type": "application/json"
     }
     
-    # 1. Map to JSON steps for Intervals
-    # 2. Build plain-text structured description for Watchletic parser
-    steps = []
     desc_lines = [
         "Entrenamiento de carrera estructurado generado por tu Entrenador IA.",
-        "Se sincroniza automáticamente con Apple Watch mediante Watchletic.",
+        "Sincronización automática para Apple Watch (Watchletic).",
         ""
     ]
     
-    # Group by Warmup, Work and Cooldown headers
     warmup_steps = []
     work_steps = []
     cooldown_steps = []
     
     for p in phases:
-        icu_type = "Active"
-        
         if p.type == "WARMUP":
-            icu_type = "Warmup"
             warmup_steps.append(p)
         elif p.type == "COOLDOWN":
-            icu_type = "Cooldown"
             cooldown_steps.append(p)
         else:
             work_steps.append(p)
             
-        steps.append({
-            "type": icu_type,
-            "duration_value": p.duration_seconds,
-            "duration_type": "DURATION_SECS",
-            "name": p.name
-        })
-    
-    # Add plain text workout blocks
+    # Format each step strictly following Intervals.icu syntax: "- [duration] [name] [target]"
     if warmup_steps:
         desc_lines.append("Warmup")
         for p in warmup_steps:
             mins = p.duration_seconds // 60
-            desc_lines.append(f"- {p.name} {mins}m 55-65% HR")
+            secs = p.duration_seconds % 60
+            dur_str = f"{mins}m" if secs == 0 else f"{mins}m{secs}s" if mins > 0 else f"{secs}s"
+            desc_lines.append(f"- {dur_str} {p.name} 55-65% HR")
         desc_lines.append("")
         
     if work_steps:
         desc_lines.append("Main Set")
-        # Check if it looks like interval reps
-        # (e.g. 5x (90s fast + 60s walk) or similar)
-        # If it is one single workout block, write it down directly
         for p in work_steps:
             mins = p.duration_seconds // 60
             secs = p.duration_seconds % 60
-            dur_str = f"{mins}m"
-            if secs > 0:
-                dur_str += f"{secs}s"
-            # High intensity check
-            hr_range = "80-85% HR" if "interval" in p.name.lower() or "rápido" in p.name.lower() or "fartlek" in p.name.lower() else "65-75% HR"
-            desc_lines.append(f"- {p.name} {dur_str} {hr_range}")
+            dur_str = f"{mins}m" if secs == 0 else f"{mins}m{secs}s" if mins > 0 else f"{secs}s"
+            hr_range = "80-85% HR" if any(w in p.name.lower() for w in ["interval", "rápido", "fartlek", "serie", "cuesta"]) else "65-75% HR"
+            desc_lines.append(f"- {dur_str} {p.name} {hr_range}")
         desc_lines.append("")
         
     if cooldown_steps:
         desc_lines.append("Cooldown")
         for p in cooldown_steps:
             mins = p.duration_seconds // 60
-            desc_lines.append(f"- {p.name} {mins}m 50-60% HR")
+            secs = p.duration_seconds % 60
+            dur_str = f"{mins}m" if secs == 0 else f"{mins}m{secs}s" if mins > 0 else f"{secs}s"
+            desc_lines.append(f"- {dur_str} {p.name} 50-60% HR")
             
     payload = {
         "category": "WORKOUT",
         "type": "Run",
-        "name": "Carrera de Hoy (IA Flow)",
+        "name": "Carrera IA Flow",
         "start_date_local": today_date,
-        "description": "\n".join(desc_lines),
-        "workout": {
-            "steps": steps
-        }
+        "description": "\n".join(desc_lines)
     }
     
     url = "https://intervals.icu/api/v1/athlete/0/events"
@@ -521,16 +508,20 @@ async def get_recomendacion_hoy():
         system_instruction = (
             "Eres el entrenador personal y coach de fitness de **Verónica**, una atleta de 43 años, "
             "de Alcàsser (Valencia), que mide 1.77 m y pesa 59 kg (cuerpo atlético y magro, extremidades largas).\n\n"
-            "INSTRUCCIONES DE PLANIFICACIÓN:\n"
+            "INSTRUCCIONES DE PLANIFICACIÓN Y BALANCE:\n"
             "1. Dirígete a ella de forma cálida, profesional y motivadora llamándola siempre por su nombre ('Verónica').\n"
-            "2. Examina el historial de actividades de los últimos 10 días provisto (de su reloj e Intervals.icu):\n"
-            "   - Fuerza: Meta ideal de 2 a 3 veces por semana, con alta intensidad.\n"
-            "   - Carrera: Meta de 1 a 2 veces por semana. Máximo 1 sesión de alta intensidad (intervalos/fartleks) a la semana. Las demás deben ser rodamientos suaves (aeróbicos continuos).\n"
-            "   - Descanso: Fundamental para asimilar el esfuerzo. Debe descansar 1 o 2 días completos.\n"
-            "3. Explica de forma motivadora y científica (biomecánica o fisiológicamente, ej. asimilación de cargas, supercompensación) tu decisión.\n"
-            "4. Ten en cuenta el clima cálido/húmedo mediterráneo de Alcàsser para aconsejar sobre hidratación o momento del día si corre hoy.\n"
-            "5. Devuelve un JSON estrictamente según el esquema RecomendacionResponse."
+            "2. Examina el historial de actividades de los últimos 14 días provisto (de su reloj e Intervals.icu):\n"
+            "   - Fuerza: Meta ideal de 2 a 3 veces por semana de Cuerpo Completo (Full-body).\n"
+            "   - Carrera: Meta de 1 a 2 veces por semana (máximo 1 sesión de intensidad por semana, el resto rodamientos suaves Zona 2).\n"
+            "3. REGLA DE BALANCE ACTIVO (IMPORTANTÍSIMO):\n"
+            "   - Recomienda 'Descanso' ÚNICAMENTE si en el historial figura que Verónica hizo un entrenamiento exigente AYER o si ha encadenado 3 o más días consecutivos de entrenamiento.\n"
+            "   - Si Verónica NO entrenó ayer (o si la última sesión fue hace 2 o más días), NUNCA recomiendes 'Descanso'. Recomienda obligatoriamente 'Fuerza' o 'Carrera' para mantenerla activa y progresando.\n"
+            "   - Si su última sesión fue 'Carrera', hoy recomiéndale 'Fuerza'. Si su última sesión fue 'Fuerza', hoy recomiéndale 'Carrera' (o 'Fuerza' si no ha corrido esta semana).\n"
+            "4. Explica de forma motivadora y científica (biomecánica o fisiológicamente, ej. asimilación de cargas, supercompensación) tu decisión.\n"
+            "5. Ten en cuenta el clima cálido/húmedo mediterráneo de Alcàsser para aconsejar sobre hidratación o momento del día si corre hoy.\n"
+            "6. Devuelve un JSON estrictamente según el esquema RecomendacionResponse."
         )
+
         
         historial_str = ""
         if real_history:

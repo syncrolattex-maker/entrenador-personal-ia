@@ -3,64 +3,66 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Fitness Flow</title>
+  <title>Fitness AI Flow — Entrenador Inteligente</title>
   
   <!-- PWA Metadata -->
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#18181B">
+  <meta name="theme-color" content="#0B0E14">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="AI Flow">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
-  
-  <!-- Stylesheets -->
-  <link rel="stylesheet" href="/style.css?v=15">
-
-
-
-
-
-  <link rel="manifest" href="/manifest.json">
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="/style.css?v=16">
+
+  <!-- Icons & Fonts -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="app-container">
     
-    <!-- Navigation / Header -->
-    <div class="app-header">
-      <div class="brand-wrapper">
-        <span class="brand-title">Fitness AI Flow <span style="font-size: 0.58rem; color: var(--text-secondary); opacity: 0.6; vertical-align: middle; margin-left: 4px; font-weight: 500; letter-spacing: normal;">v15</span></span>
-
-
-
-
-
+    <!-- Top Glassmorphic Navigation Header -->
+    <header class="app-header">
+      <div class="header-top">
+        <div class="brand-wrapper">
+          <div class="brand-logo-icon">⚡</div>
+          <span class="brand-title">FITNESS <span class="brand-highlight">AI FLOW</span></span>
+          <span class="version-tag">v16</span>
+        </div>
+        <div class="athlete-pill">
+          <span class="athlete-dot"></span>
+          <span class="athlete-name">Verónica</span>
+        </div>
       </div>
+      
+      <div class="header-subtitle">
+        <span>43 años • 1.77 m • 59 kg • Alcàsser</span>
+      </div>
+    </header>
 
-      <h1 class="main-heading">Tu Flujo Diario</h1>
-    </div>
-
-
-    <!-- Offline notification -->
+    <!-- Offline Notification Banner -->
     <div id="offline-notification" class="offline-banner" style="display: none;">
       <i data-lucide="wifi-off" style="width: 16px; height: 16px;"></i>
-      <span>Estás navegando sin conexión. Algunas funciones podrían ser limitadas.</span>
+      <span>Navegando sin conexión. Algunas funciones podrían ser limitadas.</span>
     </div>
 
-    <!-- Status Stats Banner -->
+    <!-- Status Stats Quick Banner -->
     <div class="status-banner">
       <div class="status-item">
-        <span class="status-label">Último</span>
+        <span class="status-label">Último Entreno</span>
         <span id="status-ultimo" class="status-value">-</span>
       </div>
-      <div class="status-item">
-        <span class="status-label">Siguiente</span>
+      <div class="status-item highlight-box">
+        <span class="status-label">Siguiente Enfoque</span>
         <span id="status-siguiente" class="status-value highlight">-</span>
       </div>
       <div class="status-item">
-        <span class="status-label">Sin entrenar</span>
+        <span class="status-label">Días Reposo</span>
         <span id="status-dias" class="status-value">-</span>
       </div>
     </div>
@@ -68,91 +70,144 @@
     <!-- Main Dynamic Card Area -->
     <div id="main-card-container">
       
-      <!-- Loading State (Default) -->
+      <!-- Loading State Overlay (Used for workouts) -->
       <div id="loading-state" class="workout-card loading-state" style="display: none;">
         <div class="spinner"></div>
-        <span id="loading-text" class="loading-text">Cargando sesión personalizada...</span>
+        <span id="loading-text" class="loading-text">La Coach IA está diseñando tu rutina...</span>
       </div>
 
       <!-- Selection Screen Card (Default view) -->
-      <div id="selection-card" class="workout-card" style="display: none;">
-        <div class="card-header">
-          <div class="badge" style="background-color: #EEF2FF; color: #3730A3;">Planificación IA</div>
-          <h2 class="card-title">Tu Entrenamiento</h2>
-        </div>
+      <div id="selection-card" class="workout-card">
         
-        <!-- IA Recommendation Box -->
-        <div id="recommendation-box" class="rest-banner" style="background-color: #EEF2FF; border-color: #E0E7FF; color: #3730A3; font-size: 0.85rem; padding: 16px; border-radius: 16px; display: flex; flex-direction: column; gap: 8px;">
-          <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.95rem;">
-            <span>🧠</span> Recomendado para Hoy: <span id="rec-tipo-label" style="text-transform: uppercase; font-weight: 800;">-</span>
+        <!-- IA Recommendation Card -->
+        <div id="recommendation-box" class="recommendation-card">
+          <div class="rec-header">
+            <div class="rec-badge">
+              <span class="rec-icon">🧠</span>
+              <span>RECOMENDACIÓN DE HOY</span>
+            </div>
+            <span id="rec-tipo-label" class="rec-type-pill">-</span>
           </div>
-          <p id="rec-razon-text" style="font-weight: 500; line-height: 1.4; opacity: 0.9;">Analizando tus últimas sesiones...</p>
-          <p id="rec-semanal-text" style="font-size: 0.78rem; opacity: 0.7; font-style: italic; border-top: 1px solid rgba(55, 48, 163, 0.1); padding-top: 6px; margin-top: 4px;"></p>
+          
+          <p id="rec-razon-text" class="rec-reason">Analizando tu historial de actividad en Intervals.icu...</p>
+          <p id="rec-semanal-text" class="rec-weekly-summary"></p>
         </div>
 
-        <!-- Last Completed Workout Box -->
-        <div id="last-workout-box" class="rest-banner" style="background-color: var(--bg-fuerza); border-color: var(--border-color); color: var(--text-primary); font-size: 0.85rem; padding: 16px; border-radius: 16px; display: none; flex-direction: column; gap: 6px; margin-top: 10px;">
-          <div style="display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 0.85rem; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.02em;">
-            <span id="last-workout-icon">🏋️‍♂️</span> Sesión Anterior: <span id="last-workout-tipo" style="color: #FC5200;">-</span>
+        <!-- Last Completed Workout Card (Strava / Apple Watch Sync) -->
+        <div id="last-workout-box" class="last-workout-card" style="display: none;">
+          <div class="last-workout-header">
+            <div class="last-workout-badge">
+              <span id="last-workout-icon">🏋️‍♂️</span>
+              <span>ÚLTIMO REGISTRO EN TU RELOJ</span>
+            </div>
+            <span id="last-workout-date" class="last-workout-date"></span>
           </div>
-          <div style="font-weight: 700; line-height: 1.4; color: var(--text-primary);">
-            <span id="last-workout-name">-</span>
-            <span id="last-workout-date" style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 500; margin-left: 6px;"></span>
+          
+          <div class="last-workout-body">
+            <div class="last-workout-title-row">
+              <span id="last-workout-name" class="last-workout-name">-</span>
+              <span id="last-workout-tipo" class="last-workout-type-pill">-</span>
+            </div>
+            <div id="last-workout-stats" class="last-workout-stats">
+              <!-- Injected dynamically: Duración, FC, Distancia, Calorías -->
+            </div>
+            <p id="last-workout-desc" class="last-workout-desc"></p>
           </div>
-          <div id="last-workout-stats" style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.76rem; color: var(--text-secondary); font-weight: 600; margin-top: 2px;">
-             <!-- Injected: Duración, FC, Distancia, Calorías -->
-          </div>
-          <p id="last-workout-desc" style="font-size: 0.75rem; color: var(--text-secondary); opacity: 0.85; line-height: 1.4; border-top: 1px solid var(--border-color); padding-top: 6px; margin-top: 4px; display: none;"></p>
         </div>
 
+        <!-- Section Title for Workout Choices -->
+        <div class="selection-title-wrap">
+          <h3 class="selection-heading">¿Qué vas a entrenar hoy?</h3>
+          <span class="selection-subtext">Selecciona tu sesión para iniciar el guiado</span>
+        </div>
 
-        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
-          <p style="font-size: 0.82rem; font-weight: 700; color: var(--text-secondary); text-align: center; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">¿Qué vas a entrenar hoy?</p>
+        <!-- Selection Option Cards -->
+        <div class="selection-cards-grid">
           
-          <button id="btn-select-fuerza" class="btn btn-fuerza">
-            <i data-lucide="dumbbell" style="width: 20px; height: 20px;"></i>
-            Entrenar Fuerza (Piernas/Glúteos)
+          <!-- Fuerza Full-Body -->
+          <button id="btn-select-fuerza" class="option-card option-fuerza">
+            <div class="option-icon-wrap strength-glow">
+              <i data-lucide="dumbbell" style="width: 24px; height: 24px;"></i>
+            </div>
+            <div class="option-info">
+              <div class="option-title-row">
+                <span class="option-title">Fuerza Full-Body</span>
+                <span class="option-tag strength-tag">45-60 min</span>
+              </div>
+              <span class="option-desc">Empujes, tracciones, piernas y core con tus pesas de 5kg y cintas.</span>
+              <div class="option-chips">
+                <span class="chip">Mancuernas 5kg</span>
+                <span class="chip">Cintas</span>
+                <span class="chip">Alta Intensidad</span>
+              </div>
+            </div>
+            <i data-lucide="chevron-right" class="option-arrow"></i>
           </button>
-          
-          <button id="btn-select-carrera" class="btn btn-carrera">
-            <i data-lucide="footprints" style="width: 20px; height: 20px;"></i>
-            Salir a Correr (Running)
+
+          <!-- Carrera / Running -->
+          <button id="btn-select-carrera" class="option-card option-carrera">
+            <div class="option-icon-wrap run-glow">
+              <i data-lucide="footprints" style="width: 24px; height: 24px;"></i>
+            </div>
+            <div class="option-info">
+              <div class="option-title-row">
+                <span class="option-title">Salir a Correr</span>
+                <span class="option-tag run-tag">30-45 min</span>
+              </div>
+              <span class="option-desc">Rodamiento aeróbico suave en Zona 2 o Fartlek guiado.</span>
+              <div class="option-chips">
+                <span class="chip">Apple Watch</span>
+                <span class="chip">Watchletic Sync</span>
+                <span class="chip">Zona 2</span>
+              </div>
+            </div>
+            <i data-lucide="chevron-right" class="option-arrow"></i>
           </button>
-          
-          <button id="btn-select-descanso" class="btn btn-secondary">
-            <i data-lucide="coffee" style="width: 20px; height: 20px;"></i>
-            Tomar Día de Descanso
+
+          <!-- Día de Descanso -->
+          <button id="btn-select-descanso" class="option-card option-descanso">
+            <div class="option-icon-wrap rest-glow">
+              <i data-lucide="coffee" style="width: 24px; height: 24px;"></i>
+            </div>
+            <div class="option-info">
+              <div class="option-title-row">
+                <span class="option-title">Día de Descanso</span>
+                <span class="option-tag rest-tag">Recuperación</span>
+              </div>
+              <span class="option-desc">Asimilación muscular, hidratación y regeneración celular.</span>
+            </div>
+            <i data-lucide="chevron-right" class="option-arrow"></i>
           </button>
+
         </div>
       </div>
 
       <!-- Workout Routine Card (Populated by JS) -->
       <div id="workout-card" class="workout-card" style="display: none;">
         <div class="card-header">
-          <div id="workout-badge" class="badge">Sesión</div>
-          <h2 class="card-title">Rutina de Hoy</h2>
+          <div id="workout-badge" class="badge">Sesión Guiada</div>
+          <h2 class="card-title">Rutina Diseñada por IA</h2>
         </div>
         
-        <!-- Adaptation Banner (shown if Gemini adapted the routine) -->
-        <div id="adaptation-banner" class="rest-banner" style="display: none; margin-bottom: 16px; background-color: #F0FDF4; border-color: #DCFCE7; color: #166534; font-size: 0.85rem; padding: 12px 16px; border-radius: 16px; gap: 10px;">
-          <span style="font-size: 1.1rem;">💡</span>
-          <span id="adaptation-text" class="rest-message" style="font-weight: 500; font-size: 0.85rem; line-height: 1.4;"></span>
+        <!-- Adaptation Banner -->
+        <div id="adaptation-banner" class="adaptation-card" style="display: none;">
+          <span class="adaptation-icon">💡</span>
+          <span id="adaptation-text" class="adaptation-text"></span>
         </div>
 
-        <!-- Decision Banner (explains why this workout was chosen today) -->
-        <div id="decision-banner" class="rest-banner" style="display: none; margin-bottom: 16px; background-color: #EEF2FF; border-color: #E0E7FF; color: #3730A3; font-size: 0.85rem; padding: 12px 16px; border-radius: 16px; gap: 10px;">
-          <span style="font-size: 1.1rem;">🧠</span>
-          <span id="decision-text" class="rest-message" style="font-weight: 500; font-size: 0.85rem; line-height: 1.4;"></span>
+        <!-- Decision Banner -->
+        <div id="decision-banner" class="decision-card" style="display: none;">
+          <span class="decision-icon">🧠</span>
+          <span id="decision-text" class="decision-text"></span>
         </div>
 
         <div id="workout-content">
           <!-- Populated dynamically: Exercise List or Carrera Instructions -->
         </div>
 
-        <!-- Custom Warning or Status Message -->
-        <p id="workout-note" style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; font-style: italic; margin-top: 8px; opacity: 0.7;"></p>
+        <p id="workout-note" class="workout-note"></p>
 
-        <!-- Actions -->
+        <!-- Action Buttons -->
         <div class="button-container" id="workout-actions">
           <!-- Populated dynamically by app.js -->
         </div>
@@ -160,51 +215,50 @@
 
     </div>
 
-
-    <!-- Coach Chat Card -->
-    <div id="coach-chat-card" class="workout-card coach-chat-card" style="margin-top: 16px; display: none;">
-      <div class="card-header" style="flex-direction: row; justify-content: space-between; align-items: center; width: 100%; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <div style="width: 38px; height: 38px; border-radius: 50%; background: #FFEBE0; border: 1.5px solid #FC5200; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
-            🏃‍♀️
-          </div>
-          <div>
-            <h3 style="font-size: 0.95rem; font-weight: 900; text-transform: uppercase; color: var(--text-primary); letter-spacing: -0.01em;">Coach Verónica</h3>
-            <span style="font-size: 0.7rem; color: var(--accent-success); font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
-              <span class="pulse-dot"></span> Activa ahora
-            </span>
-          </div>
+    <!-- Coach Chat Card Container -->
+    <div id="coach-chat-card" class="workout-card coach-chat-card">
+      <div class="chat-card-header">
+        <div class="coach-avatar-wrap">
+          <div class="coach-avatar">🏃‍♀️</div>
+          <span class="coach-status-dot"></span>
         </div>
+        <div class="coach-info">
+          <h3 class="coach-name">Coach Verónica IA</h3>
+          <span class="coach-subtitle">Entrenadora personal de Verónica</span>
+        </div>
+      </div>
+
+      <!-- Quick Suggestion Chips -->
+      <div class="chat-chips-scroll">
+        <button class="chat-chip" onclick="enviarTextoChat('¿Tengo poco tiempo hoy, cómo adaptamos el entreno?')">⏱️ Poco tiempo hoy</button>
+        <button class="chat-chip" onclick="enviarTextoChat('¿Tengo molestias en las piernas, qué hacemos?')">🦵 Molestias musculares</button>
+        <button class="chat-chip" onclick="enviarTextoChat('¿Cómo ha sido el análisis de mi reloj?')">⌚ Análisis del reloj</button>
       </div>
 
       <!-- Messages Area -->
       <div id="chat-messages" class="chat-messages-container">
-        <!-- Initial message will be injected dynamically -->
+        <!-- Initial message injected dynamically -->
       </div>
 
       <!-- Input Area -->
       <div class="chat-input-container">
-        <input type="text" id="chat-input" placeholder="Pregunta algo o pide una adaptación..." autocomplete="off">
-        <button id="btn-send-chat" class="btn btn-primary" style="padding: 12px; width: 44px; height: 44px; border-radius: 8px; flex-shrink: 0; background-color: #FC5200;">
+        <input type="text" id="chat-input" placeholder="Escribe a tu coach..." autocomplete="off">
+        <button id="btn-send-chat" class="chat-send-btn" aria-label="Enviar mensaje">
           <i data-lucide="send" style="width: 18px; height: 18px;"></i>
         </button>
       </div>
     </div>
 
-
-
     <!-- Success Message Overlay -->
-    <div id="success-banner" class="rest-banner" style="display: none; animation: slideIn 0.3s ease-out;">
-      <span class="rest-icon">✨</span>
-      <span id="success-text" class="rest-message">¡Gran trabajo! Tu rutina te esperará para el próximo bloque.</span>
+    <div id="success-banner" class="success-banner" style="display: none;">
+      <span class="success-icon">✨</span>
+      <span id="success-text" class="success-message">¡Gran trabajo Verónica! Sesión registrada con éxito.</span>
     </div>
 
   </div>
 
   <!-- ===================== GUIDED SESSION OVERLAY ===================== -->
   <div id="guided-overlay" class="guided-overlay" style="display: none;">
-    
-    <!-- Header: close + progress -->
     <div class="guided-header">
       <button id="guided-close" class="guided-close-btn" aria-label="Salir de la sesión">
         <i data-lucide="x" style="width:22px;height:22px;"></i>
@@ -215,24 +269,17 @@
       <span id="guided-counter" class="guided-counter">1/5</span>
     </div>
 
-    <!-- Phase label -->
     <div id="guided-phase-label" class="guided-phase-label">PREPARADO</div>
 
-    <!-- Main content area -->
     <div class="guided-main">
-
-      <!-- Exercise / Phase name -->
       <div id="guided-exercise-name" class="guided-exercise-name">—</div>
 
-      <!-- Set counter (Fuerza only) -->
       <div id="guided-set-counter" class="guided-set-counter" style="display:none;">
         Serie <span id="guided-set-current">1</span> de <span id="guided-set-total">4</span>
       </div>
 
-      <!-- Reps / info (Fuerza only) -->
       <div id="guided-reps" class="guided-reps" style="display:none;">—</div>
 
-      <!-- Countdown timer (REST + Carrera phases) -->
       <div id="guided-timer-wrap" class="guided-timer-wrap" style="display:none;">
         <svg class="guided-timer-ring" viewBox="0 0 120 120">
           <circle class="guided-timer-track" cx="60" cy="60" r="54"/>
@@ -240,13 +287,9 @@
         </svg>
         <span id="guided-timer-display" class="guided-timer-display">60</span>
       </div>
-
     </div>
 
-    <!-- Bottom action area -->
     <div class="guided-footer">
-
-      <!-- Fuerza: tap when set done -->
       <div id="guided-actions-fuerza" style="display:none; flex-direction:column; gap:12px; width:100%;">
         <button id="btn-serie-done" class="btn btn-primary guided-action-btn">
           <i data-lucide="check" style="width:22px;height:22px;"></i>
@@ -258,7 +301,6 @@
         </button>
       </div>
 
-      <!-- Rest: skip button -->
       <div id="guided-actions-rest" style="display:none; flex-direction:column; gap:12px; width:100%;">
         <button id="btn-skip-rest" class="btn btn-secondary" style="font-size:0.9rem; padding:14px;">
           <i data-lucide="fast-forward" style="width:18px;height:18px;"></i>
@@ -266,7 +308,6 @@
         </button>
       </div>
 
-      <!-- Carrera phases: pause/resume -->
       <div id="guided-actions-carrera" style="display:none; flex-direction:column; gap:12px; width:100%;">
         <button id="btn-pause-carrera" class="btn btn-secondary" style="font-size:0.9rem; padding:14px;">
           <i data-lucide="pause" style="width:18px;height:18px;"></i>
@@ -274,7 +315,6 @@
         </button>
       </div>
 
-      <!-- Completed: feedback + save -->
       <div id="guided-actions-done" style="display:none; flex-direction:column; gap:14px; width:100%;">
         <p style="text-align:center; font-weight:700; font-size:1rem; color:var(--guided-text);">¿Cómo te has sentido?</p>
         <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
@@ -287,19 +327,10 @@
           Guardar en Intervals.icu
         </button>
       </div>
-
     </div>
-
   </div>
-  <!-- ================================================================= -->
 
   <!-- App Logic script -->
-  <script src="/app.js?v=15"></script>
-
-
-
-
-
-
+  <script src="/app.js?v=16"></script>
 </body>
 </html>
