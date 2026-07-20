@@ -115,6 +115,12 @@ class ChatCoachRequest(BaseModel):
     mensaje: str
     historial: List[ChatMessage] = []
 
+class GeminiChatResponse(BaseModel):
+    respuesta: str
+    tiene_cambio_rutina: bool
+    rutina_actualizada: Optional[RutinaResponse] = None
+
+
 
 # --- Helpers ---
 
@@ -727,11 +733,12 @@ async def post_chat_coach(payload: ChatCoachRequest):
             "de Alcàsser (Valencia), que mide 1.77 m y pesa 59 kg (cuerpo atlético y magro, de raza blanca).\n\n"
             "DIRECTRICES DE PERSONALIDAD Y COACHING:\n"
             "1. Tono: Súper cercano, motivador, profesional y empático. Dirígete a ella siempre como 'Verónica'.\n"
-            "2. Contexto físico y Materiales: Tiene 43 años, mide 1.77m y pesa 59kg. Para entrenar en casa dispone únicamente de **bandas de resistencia (cintas)** y **mancuernas de 5 kg (pesas de 5 kg)**. Sus rutinas de Fuerza son siempre de **Cuerpo Completo (Full-Body)**. Tenlo muy en cuenta al proponer ejercicios, técnica y adaptaciones.\n"
-            "3. Contexto geográfico y clima: Alcàsser (Valencia) tiene inviernos suaves pero veranos calurosos y muy húmedos. Si te pregunta por correr o entrenar con calor, menciónalo y dale consejos de hidratación y horarios.\n"
-            "4. Análisis de Datos: Tienes acceso a su historial reciente de Intervals.icu y su reloj. Úsalo para justificar científicamente tus respuestas (ej. 'Vi que en tu carrera de ayer tu pulso medio fue de 158 ppm...', 'Llevas 2 sesiones de fuerza esta semana...').\n"
-            "5. Peticiones de Adaptación: Si Verónica te dice que está cansada, que le duele alguna zona (ej. lumbares, rodillas, tendones) o que tiene poco tiempo, adáptale el enfoque del día. Explícale qué modificaciones hacer en los ejercicios usando sus cintas y mancuernas de 5 kg de forma segura.\n"
-            "6. Concisión: Mantén tus respuestas relativamente cortas y al grano (máximo 3-4 párrafos) para que se lean cómodamente en una pantalla de móvil."
+            "2. Contexto físico y Materiales: Tiene 43 años, mide 1.77m y pesa 59kg. Para entrenar en casa dispone únicamente de **bandas de resistencia (cintas)** y **mancuernas de 5 kg (pesas de 5 kg)**. Sus rutinas de Fuerza son siempre de **Cuerpo Completo (Full-Body)**.\n"
+            "3. REGLA DE RECONFIGURACIÓN DE ENTRENAMIENTO EN TIEMPO REAL (COHERENCIA TOTAL EN LA APP):\n"
+            "   - Si Verónica en su mensaje te pide cambiar, adaptar, acortar, personalizar o reconfigurar su entrenamiento de hoy (por ejemplo: pedir ejercicios distintos, cambiar de fuerza a carrera o viceversa, pedir una rutina de 20 minutos, enfocarse en glúteos/core, o reportar fatiga/molestias musculares), DEBES RECONFIGURAR SU ENTRENAMIENTO.\n"
+            "   - En ese caso, establece 'tiene_cambio_rutina': true y rellena el objeto 'rutina_actualizada' con la sesión completa ajustada (tipo_sesion: 'Fuerza' o 'Carrera', explicacion_tipo, ejercicios para Fuerza o phases para Carrera, mensaje_adaptacion).\n"
+            "   - Si el mensaje es una simple duda o conversación sin intención de cambiar la sesión del día, establece 'tiene_cambio_rutina': false y 'rutina_actualizada': null.\n"
+            "4. Concisión: Mantén tu 'respuesta' escrita de forma cercana (máximo 2-3 párrafos) explicando las razones del ajuste y animándola."
         )
 
         
@@ -777,15 +784,23 @@ async def post_chat_coach(payload: ChatCoachRequest):
             contents=contents,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction + "\n\n" + intro_prompt,
+                response_mime_type="application/json",
+                response_schema=GeminiChatResponse,
                 temperature=0.7,
             )
         )
         
-        return {"respuesta": response.text}
+        chat_data = json.loads(response.text)
+        return chat_data
         
     except Exception as e:
         print("Chat Coach error:", e)
-        return {"respuesta": f"Lo siento Verónica, he tenido un problema de conexión: {str(e)}"}
+        return {
+            "respuesta": f"Lo siento Verónica, he tenido un problema de conexión: {str(e)}",
+            "tiene_cambio_rutina": False,
+            "rutina_actualizada": None
+        }
+
 
 
 # Create static folder if it doesn't exist

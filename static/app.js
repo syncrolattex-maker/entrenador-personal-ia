@@ -238,7 +238,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v16"; // Bumped version for design overhaul and Watchletic fix
+    const APP_VERSION = "v17"; // Bumped version for real-time unified chat workout reconfiguration
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
@@ -1239,6 +1239,16 @@ async function enviarMensajeChat() {
       chatHistory.push({ role: "model", parts: data.respuesta });
       renderChatMessages();
       saveChat();
+      
+      // Real-time workout reconfiguration from chat!
+      if (data.rutina_actualizada) {
+        state.currentWorkout = data.rutina_actualizada;
+        localStorage.setItem("cached_workout", JSON.stringify(state.currentWorkout));
+        localStorage.setItem("cached_workout_date", new Date().toDateString());
+        
+        renderWorkout(state.currentWorkout);
+        showSuccessBanner("✨ Tu Coach Verónica ha adaptado tu entrenamiento de hoy.");
+      }
     } else {
       chatHistory.push({ role: "model", parts: "Disculpa Verónica, he tenido un problema al procesar tu mensaje. ¿Puedes repetirlo?" });
       renderChatMessages();
