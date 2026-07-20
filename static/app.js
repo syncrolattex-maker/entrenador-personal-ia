@@ -238,7 +238,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v27"; // Automatic retry & model fallback for 503 UNAVAILABLE demand spikes
+    const APP_VERSION = "v28"; // Video-Assisted Guided Strength Workout Player
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
@@ -714,9 +714,13 @@ function showFuerzaExercise() {
   updateProgress();
   setPhaseLabel("EJERCICIO", "working");
 
+  // Update Assisted Video Demo & Tempo Cues
+  updateGuidedVideo(ex.nombre, ex.descripcion);
+
   elGuidedExName.textContent = ex.nombre;
   elGuidedExName.style.animation = "none";
   requestAnimationFrame(() => elGuidedExName.style.animation = "");
+
 
   elGuidedSetCurrent.textContent = guided.setIndex + 1;
   elGuidedSetTotal.textContent   = ex.series;
@@ -1444,6 +1448,59 @@ function guardarPreferenciasEntrenamiento() {
 
   showSuccessBanner("✨ Reglas y preferencias de entrenamiento guardadas.");
 }
+
+// Assisted Strength Workout Video Demonstration Engine
+const EXERCISE_MEDIA_MAP = [
+  { keywords: ["zancada", "lunge"], video: "https://assets.mixkit.co/videos/preview/mixkit-young-woman-doing-lunges-in-a-gym-41492-large.mp4", icon: "🦵", tempo: "3s Bajada • 1s Pausa • 1s Empuje", cues: "Mantén el torso erguido. La rodilla trasera desciende rozando el suelo." },
+  { keywords: ["sentadilla", "squat"], video: "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-squats-with-dumbbells-41489-large.mp4", icon: "🏋️‍♀️", tempo: "3s Bajar • 1s Pausa • 1s Subir", cues: "Peso en talones, rodillas alineadas con puntas de pies." },
+  { keywords: ["peso muerto", "deadlift"], video: "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-deadlifts-with-a-dumbbell-41490-large.mp4", icon: "🍑", tempo: "3s Bajar • 1s Apretar Glúteo", cues: "Empuja cadera atrás manteniendo espalda totalmente neutra." },
+  { keywords: ["hip thrust", "puente"], video: "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-hip-thrusts-with-a-resistance-band-41491-large.mp4", icon: "🍑", tempo: "2s Subir • 2s Pausa Arriba", cues: "Espalda apoyada, contrae fuertemente glúteos arriba." },
+  { keywords: ["press", "hombro", "militar"], video: "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-shoulder-press-41493-large.mp4", icon: "🙆‍♀️", tempo: "1s Empujar • 3s Controlar Bajada", cues: "Abdomen tenso, empuja vertical sin arquear la zona lumbar." },
+  { keywords: ["remo", "row"], video: "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-dumbbell-rows-41494-large.mp4", icon: "💪", tempo: "1s Tirar • 1s Apretar Escápulas", cues: "Tracciona codo hacia la cadera apretando escápulas atrás." },
+  { keywords: ["plancha", "plank", "core", "bicho"], video: "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-plank-exercise-41495-large.mp4", icon: "🧘‍♀️", tempo: "Tensión Isométrica Constante", cues: "Alinea cabeza, pelvis y tobillos. Aprieta fuertemente abdomen y glúteos." }
+];
+
+function updateGuidedVideo(exerciseName, exerciseDesc) {
+  const videoCard = document.getElementById("guided-video-card");
+  const videoEl = document.getElementById("guided-exercise-video");
+  const videoSrc = document.getElementById("guided-video-source");
+  const fallbackEl = document.getElementById("guided-video-fallback");
+  const iconEl = document.getElementById("guided-exercise-icon");
+  const tempoEl = document.getElementById("guided-tempo-text");
+  const descEl = document.getElementById("guided-exercise-desc");
+  
+  if (!videoCard) return;
+
+  videoCard.style.display = "flex";
+
+  const nameLower = (exerciseName || "").toLowerCase();
+  let match = EXERCISE_MEDIA_MAP.find(item => item.keywords.some(k => nameLower.includes(k)));
+
+  if (!match) {
+    match = {
+      video: "",
+      icon: "🏋️‍♀️",
+      tempo: "3s Bajada • 1s Pausa • 1s Empuje",
+      cues: exerciseDesc || "Mantén la postura erguida y tensión constante con tus pesas o cintas."
+    };
+  }
+
+  if (iconEl) iconEl.textContent = match.icon;
+  if (tempoEl) tempoEl.textContent = match.tempo;
+  if (descEl) descEl.textContent = exerciseDesc || match.cues;
+
+  if (match.video && videoEl && videoSrc) {
+    videoSrc.src = match.video;
+    videoEl.load();
+    videoEl.play().catch(() => {});
+    videoEl.style.display = "block";
+    if (fallbackEl) fallbackEl.style.display = "none";
+  } else {
+    if (videoEl) videoEl.style.display = "none";
+    if (fallbackEl) fallbackEl.style.display = "flex";
+  }
+}
+
 
 
 

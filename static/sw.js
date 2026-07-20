@@ -1,4 +1,4 @@
-const CACHE_NAME = "verofit-cache-v27";
+const CACHE_NAME = "verofit-cache-v28";
 const ASSETS = [
   "/",
   "/index.html",
@@ -12,7 +12,7 @@ self.addEventListener("install", (e) => {
   self.skipWaiting(); // activate immediately
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log("[Service Worker] Caching all static assets v27 for Verofit");
+      console.log("[Service Worker] Caching all static assets v28 for Verofit");
       return cache.addAll(ASSETS);
     })
   );

@@ -446,7 +446,26 @@
     <div id="guided-phase-label" class="label-caps" style="color: var(--primary); font-size: 0.9rem;">PREPARADO</div>
 
     <div class="guided-main">
+      <!-- Video Demonstration & Technique Assistant Card -->
+      <div id="guided-video-card" class="guided-video-card">
+        <div class="video-container">
+          <video id="guided-exercise-video" class="guided-video-element" autoplay loop muted playsinline poster="">
+            <source id="guided-video-source" src="" type="video/mp4">
+          </video>
+          <div id="guided-video-fallback" class="video-fallback-animation">
+            <div class="exercise-anim-icon" id="guided-exercise-icon">🏋️‍♀️</div>
+            <span class="label-caps" style="color: var(--primary); margin-top: 6px;">ASISTENTE DE TÉCNICA VEROFIT</span>
+          </div>
+        </div>
+        
+        <div class="technique-tempo-bar">
+          <span class="label-caps" style="color: var(--secondary);">RITMO Y TEMPO:</span>
+          <span id="guided-tempo-text" class="label-caps" style="color: var(--primary);">3s Bajar • 1s Pausa • 1s Subir</span>
+        </div>
+      </div>
+
       <div id="guided-exercise-name" class="display-lg-mobile">—</div>
+      <p id="guided-exercise-desc" class="body-sm-muted" style="max-width: 340px; margin: 0 auto; text-align: center;"></p>
 
       <div id="guided-set-counter" class="body-lg" style="display:none; color: var(--text-secondary);">
         Serie <span id="guided-set-current">1</span> de <span id="guided-set-total">4</span>
@@ -462,6 +481,7 @@
         <span id="guided-timer-display" class="metric-xl" style="position: absolute;">60</span>
       </div>
     </div>
+
 
     <div class="guided-footer">
       <div id="guided-actions-fuerza" style="display:none; flex-direction:column; gap:12px; width:100%;">
