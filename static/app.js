@@ -238,7 +238,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v30"; // Interactive Video Demonstration Cards & Exercise Preview Modals
+    const APP_VERSION = "v31"; // Kinetic SVG Biomechanics Motion Engine & Open Fitness Animation Visualizer
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
@@ -1457,21 +1457,69 @@ function guardarPreferenciasEntrenamiento() {
 
 // Assisted Strength Workout Video Demonstration Engine
 const EXERCISE_MEDIA_MAP = [
-  { keywords: ["zancada", "lunge"], video: "https://assets.mixkit.co/videos/preview/mixkit-young-woman-doing-lunges-in-a-gym-41492-large.mp4", icon: "🦵", tempo: "3s Bajada • 1s Pausa • 1s Empuje", cues: "Mantén el torso erguido. La rodilla trasera desciende rozando el suelo." },
-  { keywords: ["sentadilla", "squat"], video: "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-squats-with-dumbbells-41489-large.mp4", icon: "🏋️‍♀️", tempo: "3s Bajar • 1s Pausa • 1s Subir", cues: "Peso en talones, rodillas alineadas con puntas de pies." },
-  { keywords: ["peso muerto", "deadlift"], video: "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-deadlifts-with-a-dumbbell-41490-large.mp4", icon: "🍑", tempo: "3s Bajar • 1s Apretar Glúteo", cues: "Empuja cadera atrás manteniendo espalda totalmente neutra." },
-  { keywords: ["hip thrust", "puente"], video: "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-hip-thrusts-with-a-resistance-band-41491-large.mp4", icon: "🍑", tempo: "2s Subir • 2s Pausa Arriba", cues: "Espalda apoyada, contrae fuertemente glúteos arriba." },
-  { keywords: ["press", "hombro", "militar"], video: "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-shoulder-press-41493-large.mp4", icon: "🙆‍♀️", tempo: "1s Empujar • 3s Controlar Bajada", cues: "Abdomen tenso, empuja vertical sin arquear la zona lumbar." },
-  { keywords: ["remo", "row"], video: "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-dumbbell-rows-41494-large.mp4", icon: "💪", tempo: "1s Tirar • 1s Apretar Escápulas", cues: "Tracciona codo hacia la cadera apretando escápulas atrás." },
-  { keywords: ["plancha", "plank", "core", "bicho"], video: "https://assets.mixkit.co/videos/preview/mixkit-woman-doing-plank-exercise-41495-large.mp4", icon: "🧘‍♀️", tempo: "Tensión Isométrica Constante", cues: "Alinea cabeza, pelvis y tobillos. Aprieta fuertemente abdomen y glúteos." }
+  {
+    keywords: ["zancada", "lunge"],
+    gif: "https://upload.wikimedia.org/wikipedia/commons/1/18/Lunges_1.gif",
+    animClass: "anim-lunge",
+    muscle: "CUÁDRICEPS Y GLÚTEOS",
+    tempo: "3s Bajada • 1s Pausa • 1s Empuje",
+    cues: "Mantén el torso erguido. La rodilla trasera desciende rozando el suelo."
+  },
+  {
+    keywords: ["sentadilla", "squat"],
+    gif: "https://upload.wikimedia.org/wikipedia/commons/8/82/Squats.gif",
+    animClass: "anim-squat",
+    muscle: "TREN INFERIOR • GLÚTEOS",
+    tempo: "3s Bajar • 1s Pausa • 1s Subir",
+    cues: "Peso en talones, rodillas alineadas con las puntas de los pies."
+  },
+  {
+    keywords: ["peso muerto", "deadlift"],
+    gif: "https://upload.wikimedia.org/wikipedia/commons/a/a2/Barbell_Deadlift.gif",
+    animClass: "anim-squat",
+    muscle: "CADENA POSTERIOR • GLÚTEO",
+    tempo: "3s Bajar • 1s Apretar Glúteo",
+    cues: "Empuja la cadera atrás manteniendo la columna totalmente neutra."
+  },
+  {
+    keywords: ["hip thrust", "puente"],
+    gif: "https://upload.wikimedia.org/wikipedia/commons/8/82/Squats.gif",
+    animClass: "anim-squat",
+    muscle: "GLÚTEO MAYOR Y CORE",
+    tempo: "2s Subir • 2s Pausa Arriba",
+    cues: "Espalda apoyada, contrae fuertemente glúteos arriba."
+  },
+  {
+    keywords: ["press", "hombro", "militar"],
+    gif: "https://upload.wikimedia.org/wikipedia/commons/9/91/Shoulder_press.gif",
+    animClass: "anim-press",
+    muscle: "EMPUJE • DELTOIDES Y TRÍCEPS",
+    tempo: "1s Empujar • 3s Controlar Bajada",
+    cues: "Abdomen tenso, empuja vertical sin arquear la zona lumbar."
+  },
+  {
+    keywords: ["remo", "row"],
+    gif: "https://upload.wikimedia.org/wikipedia/commons/a/a0/Dumbbell_Row.gif",
+    animClass: "anim-row",
+    muscle: "TRACCIÓN • DORSAL Y ESCÁPULAS",
+    tempo: "1s Tirar • 1s Apretar Escápulas",
+    cues: "Tracciona el codo hacia la cadera apretando las escápulas atrás."
+  },
+  {
+    keywords: ["plancha", "plank", "core", "bicho"],
+    gif: "https://upload.wikimedia.org/wikipedia/commons/a/a6/Plank.gif",
+    animClass: "anim-plank",
+    muscle: "CORE • ESTABILIZACIÓN ABDOMINAL",
+    tempo: "Tensión Isométrica Constante",
+    cues: "Alinea cabeza, pelvis y tobillos. Aprieta fuertemente abdomen y glúteos."
+  }
 ];
 
 function updateGuidedVideo(exerciseName, exerciseDesc) {
   const videoCard = document.getElementById("guided-video-card");
-  const videoEl = document.getElementById("guided-exercise-video");
-  const videoSrc = document.getElementById("guided-video-source");
-  const fallbackEl = document.getElementById("guided-video-fallback");
-  const iconEl = document.getElementById("guided-exercise-icon");
+  const canvasEl = document.getElementById("guided-biomechanics-canvas");
+  const imgEl = document.getElementById("guided-exercise-img");
+  const muscleEl = document.getElementById("guided-muscle-name");
   const tempoEl = document.getElementById("guided-tempo-text");
   const descEl = document.getElementById("guided-exercise-desc");
   
@@ -1484,24 +1532,29 @@ function updateGuidedVideo(exerciseName, exerciseDesc) {
 
   if (!match) {
     match = {
-      video: "",
-      icon: "🏋️‍♀️",
+      gif: "",
+      animClass: "anim-squat",
+      muscle: "FULL-BODY • RESISTENCIA",
       tempo: "3s Bajada • 1s Pausa • 1s Empuje",
       cues: exerciseDesc || "Mantén la postura erguida y tensión constante con tus pesas o cintas."
     };
   }
 
-  if (iconEl) iconEl.textContent = match.icon;
   if (tempoEl) tempoEl.textContent = match.tempo;
   if (descEl) descEl.textContent = exerciseDesc || match.cues;
+  if (muscleEl) muscleEl.textContent = match.muscle;
 
-  if (match.video && videoEl && videoSrc) {
-    videoSrc.src = match.video;
-    videoEl.load();
-    videoEl.play().catch(() => {});
-    videoEl.style.display = "block";
-    if (fallbackEl) fallbackEl.style.display = "none";
-  } else {
+  if (canvasEl) {
+    canvasEl.className = `biomechanics-canvas ${match.animClass}`;
+  }
+
+  if (match.gif && imgEl) {
+    imgEl.src = match.gif;
+    imgEl.style.display = "block";
+    imgEl.onload = () => { imgEl.style.display = "block"; };
+    imgEl.onerror = () => { imgEl.style.display = "none"; };
+  } else if (imgEl) {
+    imgEl.style.display = "none";
   }
 }
 
@@ -1511,10 +1564,9 @@ function openExerciseVideoModal(encodedName, encodedDesc) {
 
   const modal = document.getElementById("exercise-video-modal");
   const titleEl = document.getElementById("modal-video-title");
-  const videoEl = document.getElementById("modal-exercise-video");
-  const videoSrc = document.getElementById("modal-video-source");
-  const fallbackEl = document.getElementById("modal-video-fallback");
-  const iconEl = document.getElementById("modal-exercise-icon");
+  const canvasEl = document.getElementById("modal-biomechanics-canvas");
+  const imgEl = document.getElementById("modal-exercise-img");
+  const muscleEl = document.getElementById("modal-muscle-name");
   const tempoEl = document.getElementById("modal-video-tempo");
   const cuesEl = document.getElementById("modal-video-cues");
 
@@ -1527,26 +1579,29 @@ function openExerciseVideoModal(encodedName, encodedDesc) {
 
   if (!match) {
     match = {
-      video: "",
-      icon: "🏋️‍♀️",
+      gif: "",
+      animClass: "anim-squat",
+      muscle: "FULL-BODY • RESISTENCIA",
       tempo: "3s Bajada • 1s Pausa • 1s Empuje",
       cues: desc || "Mantén la postura erguida y tensión constante con tus pesas o cintas."
     };
   }
 
-  if (iconEl) iconEl.textContent = match.icon;
   if (tempoEl) tempoEl.textContent = match.tempo;
   if (cuesEl) cuesEl.textContent = desc || match.cues;
+  if (muscleEl) muscleEl.textContent = match.muscle;
 
-  if (match.video && videoEl && videoSrc) {
-    videoSrc.src = match.video;
-    videoEl.load();
-    videoEl.play().catch(() => {});
-    videoEl.style.display = "block";
-    if (fallbackEl) fallbackEl.style.display = "none";
-  } else {
-    if (videoEl) videoEl.style.display = "none";
-    if (fallbackEl) fallbackEl.style.display = "flex";
+  if (canvasEl) {
+    canvasEl.className = `biomechanics-canvas ${match.animClass}`;
+  }
+
+  if (match.gif && imgEl) {
+    imgEl.src = match.gif;
+    imgEl.style.display = "block";
+    imgEl.onload = () => { imgEl.style.display = "block"; };
+    imgEl.onerror = () => { imgEl.style.display = "none"; };
+  } else if (imgEl) {
+    imgEl.style.display = "none";
   }
 
   modal.style.display = "flex";
@@ -1555,10 +1610,9 @@ function openExerciseVideoModal(encodedName, encodedDesc) {
 
 function closeExerciseVideoModal() {
   const modal = document.getElementById("exercise-video-modal");
-  const videoEl = document.getElementById("modal-exercise-video");
-  if (videoEl) videoEl.pause();
   if (modal) modal.style.display = "none";
 }
+
 
 
 

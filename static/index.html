@@ -446,16 +446,29 @@
     <div id="guided-phase-label" class="label-caps" style="color: var(--primary); font-size: 0.9rem;">PREPARADO</div>
 
     <div class="guided-main">
-      <!-- Video Demonstration & Technique Assistant Card -->
+      <!-- Video & Kinetic Biomechanics Motion Card -->
       <div id="guided-video-card" class="guided-video-card">
         <div class="video-container">
-          <video id="guided-exercise-video" class="guided-video-element" autoplay loop muted playsinline poster="">
-            <source id="guided-video-source" src="" type="video/mp4">
-          </video>
-          <div id="guided-video-fallback" class="video-fallback-animation">
-            <div class="exercise-anim-icon" id="guided-exercise-icon">🏋️‍♀️</div>
-            <span class="label-caps" style="color: var(--primary); margin-top: 6px;">ASISTENTE DE TÉCNICA VEROFIT</span>
+          <!-- Biomechanics SVG Engine -->
+          <div id="guided-biomechanics-canvas" class="biomechanics-canvas anim-squat">
+            <svg viewBox="0 0 200 180" class="biomechanics-svg">
+              <ellipse id="guided-muscle-glow" cx="100" cy="110" rx="40" ry="25" fill="rgba(195,244,0,0.25)"/>
+              <g id="guided-body-group">
+                <circle cx="100" cy="40" r="12" fill="#E5E2E1"/>
+                <path d="M100 52 L100 100" stroke="#E5E2E1" stroke-width="8" stroke-linecap="round"/>
+                <path id="guided-arms" d="M80 65 L100 75 L120 65" stroke="#C3F400" stroke-width="5" stroke-linecap="round" fill="none"/>
+                <circle id="guided-weight-l" cx="75" cy="65" r="7" fill="#00EEFC"/>
+                <circle id="guided-weight-r" cx="125" cy="65" r="7" fill="#00EEFC"/>
+                <path id="guided-legs" d="M100 100 L85 145 M100 100 L115 145" stroke="#C3F400" stroke-width="7" stroke-linecap="round"/>
+              </g>
+              <line x1="40" y1="152" x2="160" y2="152" stroke="#353534" stroke-width="4" stroke-linecap="round"/>
+            </svg>
+            <div class="media-tech-badge">
+              <span id="guided-muscle-name" class="label-caps" style="color: var(--primary);">TREN INFERIOR • GLÚTEOS</span>
+            </div>
           </div>
+
+          <img id="guided-exercise-img" class="guided-video-element" src="" alt="Demostración de ejercicio" style="display:none;" />
         </div>
         
         <div class="technique-tempo-bar">
@@ -463,6 +476,7 @@
           <span id="guided-tempo-text" class="label-caps" style="color: var(--primary);">3s Bajar • 1s Pausa • 1s Subir</span>
         </div>
       </div>
+
 
       <div id="guided-exercise-name" class="display-lg-mobile">—</div>
       <p id="guided-exercise-desc" class="body-sm-muted" style="max-width: 340px; margin: 0 auto; text-align: center;"></p>
@@ -535,14 +549,27 @@
       <h3 id="modal-video-title" class="headline-sm" style="margin: 6px 0 14px 0;">-</h3>
 
       <div class="video-container" style="border-radius: var(--rounded-md); overflow: hidden; margin-bottom: 14px; height: 210px;">
-        <video id="modal-exercise-video" class="guided-video-element" autoplay loop muted playsinline>
-          <source id="modal-video-source" src="" type="video/mp4">
-        </video>
-        <div id="modal-video-fallback" class="video-fallback-animation">
-          <div class="exercise-anim-icon" id="modal-exercise-icon">🏋️‍♀️</div>
-          <span class="label-caps" style="color: var(--primary); margin-top: 6px;">ASISTENTE VEROFIT</span>
+        <div id="modal-biomechanics-canvas" class="biomechanics-canvas anim-squat">
+          <svg viewBox="0 0 200 180" class="biomechanics-svg">
+            <ellipse id="modal-muscle-glow" cx="100" cy="110" rx="40" ry="25" fill="rgba(195,244,0,0.25)"/>
+            <g id="modal-body-group">
+              <circle cx="100" cy="40" r="12" fill="#E5E2E1"/>
+              <path d="M100 52 L100 100" stroke="#E5E2E1" stroke-width="8" stroke-linecap="round"/>
+              <path id="modal-arms" d="M80 65 L100 75 L120 65" stroke="#C3F400" stroke-width="5" stroke-linecap="round" fill="none"/>
+              <circle id="modal-weight-l" cx="75" cy="65" r="7" fill="#00EEFC"/>
+              <circle id="modal-weight-r" cx="125" cy="65" r="7" fill="#00EEFC"/>
+              <path id="modal-legs" d="M100 100 L85 145 M100 100 L115 145" stroke="#C3F400" stroke-width="7" stroke-linecap="round"/>
+            </g>
+            <line x1="40" y1="152" x2="160" y2="152" stroke="#353534" stroke-width="4" stroke-linecap="round"/>
+          </svg>
+          <div class="media-tech-badge">
+            <span id="modal-muscle-name" class="label-caps" style="color: var(--primary);">TREN INFERIOR • GLÚTEOS</span>
+          </div>
         </div>
+
+        <img id="modal-exercise-img" class="guided-video-element" src="" alt="Demostración" style="display:none;" />
       </div>
+
 
       <div class="technique-tempo-bar" style="border-radius: var(--rounded-md); margin-bottom: 12px;">
         <span class="label-caps" style="color: var(--secondary);">TEMPO Y RITMO:</span>
