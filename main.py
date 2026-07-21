@@ -711,12 +711,13 @@ async def get_rapidapi_exercises(muscle: str):
     }
 
 @app.get("/api/musclewiki/{category}")
-async def get_musclewiki_exercises(category: str):
+async def get_musclewiki_exercises(category: str, lang: str = "es-es"):
     """
-    Official MuscleWiki API Proxy Endpoint.
-    Uses MuscleWiki X-API-Key: mw_DlcYcuEWMjyww9sFtjX8JFmb5hNylJRNNLxcpNBUnXM.
-    Fetches exercises, HD video loops, and step-by-step biomechanical form cues.
-    Falls back gracefully to Kaggle Catalog + Kinetic SVG Engine if restricted/offline.
+    Official MuscleWiki REST API Proxy Endpoint.
+    Documentation: https://api.musclewiki.com/documentation
+    Header: X-API-Key: mw_DlcYcuEWMjyww9sFtjX8JFmb5hNylJRNNLxcpNBUnXM
+    Supported categories: dumbbell, barbell, bodyweight, band, cable.
+    Languages: es-es, en-us, etc.
     """
     mw_key = os.getenv("MUSCLEWIKI_API_KEY", "mw_DlcYcuEWMjyww9sFtjX8JFmb5hNylJRNNLxcpNBUnXM")
     url = "https://api.musclewiki.com/exercises"
@@ -724,7 +725,9 @@ async def get_musclewiki_exercises(category: str):
         "X-API-Key": mw_key
     }
     params = {
-        "category": category.lower().strip()
+        "category": category.lower().strip(),
+        "limit": 20,
+        "lang": lang
     }
 
     try:
@@ -732,15 +735,21 @@ async def get_musclewiki_exercises(category: str):
             res = await client.get(url, headers=headers, params=params, timeout=5.0)
             if res.status_code == 200:
                 data = res.json()
-                return {"status": "ok", "source": "MuscleWikiAPI", "category": category, "data": data}
+                return {
+                    "status": "ok",
+                    "source": "MuscleWikiAPI",
+                    "category": category,
+                    "count": data.get("count", 0),
+                    "data": data.get("results", data)
+                }
             else:
-                print(f"[MuscleWiki Proxy] Status {res.status_code}: {res.text[:180]}")
+                print(f"[MuscleWiki Proxy] Status {res.status_code}: {res.text[:200]}")
     except Exception as e:
         print(f"[MuscleWiki Proxy Exception]: {e}")
 
     # Fallback to local catalog
     clean_cat = category.lower().strip()
-    filtered = [ex for ex in GYM_EXERCISE_CATALOG if clean_cat in ex["target_muscle"].lower() or clean_cat in ex["grupo"].lower()]
+    filtered = [ex for ex in GYM_EXERCISE_CATALOG if clean_cat in ex["target_muscle"].lower() or clean_cat in ex["grupo"].lower() or clean_cat in ex["equipamiento"].lower()]
     if not filtered:
         filtered = GYM_EXERCISE_CATALOG
 
@@ -750,6 +759,7 @@ async def get_musclewiki_exercises(category: str):
         "category": category,
         "data": filtered
     }
+
 
 
 
