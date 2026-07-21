@@ -238,7 +238,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v33"; // Gym & Home Exercises RapidAPI Integration Layer & Fallback Engine
+    const APP_VERSION = "v34"; // MuscleWiki Official API Integration & Proxy Layer
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");

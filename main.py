@@ -710,6 +710,48 @@ async def get_rapidapi_exercises(muscle: str):
         "data": filtered
     }
 
+@app.get("/api/musclewiki/{category}")
+async def get_musclewiki_exercises(category: str):
+    """
+    Official MuscleWiki API Proxy Endpoint.
+    Uses MuscleWiki X-API-Key: mw_DlcYcuEWMjyww9sFtjX8JFmb5hNylJRNNLxcpNBUnXM.
+    Fetches exercises, HD video loops, and step-by-step biomechanical form cues.
+    Falls back gracefully to Kaggle Catalog + Kinetic SVG Engine if restricted/offline.
+    """
+    mw_key = os.getenv("MUSCLEWIKI_API_KEY", "mw_DlcYcuEWMjyww9sFtjX8JFmb5hNylJRNNLxcpNBUnXM")
+    url = "https://api.musclewiki.com/exercises"
+    headers = {
+        "X-API-Key": mw_key
+    }
+    params = {
+        "category": category.lower().strip()
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            res = await client.get(url, headers=headers, params=params, timeout=5.0)
+            if res.status_code == 200:
+                data = res.json()
+                return {"status": "ok", "source": "MuscleWikiAPI", "category": category, "data": data}
+            else:
+                print(f"[MuscleWiki Proxy] Status {res.status_code}: {res.text[:180]}")
+    except Exception as e:
+        print(f"[MuscleWiki Proxy Exception]: {e}")
+
+    # Fallback to local catalog
+    clean_cat = category.lower().strip()
+    filtered = [ex for ex in GYM_EXERCISE_CATALOG if clean_cat in ex["target_muscle"].lower() or clean_cat in ex["grupo"].lower()]
+    if not filtered:
+        filtered = GYM_EXERCISE_CATALOG
+
+    return {
+        "status": "ok",
+        "source": "LocalKaggleCatalog",
+        "category": category,
+        "data": filtered
+    }
+
+
 
 @app.get("/historial-actividades")
 async def get_historial_actividades_endpoint():
