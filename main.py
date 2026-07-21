@@ -670,6 +670,47 @@ async def get_ejercicios_catalogo_endpoint():
     """
     return {"status": "ok", "ejercicios": GYM_EXERCISE_CATALOG}
 
+@app.get("/api/rapidapi-exercises/{muscle}")
+async def get_rapidapi_exercises(muscle: str):
+    """
+    Proxy endpoint to fetch exercise data directly from Gym and Home Exercises RapidAPI.
+    Supports muscle groups: adductor, quadriceps, glutes, hamstrings, shoulders, back, chest, abs.
+    Falls back gracefully to local catalog if unsubscribed or offline.
+    """
+    rapid_key = os.getenv("RAPIDAPI_KEY", "894945d817msh8622b11c7f9f712p171acajsnb3339e41c2f6")
+    rapid_host = os.getenv("RAPIDAPI_HOST", "gym-and-home-exercises.p.rapidapi.com")
+
+    clean_muscle = muscle.lower().strip()
+    url = f"https://{rapid_host}/{clean_muscle}.json"
+    headers = {
+        "x-rapidapi-host": rapid_host,
+        "x-rapidapi-key": rapid_key
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            res = await client.get(url, headers=headers, timeout=5.0)
+            if res.status_code == 200:
+                data = res.json()
+                return {"status": "ok", "source": "RapidAPI", "muscle": muscle, "data": data}
+            else:
+                print(f"[RapidAPI Proxy] Status {res.status_code}: {res.text[:150]}")
+    except Exception as e:
+        print(f"[RapidAPI Proxy Exception]: {e}")
+
+    # Seamless fallback to Kaggle Catalog filtered by muscle group
+    filtered = [ex for ex in GYM_EXERCISE_CATALOG if clean_muscle in ex["target_muscle"].lower() or clean_muscle in ex["grupo"].lower()]
+    if not filtered:
+        filtered = GYM_EXERCISE_CATALOG
+
+    return {
+        "status": "ok",
+        "source": "LocalKaggleCatalog",
+        "muscle": muscle,
+        "data": filtered
+    }
+
+
 @app.get("/historial-actividades")
 async def get_historial_actividades_endpoint():
     """
