@@ -238,7 +238,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v31"; // Kinetic SVG Biomechanics Motion Engine & Open Fitness Animation Visualizer
+    const APP_VERSION = "v32"; // Integration of Kaggle Gym Exercise Dataset & Biomechanical Catalog
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");

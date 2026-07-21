@@ -576,6 +576,100 @@ async def post_registrar_actividad(payload: ActividadCompletadaPayload):
         "db": db
     }
 
+GYM_EXERCISE_CATALOG = [
+    {
+        "id": "ex_01",
+        "nombre": "Zancadas Búlgaras con Mancuernas (5 kg)",
+        "target_muscle": "Glúteos y Cuádriceps",
+        "grupo": "Piernas",
+        "equipamiento": "Mancuernas de 5 kg",
+        "dificultad": "Exigente",
+        "tempo": "3s Bajada • 1s Pausa • 1s Empuje",
+        "animClass": "anim-lunge",
+        "gif": "https://upload.wikimedia.org/wikipedia/commons/1/18/Lunges_1.gif",
+        "paso_a_paso": "1. Apoya el empeine trasero sobre una silla o sofá.\n2. Sostén las mancuernas de 5 kg con brazos relajados a los lados.\n3. Desciende flexionando la rodilla delantera hasta 90º en 3 segundos.\n4. Empuja fuertemente con el talón delantero para retornar a la posición inicial."
+    },
+    {
+        "id": "ex_02",
+        "nombre": "Sentadilla Goblet con Mancuerna de 5 kg",
+        "target_muscle": "Cuádriceps y Glúteo Mayor",
+        "grupo": "Piernas",
+        "equipamiento": "Mancuernas de 5 kg",
+        "dificultad": "Intermedio",
+        "tempo": "3s Bajada • 1s Pausa • 1s Subida",
+        "animClass": "anim-squat",
+        "gif": "https://upload.wikimedia.org/wikipedia/commons/8/82/Squats.gif",
+        "paso_a_paso": "1. Sostén la pesita de 5 kg pegada al pecho con ambas manos.\n2. Coloca los pies al ancho de hombros, puntas ligeramente hacia afuera.\n3. Inicia la bajada llevando la cadera atrás y abajo manteniendo el torso erguido.\n4. Mantén la presión sobre los talones y sube apretando glúteos."
+    },
+    {
+        "id": "ex_03",
+        "nombre": "Peso Muerto Rumano a Una Pierna (5 kg)",
+        "target_muscle": "Isquiotibiales y Glúteo Medio",
+        "grupo": "Piernas",
+        "equipamiento": "Mancuernas de 5 kg",
+        "dificultad": "Exigente",
+        "tempo": "3s Bajar • 1s Apretar Glúteo",
+        "animClass": "anim-squat",
+        "gif": "https://upload.wikimedia.org/wikipedia/commons/a/a2/Barbell_Deadlift.gif",
+        "paso_a_paso": "1. Mantén una pierna apoyada con ligera flexión de rodilla.\n2. Lleva la otra pierna recta hacia atrás mientras inclinas el torso adelante.\n3. Sostén la pesa de 5kg rozando la espinilla hasta sentir la tensión en el isquio.\n4. Vuelve a la vertical contrayendo fuertemente el glúteo."
+    },
+    {
+        "id": "ex_04",
+        "nombre": "Hip Thrust con Banda de Resistencia",
+        "target_muscle": "Glúteo Mayor y Core",
+        "grupo": "Glúteos",
+        "equipamiento": "Banda de resistencia",
+        "dificultad": "Intermedio",
+        "tempo": "2s Subida • 2s Pausa Arriba",
+        "animClass": "anim-squat",
+        "gif": "https://upload.wikimedia.org/wikipedia/commons/8/82/Squats.gif",
+        "paso_a_paso": "1. Apoya las escápulas sobre el borde de una silla o sofá.\n2. Coloca la banda elástica justo sobre tus rodillas y pies apoyados firmes.\n3. Desciende la cadera y empuja explosivamente hacia el techo.\n4. Aprieta intensamente los glúteos 2 segundos en el punto más alto."
+    },
+    {
+        "id": "ex_05",
+        "nombre": "Press Militar de Hombros con Banda / 5kg",
+        "target_muscle": "Deltoides y Tríceps",
+        "grupo": "Hombros",
+        "equipamiento": "Cintas / Mancuernas 5 kg",
+        "dificultad": "Intermedio",
+        "tempo": "1s Empuje • 3s Bajada Controlada",
+        "animClass": "anim-press",
+        "gif": "https://upload.wikimedia.org/wikipedia/commons/9/91/Shoulder_press.gif",
+        "paso_a_paso": "1. De pie, pisa la cinta o sostiene las mancuernas a la altura de los hombros.\n2. Contrae el abdomen y los glúteos para bloquear la zona lumbar.\n3. Empuja verticalmente hacia arriba hasta extender los brazos.\n4. Baja de forma lenta y pausada sintiendo el trabajo en los hombros."
+    },
+    {
+        "id": "ex_06",
+        "nombre": "Remo Unilateral con Mancuerna de 5 kg",
+        "target_muscle": "Dorsal Ancho y Escápulas",
+        "grupo": "Espalda",
+        "equipamiento": "Mancuernas de 5 kg",
+        "dificultad": "Intermedio",
+        "tempo": "1s Tirar • 1s Apretar Escápula",
+        "animClass": "anim-row",
+        "gif": "https://upload.wikimedia.org/wikipedia/commons/a/a0/Dumbbell_Row.gif",
+        "paso_a_paso": "1. Inclina el torso adelante apoyando una mano sobre una mesa o rodilla.\n2. Sostén la mancuerna de 5 kg con el brazo extendido.\n3. Tracciona el codo rozando las costillas dirigiéndolo hacia la cadera.\n4. Aprieta la escápula atrás 1 segundo antes de descender."
+    },
+    {
+        "id": "ex_07",
+        "nombre": "Plancha Isométrica con Toque de Hombros",
+        "target_muscle": "Abdomen, Transverso y Deltoides",
+        "grupo": "Core",
+        "equipamiento": "Peso corporal",
+        "dificultad": "Intermedio",
+        "tempo": "Tensión Isométrica 45-60s",
+        "animClass": "anim-plank",
+        "gif": "https://upload.wikimedia.org/wikipedia/commons/a/a6/Plank.gif",
+        "paso_a_paso": "1. Colócate en posición de plancha alta sobre palmas y puntas de pies.\n2. Mantén la alineación perfecta de tobillos, pelvis y cabeza.\n3. Toca alternativamente con cada mano el hombro contrario sin oscilar la cadera.\n4. Mantén la respiración fluida y abdomen en máxima tensión."
+    }
+]
+
+@app.get("/api/ejercicios-catalogo")
+async def get_ejercicios_catalogo_endpoint():
+    """
+    Returns the complete Gym Exercise Catalog structured after Kaggle Gym Exercise Dataset.
+    """
+    return {"status": "ok", "ejercicios": GYM_EXERCISE_CATALOG}
+
 @app.get("/historial-actividades")
 async def get_historial_actividades_endpoint():
     """
@@ -603,6 +697,7 @@ async def get_historial_actividades_endpoint():
             
     return {"status": "ok", "historial": local_history}
 async def generate_gemini_content_with_retry(client, contents, system_instruction, response_schema, temperature=0.7):
+
     """
     Calls Gemini API with automatic retry and model fallback on 503 UNAVAILABLE or 429 RESOURCE_EXHAUSTED.
     """
