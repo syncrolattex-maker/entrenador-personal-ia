@@ -729,11 +729,14 @@ async def get_musclewiki_exercises(category: str = "all", categoria: str = None,
         params["category"] = clean_cat
 
     try:
+        print(f"[MuscleWiki Attempt] Connecting to {url} with key {mw_key[:6]}... category={clean_cat}")
         async with httpx.AsyncClient() as client:
             res = await client.get(url, headers=headers, params=params, timeout=5.0)
+            print(f"[MuscleWiki Response] HTTP Status: {res.status_code}")
             if res.status_code == 200:
                 data = res.json()
                 exercises_list = data.get("results", data) if isinstance(data, dict) else data
+                print(f"[MuscleWiki Live SUCCESS] Fetched {len(exercises_list)} exercises live from MuscleWiki API.")
                 return {
                     "status": "ok",
                     "source": "MuscleWikiAPI",
@@ -743,9 +746,10 @@ async def get_musclewiki_exercises(category: str = "all", categoria: str = None,
                     "data": exercises_list
                 }
             else:
-                print(f"[MuscleWiki Proxy] Status {res.status_code}: {res.text[:150]}")
+                print(f"[MuscleWiki Blocked/Restricted] Status {res.status_code}: {res.text[:150]}")
     except Exception as e:
         print(f"[MuscleWiki Proxy Exception]: {e}")
+
 
     # Fallback to local GYM_EXERCISE_CATALOG
     if clean_cat in ["all", "todos", "ejercicios"]:
