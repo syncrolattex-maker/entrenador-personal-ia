@@ -238,7 +238,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v35"; // Official MuscleWiki REST API Documentation Specification & Multi-Language Alignment
+    const APP_VERSION = "v36"; // Full MuscleWiki & Kaggle Exercise Catalog Route Fix
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
@@ -1803,7 +1803,8 @@ async function loadMuscleWikiExercises(category = "all") {
     const res = await fetch(`/api/musclewiki/ejercicios?categoria=${encodeURIComponent(category)}`);
     if (res.ok) {
       const data = await res.json();
-      renderMuscleWikiExercises(data.ejercicios || []);
+      renderMuscleWikiExercises(data.ejercicios || data.data || []);
+
     } else {
       container.innerHTML = `<p class="body-sm-muted" style="text-align: center; padding: 10px;">No se pudieron cargar los ejercicios.</p>`;
     }

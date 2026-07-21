@@ -710,55 +710,60 @@ async def get_rapidapi_exercises(muscle: str):
         "data": filtered
     }
 
+@app.get("/api/musclewiki/ejercicios")
 @app.get("/api/musclewiki/{category}")
-async def get_musclewiki_exercises(category: str, lang: str = "es-es"):
+async def get_musclewiki_exercises(category: str = "all", categoria: str = None, lang: str = "es-es"):
     """
-    Official MuscleWiki REST API Proxy Endpoint.
-    Documentation: https://api.musclewiki.com/documentation
-    Header: X-API-Key: mw_DlcYcuEWMjyww9sFtjX8JFmb5hNylJRNNLxcpNBUnXM
-    Supported categories: dumbbell, barbell, bodyweight, band, cable.
-    Languages: es-es, en-us, etc.
+    Official MuscleWiki REST API Proxy & Exercise Library Endpoint.
+    Handles both query param `categoria` and path param `category`.
+    Returns full Kaggle/MuscleWiki catalog filtered by category or muscle.
     """
+    cat_query = categoria or category or "all"
+    clean_cat = cat_query.lower().strip()
+
     mw_key = os.getenv("MUSCLEWIKI_API_KEY", "mw_DlcYcuEWMjyww9sFtjX8JFmb5hNylJRNNLxcpNBUnXM")
     url = "https://api.musclewiki.com/exercises"
-    headers = {
-        "X-API-Key": mw_key
-    }
-    params = {
-        "category": category.lower().strip(),
-        "limit": 20,
-        "lang": lang
-    }
+    headers = {"X-API-Key": mw_key}
+    params = {"limit": 20, "lang": lang}
+    if clean_cat not in ["all", "todos", "ejercicios"]:
+        params["category"] = clean_cat
 
     try:
         async with httpx.AsyncClient() as client:
             res = await client.get(url, headers=headers, params=params, timeout=5.0)
             if res.status_code == 200:
                 data = res.json()
+                exercises_list = data.get("results", data) if isinstance(data, dict) else data
                 return {
                     "status": "ok",
                     "source": "MuscleWikiAPI",
-                    "category": category,
-                    "count": data.get("count", 0),
-                    "data": data.get("results", data)
+                    "categoria": clean_cat,
+                    "count": len(exercises_list),
+                    "ejercicios": exercises_list,
+                    "data": exercises_list
                 }
             else:
-                print(f"[MuscleWiki Proxy] Status {res.status_code}: {res.text[:200]}")
+                print(f"[MuscleWiki Proxy] Status {res.status_code}: {res.text[:150]}")
     except Exception as e:
         print(f"[MuscleWiki Proxy Exception]: {e}")
 
-    # Fallback to local catalog
-    clean_cat = category.lower().strip()
-    filtered = [ex for ex in GYM_EXERCISE_CATALOG if clean_cat in ex["target_muscle"].lower() or clean_cat in ex["grupo"].lower() or clean_cat in ex["equipamiento"].lower()]
-    if not filtered:
+    # Fallback to local GYM_EXERCISE_CATALOG
+    if clean_cat in ["all", "todos", "ejercicios"]:
         filtered = GYM_EXERCISE_CATALOG
+    else:
+        filtered = [ex for ex in GYM_EXERCISE_CATALOG if clean_cat in ex["target_muscle"].lower() or clean_cat in ex["grupo"].lower() or clean_cat in ex["equipamiento"].lower()]
+        if not filtered:
+            filtered = GYM_EXERCISE_CATALOG
 
     return {
         "status": "ok",
         "source": "LocalKaggleCatalog",
-        "category": category,
+        "categoria": clean_cat,
+        "count": len(filtered),
+        "ejercicios": filtered,
         "data": filtered
     }
+
 
 
 
