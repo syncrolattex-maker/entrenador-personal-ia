@@ -6,6 +6,7 @@ from typing import List, Literal, Optional, Any
 import os
 import json
 import httpx
+import requests
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -1370,6 +1371,163 @@ async def get_musclewiki_ejercicios_endpoint(categoria: Optional[str] = "all"):
         "categoria": categoria,
         "ejercicios": ejercicios
     }
+
+def obtener_clima_actual(latitud: float, longitud: float) -> str:
+    """
+    Obtiene las condiciones climáticas actuales para una ubicación geográfica
+    basándose en su latitud y longitud.
+
+    Args:
+        latitud: La latitud en grados decimales (ej. 40.4168).
+        longitud: La longitud en grados decimales (ej. -3.7038).
+
+    Returns:
+        Un resumen que describe si llueve, hace calor extremo (>35°C) o si el clima es ideal para entrenar.
+    """
+    try:
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={latitud}&longitude={longitud}&current_weather=true"
+        res = requests.get(url, timeout=5.0)
+        if res.status_code == 200:
+            data = res.json()
+            current = data.get("current_weather", {})
+            temp = current.get("temperature", 22.0)
+            wcode = current.get("weathercode", 0)
+            
+            # Extreme heat check (>35 degrees Celsius)
+            if temp > 35.0:
+                return f"Calor extremo detectado: {temp}°C. Es peligroso correr al aire libre."
+            
+            # Rain weather codes check (drizzle, rain, snow, showers, thunderstorms)
+            rain_codes = {51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99}
+            if wcode in rain_codes:
+                return f"Lluvia detectada (código de clima {wcode}). El suelo está resbaladizo."
+            
+            return f"Clima ideal detectado: {temp}°C con código de clima {wcode}. Es seguro entrenar fuera."
+        else:
+            return "No se pudo obtener el clima (error de respuesta API). Asume clima ideal."
+    except Exception as e:
+        return f"Excepción al consultar clima: {e}. Asume clima ideal."
+
+def obtener_ruta_visual(categoria: str) -> str:
+    """
+    Obtiene la ruta local del recurso multimedia (video demostrativo o imagen vectorial SVG)
+    asociado a una categoría o postura específica.
+
+    Args:
+        categoria: El nombre del ejercicio, postura o grupo muscular (ej. 'sentadilla', 'árbol', 'guerrero').
+
+    Returns:
+        La ruta relativa del archivo en el servidor (ej. '/static/videos/sentadilla.mp4').
+    """
+    catalog = {
+        "sentadilla": "/static/videos/sentadilla.mp4",
+        "squat": "/static/videos/sentadilla.mp4",
+        "arbol": "/static/yoga/arbol.svg",
+        "tree": "/static/yoga/arbol.svg",
+        "perro": "/static/yoga/perro.svg",
+        "downward-dog": "/static/yoga/perro.svg",
+        "guerrero": "/static/yoga/guerrero.svg",
+        "warrior": "/static/yoga/guerrero.svg",
+        "nino": "/static/yoga/nino.svg",
+        "child": "/static/yoga/nino.svg",
+        "esfinge": "/static/yoga/esfinge.svg",
+        "sphinx": "/static/yoga/esfinge.svg",
+        "cadaver": "/static/yoga/cadaver.svg",
+        "corpse": "/static/yoga/cadaver.svg"
+    }
+    clean_cat = categoria.lower()
+    for key, value in catalog.items():
+        if key in clean_cat:
+            return value
+    return "/static/images/default.png"
+
+
+# --- Pydantic models for RutinaHoy Response ---
+class EjercicioRutina(BaseModel):
+    nombre: str
+    series: int
+    repeticiones: str
+    descripcion: str
+    ruta_recurso: str
+
+class RutinaHoyResponse(BaseModel):
+    tipo_sesion: Literal["Carrera", "Yoga", "Fuerza"]
+    mensaje_motivacional: str
+    ejercicios: List[EjercicioRutina]
+
+
+@app.get("/rutina-hoy")
+async def get_rutina_hoy():
+    """
+    Genera y adapta la rutina para el día de hoy utilizando Function Calling de Gemini.
+    Vigila el clima usando open-meteo API y asigna las rutas visuales de los ejercicios.
+    """
+    # 1. Variables de estado locales
+    bloque_hoy = "Carrera"
+    ciudad_hoy = "Madrid"
+    latitud_madrid = 40.4168
+    longitud_madrid = -3.7038
+    
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        print("[Rutina Hoy] API Key missing. Returning fallback.")
+        return {
+            "tipo_sesion": "Carrera",
+            "mensaje_motivacional": "¡Hoy toca rodar en Madrid! El clima simulado es ideal, sal a disfrutar del entrenamiento.",
+            "ejercicios": [
+                {
+                    "nombre": "Trote Suave Regenerativo",
+                    "series": 1,
+                    "repeticiones": "35 min",
+                    "descripcion": "Mantén un ritmo muy suave y conversacional durante toda la sesión.",
+                    "ruta_recurso": "/static/images/default.png"
+                }
+            ]
+        }
+        
+    try:
+        # Initialize GenAI Client using google-genai SDK
+        client = genai.Client(api_key=api_key)
+        
+        system_instruction = (
+            "Eres el entrenador personal inteligente de Verofit.\n"
+            f"Hoy está planificado una sesión de '{bloque_hoy}' en la ubicación '{ciudad_hoy}' (Latitud: {latitud_madrid}, Longitud: {longitud_madrid}).\n"
+            "Debes cumplir estrictamente con las siguientes reglas:\n"
+            "1. Si el tipo de sesión planificada hoy es 'Carrera', debes consultar OBLIGATORIAMENTE el clima actual llamando a la herramienta 'obtener_clima_actual'.\n"
+            "2. Si la herramienta del clima indica condiciones adversas (como lluvia detectada o calor extremo mayor a 35°C), "
+            "debes cancelar la carrera por seguridad y en su lugar generar una sesión de 'Yoga' de recuperación.\n"
+            "3. Si el clima es ideal o seguro, procede a generar la sesión de 'Carrera' planificada.\n"
+            "4. Para cada ejercicio o postura (asana) generada en la lista, debes llamar obligatoriamente a la herramienta 'obtener_ruta_visual' "
+            "pasándole el nombre o la categoría para rellenar el campo 'ruta_recurso' con la ruta del archivo correspondiente.\n"
+            "5. Devuelve la respuesta final estrictamente en formato JSON cumpliendo con el esquema proporcionado."
+        )
+        
+        prompt = (
+            f"Genera la rutina recomendada para hoy. Recuerda consultar el clima si toca Carrera, "
+            f"y adjuntar las rutas de recursos multimedia correctas para cada ejercicio."
+        )
+        
+        # Call Gemini with tools and schema
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                tools=[obtener_clima_actual, obtener_ruta_visual],
+                response_mime_type="application/json",
+                response_schema=RutinaHoyResponse,
+                temperature=0.7
+            )
+        )
+        
+        # Load and parse the structured JSON response text
+        result = json.loads(response.text)
+        return result
+        
+    except Exception as e:
+        print("[Rutina Hoy Error]:", e)
+        raise HTTPException(status_code=500, detail=f"Error al generar la rutina del día: {e}")
+
 
 
 
