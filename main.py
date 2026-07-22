@@ -1457,23 +1457,24 @@ class RutinaHoyResponse(BaseModel):
 
 
 @app.get("/rutina-hoy")
-async def get_rutina_hoy():
+async def get_rutina_hoy(
+    lat: Optional[float] = 39.3739,
+    lon: Optional[float] = -0.4439,
+    city: Optional[str] = "Alcàsser (Valencia) España"
+):
     """
     Genera y adapta la rutina para el día de hoy utilizando Function Calling de Gemini.
     Vigila el clima usando open-meteo API y asigna las rutas visuales de los ejercicios.
+    Soporta geolocalización dinámica (lat, lon, city) enviada por el frontend del navegador.
     """
-    # 1. Variables de estado locales
     bloque_hoy = "Carrera"
-    ciudad_hoy = "Madrid"
-    latitud_madrid = 40.4168
-    longitud_madrid = -3.7038
     
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         print("[Rutina Hoy] API Key missing. Returning fallback.")
         return {
             "tipo_sesion": "Carrera",
-            "mensaje_motivacional": "¡Hoy toca rodar en Madrid! El clima simulado es ideal, sal a disfrutar del entrenamiento.",
+            "mensaje_motivacional": f"¡Hoy toca rodar en {city}! El clima simulado es ideal, sal a disfrutar del entrenamiento por la huerta.",
             "ejercicios": [
                 {
                     "nombre": "Trote Suave Regenerativo",
@@ -1491,9 +1492,9 @@ async def get_rutina_hoy():
         
         system_instruction = (
             "Eres el entrenador personal inteligente de Verofit.\n"
-            f"Hoy está planificado una sesión de '{bloque_hoy}' en la ubicación '{ciudad_hoy}' (Latitud: {latitud_madrid}, Longitud: {longitud_madrid}).\n"
+            f"Hoy está planificado una sesión de '{bloque_hoy}' en la ubicación '{city}' (Latitud: {lat}, Longitud: {lon}).\n"
             "Debes cumplir estrictamente con las siguientes reglas:\n"
-            "1. Si el tipo de sesión planificada hoy es 'Carrera', debes consultar OBLIGATORIAMENTE el clima actual llamando a la herramienta 'obtener_clima_actual'.\n"
+            "1. Si el tipo de sesión planificada hoy es 'Carrera', debes consultar OBLIGATORIAMENTE el clima actual llamando a la herramienta 'obtener_clima_actual' pasando las coordenadas correctas del usuario.\n"
             "2. Si la herramienta del clima indica condiciones adversas (como lluvia detectada o calor extremo mayor a 35°C), "
             "debes cancelar la carrera por seguridad y en su lugar generar una sesión de 'Yoga' de recuperación.\n"
             "3. Si el clima es ideal o seguro, procede a generar la sesión de 'Carrera' planificada.\n"
@@ -1527,6 +1528,7 @@ async def get_rutina_hoy():
     except Exception as e:
         print("[Rutina Hoy Error]:", e)
         raise HTTPException(status_code=500, detail=f"Error al generar la rutina del día: {e}")
+
 
 
 
