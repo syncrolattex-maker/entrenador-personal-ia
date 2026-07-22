@@ -242,7 +242,8 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v40"; // alexcumplido/yoga-api integration for Yoga sessions
+    const APP_VERSION = "v41"; // High contrast backdrops for transparent Yoga SVGs
+
 
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
@@ -512,9 +513,10 @@ function renderWorkout(workout) {
       
       html += `
         <div class="exercise-item-enriched">
-          <div class="exercise-thumb-wrapper">
-            ${gifUrl ? `<img src="${gifUrl}" alt="${ex.nombre}" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\'exercise-thumb-icon\'>🧘‍♀️</span>'" />` : `<span class="exercise-thumb-icon">🧘‍♀️</span>`}
+          <div class="exercise-thumb-wrapper" style="${isYoga ? 'background:#ffffff; padding:4px;' : ''}">
+            ${gifUrl ? `<img src="${gifUrl}" alt="${ex.nombre}" loading="lazy" style="${isYoga ? 'object-fit:contain;' : ''}" onerror="this.parentElement.innerHTML='<span class=\'exercise-thumb-icon\'>🧘‍♀️</span>'" />` : `<span class="exercise-thumb-icon">🧘‍♀️</span>`}
           </div>
+
           <div class="exercise-info-content">
             <div class="exercise-title-row">
               <span class="exercise-name-text">${ex.nombre}</span>
@@ -1730,7 +1732,10 @@ function updateGuidedVideo(exerciseName, exerciseDesc) {
 
   videoCard.style.display = "flex";
 
+  const wrapperEl = document.querySelector(".guided-video-wrapper");
+
   if (state.currentWorkout && state.currentWorkout.tipo_sesion === "Yoga") {
+    if (wrapperEl) wrapperEl.style.background = "#f9f9fb";
     if (muscleEl) muscleEl.textContent = "YOGA • FLEXIBILIDAD Y CONEXIÓN";
     if (tempoEl) tempoEl.textContent = "Respiración Controlada (Pranayama)";
     if (descEl) descEl.textContent = exerciseDesc || "Mantén la postura respirando con calma.";
@@ -1739,6 +1744,8 @@ function updateGuidedVideo(exerciseName, exerciseDesc) {
     if (currentEx && currentEx.gif_url) {
       if (imgEl) {
         imgEl.src = currentEx.gif_url;
+        imgEl.style.objectFit = "contain";
+        imgEl.style.padding = "12px";
         imgEl.style.display = "block";
       }
       if (canvasEl) {
@@ -1746,7 +1753,14 @@ function updateGuidedVideo(exerciseName, exerciseDesc) {
       }
       return;
     }
+  } else {
+    if (wrapperEl) wrapperEl.style.background = "#000000";
+    if (imgEl) {
+      imgEl.style.objectFit = "cover";
+      imgEl.style.padding = "0";
+    }
   }
+
 
   const nameLower = (exerciseName || "").toLowerCase();
 
@@ -1847,17 +1861,27 @@ function openExerciseVideoModal(arg1, arg2, arg3) {
   if (gifUrl && imgEl) {
     imgEl.src = gifUrl;
     imgEl.style.display = "block";
+    if (isYogaSession) {
+      imgEl.style.background = "#f9f9fb";
+      imgEl.style.padding = "14px";
+      imgEl.style.objectFit = "contain";
+    } else {
+      imgEl.style.background = "#080808";
+      imgEl.style.padding = "0";
+      imgEl.style.objectFit = "contain";
+    }
     imgEl.onload = () => {
       imgEl.style.display = "block";
     };
     imgEl.onerror = () => {
       imgEl.style.display = "none";
-      if (canvasEl) canvasEl.style.display = "flex";
+      if (!isYogaSession && canvasEl) canvasEl.style.display = "flex";
     };
   } else if (imgEl) {
     imgEl.style.display = "none";
-    if (canvasEl) canvasEl.style.display = "flex";
+    if (!isYogaSession && canvasEl) canvasEl.style.display = "flex";
   }
+
 
   if (instructions && instructions.length > 0) {
     let stepsHtml = `<span class="label-caps" style="color: var(--secondary); display: block; margin-bottom: 6px;">TÉCNICA PASO A PASO:</span><ol class="exercise-instructions-list">`;
