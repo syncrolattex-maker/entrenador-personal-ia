@@ -242,7 +242,8 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v42"; // Aligned mock templates with yoga-api English names for 100% vector mapping
+    const APP_VERSION = "v43"; // Fixed Yoga minutes-to-seconds timer and isolated images fallback
+
 
 
     const cachedVersion = localStorage.getItem("cached_version");
@@ -832,20 +833,21 @@ function showFuerzaExercise() {
   show(elGuidedReps);
 
   const workSeconds = getDurationFromReps(ex.repeticiones);
+  const isYoga = guided.tipo === "Yoga";
+
   if (workSeconds) {
-    // Time-based exercise (e.g. Plancha 45 seg)
     show(elGuidedTimerWrap);
-    elGuidedTimerArc.className = "guided-timer-arc";
+    elGuidedTimerArc.className = isYoga ? "guided-timer-arc yoga" : "guided-timer-arc";
     updateTimerUI(workSeconds, workSeconds);
 
     elGuidedActionsFuerza.innerHTML = `
-      <button id="btn-start-work-fuerza" class="btn btn-primary guided-action-btn">
+      <button id="btn-start-work-fuerza" class="btn btn-primary guided-action-btn ${isYoga ? 'yoga' : ''}">
         <i data-lucide="play" style="width:22px;height:22px;"></i>
-        Iniciar Serie (${ex.repeticiones})
+        ${isYoga ? 'Mantener Postura' : 'Iniciar Serie'} (${ex.repeticiones})
       </button>
       <button id="btn-skip-exercise" class="btn btn-secondary" style="font-size:0.9rem; padding:14px;">
         <i data-lucide="skip-forward" style="width:18px;height:18px;"></i>
-        Saltar ejercicio
+        ${isYoga ? 'Saltar Postura' : 'Saltar ejercicio'}
       </button>
     `;
     lucide.createIcons();
@@ -853,9 +855,9 @@ function showFuerzaExercise() {
     document.getElementById("btn-start-work-fuerza").addEventListener("click", () => {
       // Switch button to let user skip the working timer if needed
       elGuidedActionsFuerza.innerHTML = `
-        <button id="btn-skip-work-timer" class="btn btn-primary guided-action-btn" style="background: var(--guided-accent-fuerza) !important; box-shadow: 0 8px 30px rgba(251, 113, 133, 0.3) !important;">
+        <button id="btn-skip-work-timer" class="btn btn-primary guided-action-btn ${isYoga ? 'yoga' : ''}" style="${isYoga ? 'background: #A78BFA !important; box-shadow: 0 8px 30px rgba(167, 139, 250, 0.3) !important; color:#0e0e10 !important;' : 'background: var(--guided-accent-fuerza) !important; box-shadow: 0 8px 30px rgba(251, 113, 133, 0.3) !important;'}">
           <i data-lucide="skip-forward" style="width:22px;height:22px;"></i>
-          Saltar e ir a Descanso
+          ${isYoga ? 'Siguiente Asana' : 'Saltar e ir a Descanso'}
         </button>
       `;
       lucide.createIcons();
@@ -871,16 +873,15 @@ function showFuerzaExercise() {
 
     document.getElementById("btn-skip-exercise").addEventListener("click", onSkipExercise);
   } else {
-    // Reps-based exercise (e.g. 12 reps)
     hide(elGuidedTimerWrap);
     elGuidedActionsFuerza.innerHTML = `
-      <button id="btn-serie-done" class="btn btn-primary guided-action-btn">
+      <button id="btn-serie-done" class="btn btn-primary guided-action-btn ${isYoga ? 'yoga' : ''}">
         <i data-lucide="check" style="width:22px;height:22px;"></i>
-        Serie completada
+        ${isYoga ? 'Postura completada' : 'Serie completada'}
       </button>
       <button id="btn-skip-exercise" class="btn btn-secondary" style="font-size:0.9rem; padding:14px;">
         <i data-lucide="skip-forward" style="width:18px;height:18px;"></i>
-        Saltar ejercicio
+        ${isYoga ? 'Saltar Postura' : 'Saltar ejercicio'}
       </button>
     `;
     lucide.createIcons();
@@ -888,6 +889,7 @@ function showFuerzaExercise() {
     document.getElementById("btn-serie-done").addEventListener("click", onSerieDone);
     document.getElementById("btn-skip-exercise").addEventListener("click", onSkipExercise);
   }
+
 
   showActions("fuerza");
 }
@@ -930,23 +932,27 @@ function onSkipExercise() {
 // ============================================================
 function startRest() {
   guided.phase = "resting";
-  setPhaseLabel("DESCANSO", "resting");
+  const isYoga = guided.tipo === "Yoga";
+  setPhaseLabel(isYoga ? "TRANSICIÓN" : "DESCANSO", "resting");
   updateProgress();
 
   hide(elGuidedSetCounter);
   hide(elGuidedReps);
-  elGuidedExName.textContent = "Descansa";
+  elGuidedExName.textContent = isYoga ? "Cambio de Postura" : "Descansa";
 
   showActions("rest");
   show(elGuidedTimerWrap);
-  elGuidedTimerArc.className = "guided-timer-arc";
+  elGuidedTimerArc.className = isYoga ? "guided-timer-arc yoga" : "guided-timer-arc";
 
-  startCountdown(REST_DURATION, () => {
+  const duration = isYoga ? 10 : REST_DURATION;
+
+  startCountdown(duration, () => {
     // Auto-advance after rest with sound ping
     playGoSound();
     showFuerzaExercise();
   });
 }
+
 
 function onSkipRest() {
   clearTimer();
@@ -1334,7 +1340,16 @@ function playWorkoutCompleteSound() {
 function getDurationFromReps(repsStr) {
   if (!repsStr) return null;
   const clean = repsStr.toLowerCase();
-  // Match strings that contain seg, s, segundos, sec, seconds
+
+  // Match minutes: e.g. "3 min" or "2 min" or "1 min por lado"
+  if (clean.includes("min") || clean.includes("minuto") || clean.includes("minute")) {
+    const match = clean.match(/\d+/);
+    if (match) {
+      return parseInt(match[0], 10) * 60;
+    }
+  }
+
+  // Match seconds
   if (clean.includes("seg") || clean.includes("segundos") || clean.includes(" sec") || clean.includes("second") || (clean.endsWith("s") && !clean.includes("reps") && !clean.includes("series"))) {
     const match = clean.match(/\d+/);
     if (match) {
@@ -1343,6 +1358,7 @@ function getDurationFromReps(repsStr) {
   }
   return null;
 }
+
 
 // ============================================================
 // HELPERS — show/hide action panels

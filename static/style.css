@@ -1099,6 +1099,11 @@ body {
   stroke-dasharray: 339; stroke-dashoffset: 0;
 }
 
+.guided-timer-arc.yoga {
+  stroke: #A78BFA;
+}
+
+
 /* Real Activity History Cards in Metrics Tab */
 .metrics-history-wrap {
   display: flex;
