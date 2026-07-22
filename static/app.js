@@ -242,7 +242,8 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v43"; // Fixed Yoga minutes-to-seconds timer and isolated images fallback
+    const APP_VERSION = "v44"; // Responsive centered ring typography & alignment
+
 
 
 
