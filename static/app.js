@@ -238,7 +238,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v38"; // Clean UI & Focused Guided Workout Player
+    const APP_VERSION = "v39"; // Dynamic Readiness Score & Weekly Training Load Assessment
 
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
@@ -359,6 +359,22 @@ function renderRecommendation(rec) {
   
   elRecRazonText.textContent = rec.razon;
   elRecSemanalText.textContent = rec.explicacion_semanal || "";
+
+  // Update dynamic readiness score (Weekly Load Balance Score)
+  const elPercent = document.getElementById("daily-goal-percent");
+  const elRingArc = document.getElementById("daily-ring-arc");
+  const score = rec.readiness_score || 85;
+  if (elPercent) {
+    elPercent.innerHTML = `${score}<small>%</small>`;
+  }
+  if (elRingArc) {
+    const r = 58;
+    const circumference = 2 * Math.PI * r;
+    const offset = circumference - (score / 100) * circumference;
+    elRingArc.style.strokeDasharray = circumference;
+    elRingArc.style.strokeDashoffset = offset;
+  }
+
 
   // Render Last Completed Workout details
   if (rec.ultimo_entreno_detalles && elLastWorkoutBox) {

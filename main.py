@@ -902,13 +902,48 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict) -> dict:
             rec_tipo = "Carrera"
             razon = "¡Hola Verónica! Para complementar tus bloques de musculación con trabajo cardiovascular de base, hoy Verofit te recomienda una sesión de Carrera aeróbica suave en Zona 2."
 
+    # Calculate dynamic readiness/load score (0-100%)
+    # 1. Adherence to weekly volume (max 40 pts)
+    weekly_total = fuerza_count_7d + carrera_count_7d
+    adherence_points = min(40.0, (weekly_total / 4.0) * 40.0)  # target is 4 workouts/wk
+    
+    # 2. Recovery / Fatigue status (max 40 pts)
+    recovery_points = 40.0
+    if days_inactive == 0:
+        recovery_points = 30.0
+    elif days_inactive == 1:
+        recovery_points = 40.0  # 1 day rest is optimal!
+    elif days_inactive == 2:
+        recovery_points = 35.0
+    elif days_inactive >= 3:
+        recovery_points = max(15.0, 40.0 - (days_inactive - 2) * 5.0)
+
+    # Subjective fatigue deduction from last workout
+    last_workout = next((x for x in reversed(db.get("historial_entrenamientos", [])) if x.get("completado")), None)
+    if last_workout:
+        if last_workout.get("esfuerzo_subjetivo") == "agotador":
+            recovery_points = max(10.0, recovery_points - 15.0)
+        elif last_workout.get("esfuerzo_subjetivo") == "moderado":
+            recovery_points = max(10.0, recovery_points - 5.0)
+
+    # 3. Stimulus Balance / Variety (max 20 pts)
+    balance_points = 20.0
+    recent_workouts = [x.get("tipo") for x in reversed(db.get("historial_entrenamientos", [])) if x.get("completado")][:3]
+    if len(recent_workouts) >= 2 and len(set(recent_workouts)) == 1:
+        balance_points = 10.0
+
+    readiness_score = int(adherence_points + recovery_points + balance_points)
+    readiness_score = max(20, min(100, readiness_score))
+
     return {
         "recomendacion": rec_tipo,
         "razon": razon,
         "explicacion_semanal": explicacion_semanal,
         "ultimo_entreno_detalles": ultimo_detalles,
-        "historial_real": real_history
+        "historial_real": real_history,
+        "readiness_score": readiness_score
     }
+
 
 @app.get("/recomendacion-hoy")
 async def get_recomendacion_hoy():
