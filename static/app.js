@@ -242,7 +242,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v41"; // High contrast backdrops for transparent Yoga SVGs
+    const APP_VERSION = "v42"; // Aligned mock templates with yoga-api English names for 100% vector mapping
 
 
     const cachedVersion = localStorage.getItem("cached_version");

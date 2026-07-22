@@ -404,11 +404,12 @@ async def generar_rutina_mock(tipo: str, mensaje_warning: str = None) -> dict:
     elif tipo == "Yoga":
         explicacion = "Sesión de Yoga y flexibilidad diseñada para liberar la tensión acumulada y mejorar el rango de movimiento."
         ejercicios = [
-            {"nombre": "Postura de la Montaña (Tadasana)", "series": 1, "repeticiones": "3 min", "descripcion": "De pie, alinea tus pies y brazos. Cierra los ojos y realiza respiraciones profundas diafragmáticas."},
-            {"nombre": "Perro Boca Abajo (Adho Mukha Svanasana)", "series": 3, "repeticiones": "1 min", "descripcion": "Forma una V invertida con tu cuerpo. Estira la espalda y empuja los talones al suelo."},
-            {"nombre": "Postura del Guerrero I (Virabhadrasana I)", "series": 3, "repeticiones": "1 min por lado", "descripcion": "Da un paso amplio atrás, flexiona la rodilla delantera a 90 grados y eleva tus brazos firmes."},
-            {"nombre": "Postura del Niño (Balasana)", "series": 2, "repeticiones": "2 min", "descripcion": "Arrodíllate y apoya la frente en el suelo con los brazos relajados extendidos. Relaja los hombros."},
-            {"nombre": "Postura de la Cobra (Bhujangasana)", "series": 3, "repeticiones": "1 min", "descripcion": "Tumbada boca abajo, presiona el suelo con las palmas y eleva el pecho manteniendo hombros relajados."}
+            {"nombre": "Postura del Árbol (Tree Pose)", "series": 2, "repeticiones": "1 min por pierna", "descripcion": "Apoya una planta del pie en el muslo interno de la pierna contraria, junta palmas en el pecho y busca equilibrio. Respira lento."},
+            {"nombre": "Perro Boca Abajo (Downward-Facing Dog)", "series": 3, "repeticiones": "1 min", "descripcion": "Forma una V invertida con tu cuerpo. Estira la espalda y empuja los talones al suelo."},
+            {"nombre": "Postura del Guerrero I (Warrior One)", "series": 3, "repeticiones": "1 min por lado", "descripcion": "Da un paso amplio atrás, flexiona la rodilla delantera a 90 grados y eleva tus brazos firmes."},
+            {"nombre": "Postura del Niño (Child's Pose)", "series": 2, "repeticiones": "2 min", "descripcion": "Arrodíllate y apoya la frente en el suelo con los brazos relajados extendidos. Relaja los hombros."},
+            {"nombre": "Postura de la Esfinge (Sphinx Pose)", "series": 3, "repeticiones": "1 min", "descripcion": "Tumbada boca abajo, apoya los antebrazos paralelos y eleva el pecho manteniendo hombros relajados y glúteos firmes."},
+            {"nombre": "Postura del Cadáver (Corpse Pose)", "series": 1, "repeticiones": "3 min", "descripcion": "Túmbate boca arriba, relaja brazos y piernas, cierra los ojos y asimila la paz de la sesión."}
         ]
         return {
             "tipo_sesion": "Yoga",
@@ -417,6 +418,7 @@ async def generar_rutina_mock(tipo: str, mensaje_warning: str = None) -> dict:
             "mensaje_adaptacion": None,
             "mensaje": mensaje_warning
         }
+
     else:
         carrera_templates = [
             [
@@ -815,54 +817,63 @@ async def get_yoga_poses():
     except Exception as e:
         print(f"[Yoga API Proxy Exception]: {e}")
 
-    # Solid offline fallback
     fallback_poses = [
         {
-            "id": 1,
-            "english_name": "Mountain Pose",
-            "sanskrit_name": "Tadasana",
-            "translation_name": "tada = mountain, asana = pose",
-            "pose_description": "Stand tall with feet together, arms at your sides, distributing weight evenly. Breathe deeply.",
-            "pose_benefits": "Improves posture, strengthens thighs, knees, and ankles.",
-            "url_svg": "https://upload.wikimedia.org/wikipedia/commons/e/ee/Tadasana_Yoga-Pose.svg"
+            "id": 41,
+            "english_name": "Tree",
+            "sanskrit_name": "Vksana",
+            "translation_name": "vrksa = tree, asana = pose",
+            "pose_description": "Balance on one leg, placing the sole of the opposite foot on your inner thigh. Bring hands together in front of your chest.",
+            "pose_benefits": "Improves balance, focus, and strengthens ankle and leg muscles.",
+            "url_svg": "https://upload.wikimedia.org/wikipedia/commons/3/3b/Vrkshasana.svg"
         },
         {
-            "id": 2,
+            "id": 15,
             "english_name": "Downward-Facing Dog",
-            "sanskrit_name": "Adho Mukha Svanasana",
+            "sanskrit_name": "Parivtta Adho Mukha vnsana",
             "translation_name": "adho = downward, mukha = face, svana = dog, asana = pose",
             "pose_description": "On all fours, lift hips back and up to form an inverted V shape. Keep heels reaching down.",
             "pose_benefits": "Stretches shoulders, hamstrings, calves, and hands. Energizes the body.",
             "url_svg": "https://upload.wikimedia.org/wikipedia/commons/7/71/Adho_Mukha_Svanasana.svg"
         },
         {
-            "id": 3,
-            "english_name": "Warrior I",
-            "sanskrit_name": "Virabhadrasana I",
+            "id": 44,
+            "english_name": "Warrior One",
+            "sanskrit_name": "Vrabhadrsana I",
             "translation_name": "virabhadra = warrior, asana = pose",
             "pose_description": "Step one foot back, bend front knee to 90 degrees, and raise arms straight overhead.",
             "pose_benefits": "Strengthens shoulders, arms, legs, and back. Opens hips and chest.",
             "url_svg": "https://upload.wikimedia.org/wikipedia/commons/7/7a/Warrior_Pose_I.svg"
         },
         {
-            "id": 4,
+            "id": 10,
             "english_name": "Child's Pose",
-            "sanskrit_name": "Balasana",
+            "sanskrit_name": "Balsana",
             "translation_name": "bala = child, asana = pose",
             "pose_description": "Kneel, sit back on your heels, fold forward, and rest your forehead on the floor with arms extended.",
             "pose_benefits": "Gently stretches hips, thighs, and ankles. Calms the mind and relieves fatigue.",
             "url_svg": "https://upload.wikimedia.org/wikipedia/commons/0/0a/Balasana_Yoga-Pose.svg"
         },
         {
-            "id": 5,
-            "english_name": "Cobra Pose",
-            "sanskrit_name": "Bhujangasana",
-            "translation_name": "bhujanga = serpent, asana = pose",
-            "pose_description": "Lie prone, place hands under shoulders, and lift chest up gently keeping pelvis on the mat.",
-            "pose_benefits": "Strengthens spine, stretches chest, shoulders, and abdomen. Firms buttocks.",
+            "id": 35,
+            "english_name": "Sphinx",
+            "sanskrit_name": "Slamba Bhujagsana",
+            "translation_name": "salamba = supported, bhujanga = cobra, asana = pose",
+            "pose_description": "Lie prone, place elbows under shoulders, forearms on the floor, and lift chest up gently.",
+            "pose_benefits": "Strengthens spine, stretches chest, shoulders, and abdomen. Calms nervous system.",
             "url_svg": "https://upload.wikimedia.org/wikipedia/commons/b/b3/Bhujangasana_Yoga-Pose.svg"
+        },
+        {
+            "id": 11,
+            "english_name": "Corpse",
+            "sanskrit_name": "avsana",
+            "translation_name": "shava = corpse, asana = pose",
+            "pose_description": "Lie flat on your back, legs spread slightly, arms relaxed at your sides with palms facing up. Focus on your breathing.",
+            "pose_benefits": "Calms the brain, helps relieve stress and mild depression. Relaxes the body.",
+            "url_svg": "https://upload.wikimedia.org/wikipedia/commons/6/6d/Savasana_Yoga-Pose.svg"
         }
     ]
+
 
     return {"status": "ok", "source": "OfflineFallback", "poses": fallback_poses}
 
