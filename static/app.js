@@ -242,7 +242,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v48"; // Dynamic geolocation support on GET /rutina-hoy
+    const APP_VERSION = "v49"; // Fix: dashboard ÚLTIMO/SIGUIENTE synced with real Intervals.icu history
 
 
 
@@ -299,6 +299,13 @@ async function initApp() {
       }
       
       renderRecommendation(recommendation);
+
+      // ✅ Re-fetch db AFTER recommendation (backend has now synced db with real history)
+      try {
+        const dbRes2 = await fetch("/estado-db");
+        if (dbRes2.ok) { state.db = await dbRes2.json(); updateStatsBanner(); }
+      } catch (e) { console.warn("Could not refresh stats banner:", e); }
+
     } else {
 
       renderRecommendation({

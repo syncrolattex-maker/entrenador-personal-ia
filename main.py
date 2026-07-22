@@ -1049,7 +1049,12 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict) -> dict:
                 trained_yesterday = True
         except Exception:
             pass
-            
+
+        # ✅ Sync in-memory db so /estado-db (dashboard banner) reflects real history
+        db["ultimo_entreno"]   = last_type
+        db["siguiente_bloque"] = "Carrera" if last_type == "Fuerza" else "Fuerza"
+        db["dias_sin_entrenar"] = days_inactive
+
         yoga_count_7d = 0
         for act in sorted_history:
             act_date_str = act.get("fecha", "")
