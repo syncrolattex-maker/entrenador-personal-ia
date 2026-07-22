@@ -238,7 +238,8 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v36"; // Full MuscleWiki & Kaggle Exercise Catalog Route Fix
+    const APP_VERSION = "v38"; // Clean UI & Focused Guided Workout Player
+
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
@@ -259,8 +260,6 @@ async function initApp() {
       })
       .catch(e => console.error("Error fetching real history:", e));
 
-    // 4. Load MuscleWiki Explorer exercises
-    loadMuscleWikiExercises("all");
 
     // 4. Read cached recommendation for today
     const todayStr = new Date().toDateString();
@@ -1790,84 +1789,6 @@ function closeExerciseVideoModal() {
   if (modal) modal.style.display = "none";
 }
 
-// ============================================================
-// MUSCLEWIKI EXPLORER ENGINE
-// ============================================================
-async function loadMuscleWikiExercises(category = "all") {
-  const container = document.getElementById("musclewiki-exercise-list");
-  if (!container) return;
-
-  container.innerHTML = `<p class="body-sm-muted" style="text-align: center; padding: 12px 0;">Cargando ejercicios de MuscleWiki...</p>`;
-
-  try {
-    const res = await fetch(`/api/musclewiki/ejercicios?categoria=${encodeURIComponent(category)}`);
-    if (res.ok) {
-      const data = await res.json();
-      renderMuscleWikiExercises(data.ejercicios || data.data || []);
-
-    } else {
-      container.innerHTML = `<p class="body-sm-muted" style="text-align: center; padding: 10px;">No se pudieron cargar los ejercicios.</p>`;
-    }
-  } catch (err) {
-    console.error("Error loading MuscleWiki exercises:", err);
-    container.innerHTML = `<p class="body-sm-muted" style="text-align: center; padding: 10px;">Error al conectar con MuscleWiki.</p>`;
-  }
-}
-
-function renderMuscleWikiExercises(exercises) {
-  const container = document.getElementById("musclewiki-exercise-list");
-  if (!container) return;
-
-  if (!exercises || exercises.length === 0) {
-    container.innerHTML = `<p class="body-sm-muted" style="text-align: center; padding: 12px 0;">No hay ejercicios registrados para este grupo muscular.</p>`;
-    return;
-  }
-
-  window.currentMuscleWikiExercises = exercises;
-
-  let html = "";
-  exercises.forEach((ex, idx) => {
-    const name = ex.name || ex.nombre;
-    const catName = ex.category_name || ex.target_muscle || "Fuerza";
-    const equip = ex.equipment || "Pesas 5kg";
-    const imgUrl = ex.gif_url || ex.video_url || "";
-
-    html += `
-      <div class="musclewiki-exercise-card" onclick="openMuscleWikiDetailModal(${idx})">
-        <div class="exercise-thumb-wrapper" style="width: 54px; height: 54px; min-width: 54px; border-radius: 8px; overflow: hidden; background: #080808; display: flex; align-items: center; justify-content: center;">
-          ${imgUrl ? `<img src="${imgUrl}" alt="${name}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'" />` : `<i data-lucide="dumbbell" style="width:24px;height:24px;color:var(--primary);"></i>`}
-        </div>
-        <div style="flex: 1; min-width: 0;">
-          <h4 style="margin: 0 0 4px 0; font-size: 0.88rem; font-weight: 700; color: var(--on-surface); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${name}</h4>
-          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-            <span class="ex-tag muscle" style="font-size: 0.65rem;">🎯 ${catName}</span>
-            <span class="ex-tag equip" style="font-size: 0.65rem;">🏋️ ${equip}</span>
-          </div>
-        </div>
-        <button class="btn-video-demo-chip" style="margin: 0; padding: 4px 8px; font-size: 0.7rem;">Ver Técnica</button>
-      </div>
-    `;
-  });
-
-  container.innerHTML = html;
-  if (window.lucide) lucide.createIcons();
-}
-
-function filterMuscleWikiCategory(category, btnEl) {
-  const chips = document.querySelectorAll("#musclewiki-chips-bar .mw-chip");
-  chips.forEach(chip => chip.classList.remove("active"));
-  if (btnEl) btnEl.classList.add("active");
-
-  loadMuscleWikiExercises(category);
-}
-
-function openMuscleWikiDetailModal(idx) {
-  const list = window.currentMuscleWikiExercises;
-  if (list && list[idx]) {
-    const ex = list[idx];
-    openExerciseVideoModal(ex);
-  }
-}
 
 
 
