@@ -420,24 +420,72 @@ async def generar_rutina_mock(tipo: str, mensaje_warning: str = None) -> dict:
         }
 
     else:
+        # Check if she already did a quality running session this week
+        has_quality_run_7d = False
+        try:
+            today_date = datetime.now().date()
+            monday_date = today_date - timedelta(days=today_date.weekday())
+            monday_str = monday_date.strftime("%Y-%m-%d")
+            for item in db.get("historial_entrenamientos", []):
+                if item.get("completado") and item.get("tipo") == "Carrera":
+                    f_date = item.get("fecha", "")
+                    if f_date >= monday_str:
+                        n_lower = (item.get("nombre") or "").lower()
+                        if any(q in n_lower for q in ["fartlek", "interval", "serie", "velocidad", "calidad"]):
+                            has_quality_run_7d = True
+        except Exception:
+            pass
+
         carrera_templates = [
+            # Template 1: Rodaje en Zona 2 con Rectas Progresivas
             [
-                {"name": "Calentamiento: Trote suave y movilidad", "duration_seconds": 300, "type": "WARMUP"},
-                {"name": "Rodamiento Continuo Aeróbico Zona 2", "duration_seconds": 2100, "type": "WORK"},
-                {"name": "Enfriamiento: Caminata y estiramientos", "duration_seconds": 300, "type": "COOLDOWN"}
+                {"name": "Calentamiento: Trote suave y movilidad articular", "duration_seconds": 300, "type": "WARMUP"},
+                {"name": "Rodaje Aeróbico Cómodo (Zona 2 conversacional)", "duration_seconds": 1800, "type": "WORK"},
+                {"name": "5 Progresiones de 80 metros (15s rápido / 45s recuperar)", "duration_seconds": 300, "type": "WORK"},
+                {"name": "Enfriamiento: Vuelta a la calma caminando", "duration_seconds": 300, "type": "COOLDOWN"}
             ],
+            # Template 2: Fartlek Dinámico Piramidal (Sesión de Calidad)
             [
-                {"name": "Calentamiento: Trote paulatino", "duration_seconds": 300, "type": "WARMUP"},
-                {"name": "Rodamiento Suave de Asimilación", "duration_seconds": 1800, "type": "WORK"},
-                {"name": "Enfriamiento: Caminata ligera", "duration_seconds": 300, "type": "COOLDOWN"}
+                {"name": "Calentamiento: Trote suave y técnica de carrera", "duration_seconds": 480, "type": "WARMUP"},
+                {"name": "Fartlek Pirámide: 1m rápido / 1m suave", "duration_seconds": 120, "type": "WORK"},
+                {"name": "Fartlek Pirámide: 2m rápido / 2m suave", "duration_seconds": 240, "type": "WORK"},
+                {"name": "Fartlek Pirámide: 3m rápido / 3m suave", "duration_seconds": 360, "type": "WORK"},
+                {"name": "Fartlek Pirámide: 2m rápido / 2m suave", "duration_seconds": 240, "type": "WORK"},
+                {"name": "Fartlek Pirámide: 1m rápido / 1m suave", "duration_seconds": 120, "type": "WORK"},
+                {"name": "Enfriamiento: Trote regenerativo y estiramientos", "duration_seconds": 300, "type": "COOLDOWN"}
+            ],
+            # Template 3: Rodamiento Progresivo (Control de ritmo)
+            [
+                {"name": "Calentamiento: Trote suave inicial", "duration_seconds": 300, "type": "WARMUP"},
+                {"name": "Bloque A: Ritmo muy suave conversacional", "duration_seconds": 600, "type": "WORK"},
+                {"name": "Bloque B: Incremento de ritmo (Zona 2 media)", "duration_seconds": 600, "type": "WORK"},
+                {"name": "Bloque C: Ritmo alegre exigente (Zona 2 alta)", "duration_seconds": 600, "type": "WORK"},
+                {"name": "Enfriamiento: Vuelta a la calma caminando", "duration_seconds": 300, "type": "COOLDOWN"}
+            ],
+            # Template 4: Intervalos de Potencia Aeróbica (Sesión de Calidad)
+            [
+                {"name": "Calentamiento: Trote progresivo + movilidad activa", "duration_seconds": 450, "type": "WARMUP"},
+                {"name": "Intervalo 1: 90 seg ritmo rápido / 90 seg andar", "duration_seconds": 180, "type": "WORK"},
+                {"name": "Intervalo 2: 90 seg ritmo rápido / 90 seg andar", "duration_seconds": 180, "type": "WORK"},
+                {"name": "Intervalo 3: 90 seg ritmo rápido / 90 seg andar", "duration_seconds": 180, "type": "WORK"},
+                {"name": "Intervalo 4: 90 seg ritmo rápido / 90 seg andar", "duration_seconds": 180, "type": "WORK"},
+                {"name": "Intervalo 5: 90 seg ritmo rápido / 90 seg andar", "duration_seconds": 180, "type": "WORK"},
+                {"name": "Intervalo 6: 90 seg ritmo rápido / 90 seg andar", "duration_seconds": 180, "type": "WORK"},
+                {"name": "Enfriamiento: Vuelta a la calma de vuelta", "duration_seconds": 300, "type": "COOLDOWN"}
             ]
         ]
+        
         phases = carrera_templates[day_seed % len(carrera_templates)]
+        is_quality = len(phases) > 5  # Templates 2 and 4 are quality
         
         msg_adapt = None
-        if is_fatigued:
-            phases[1]["duration_seconds"] = 1200
-            msg_adapt = "Reducimos la duración del rodamiento por fatiga previa detectada."
+        if is_fatigued or (is_quality and has_quality_run_7d):
+            phases = [
+                {"name": "Calentamiento: Trote suave y movilidad", "duration_seconds": 300, "type": "WARMUP"},
+                {"name": "Rodamiento Suave de Asimilación (Zona 2)", "duration_seconds": 1500, "type": "WORK"},
+                {"name": "Enfriamiento: Vuelta a la calma caminando", "duration_seconds": 300, "type": "COOLDOWN"}
+            ]
+            msg_adapt = "Adaptación inteligente: Ajustado a Rodamiento de Recuperación por fatiga previa o por haber realizado ya la sesión de calidad semanal."
 
         return {
             "tipo_sesion": "Carrera",
@@ -447,6 +495,7 @@ async def generar_rutina_mock(tipo: str, mensaje_warning: str = None) -> dict:
             "enviado_al_reloj": False,
             "mensaje": mensaje_warning
         }
+
 
 
 
