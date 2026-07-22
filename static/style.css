@@ -369,6 +369,13 @@ body {
   box-shadow: 0 0 30px var(--glow-primary);
 }
 
+.btn-primary.yoga {
+  background: #A78BFA;
+  color: #0E0E10;
+  box-shadow: 0 0 30px rgba(167, 139, 250, 0.45);
+}
+
+
 .btn-primary:active {
   transform: scale(0.98);
 }
@@ -397,6 +404,32 @@ body {
   padding: 4px 8px;
   border-radius: var(--rounded-sm);
 }
+
+.badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: inline-block;
+}
+.badge.fuerza {
+  background: rgba(195, 244, 0, 0.12);
+  color: var(--primary);
+  border: 1px solid rgba(195, 244, 0, 0.3);
+}
+.badge.carrera {
+  background: rgba(0, 238, 252, 0.12);
+  color: var(--secondary);
+  border: 1px solid rgba(0, 238, 252, 0.3);
+}
+.badge.yoga {
+  background: rgba(210, 168, 255, 0.12);
+  color: #D2A8FF;
+  border: 1px solid rgba(210, 168, 255, 0.3);
+}
+
 
 .calendar-icon {
   color: var(--primary);
@@ -496,6 +529,13 @@ body {
   background: var(--surface-container-high);
   color: var(--text-muted);
 }
+
+.yoga-glow {
+  background: rgba(210, 168, 255, 0.15);
+  color: #D2A8FF;
+  border: 1px solid rgba(210, 168, 255, 0.35);
+}
+
 
 .btn-text-wrap {
   display: flex;
@@ -1089,6 +1129,11 @@ body {
 .history-card-item.carrera {
   border-left: 4px solid var(--secondary);
 }
+
+.history-card-item.yoga {
+  border-left: 4px solid #D2A8FF;
+}
+
 
 .history-card-header {
   display: flex;

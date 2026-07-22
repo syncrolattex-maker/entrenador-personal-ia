@@ -94,11 +94,12 @@ class FaseCarrera(BaseModel):
     type: Literal["WARMUP", "WORK", "COOLDOWN"]
 
 class RutinaResponse(BaseModel):
-    tipo_sesion: Literal["Fuerza", "Carrera"]
-    explicacion_tipo: str  # Why the AI selected Strength or Running today
+    tipo_sesion: Literal["Fuerza", "Carrera", "Yoga"]
+    explicacion_tipo: str  # Why the AI selected Strength, Running or Yoga today
     ejercicios: Optional[List[Ejercicio]] = None
     phases: Optional[List[FaseCarrera]] = None
     mensaje_adaptacion: Optional[str] = None
+
 
 class UltimoEntrenoDetalles(BaseModel):
     tipo: str
@@ -124,7 +125,8 @@ class GeminiRecomendacionResponse(BaseModel):
 
 
 class GenerarEntrenamientoPayload(BaseModel):
-    tipo: Literal["Fuerza", "Carrera"]
+    tipo: Literal["Fuerza", "Carrera", "Yoga"]
+
 
 class SincronizarCarreraPayload(BaseModel):
     phases: List[FaseCarrera]
@@ -399,6 +401,22 @@ async def generar_rutina_mock(tipo: str, mensaje_warning: str = None) -> dict:
             "mensaje": mensaje_warning
         }
         return await enrich_routine_data(routine_res)
+    elif tipo == "Yoga":
+        explicacion = "Sesión de Yoga y flexibilidad diseñada para liberar la tensión acumulada y mejorar el rango de movimiento."
+        ejercicios = [
+            {"nombre": "Postura de la Montaña (Tadasana)", "series": 1, "repeticiones": "3 min", "descripcion": "De pie, alinea tus pies y brazos. Cierra los ojos y realiza respiraciones profundas diafragmáticas."},
+            {"nombre": "Perro Boca Abajo (Adho Mukha Svanasana)", "series": 3, "repeticiones": "1 min", "descripcion": "Forma una V invertida con tu cuerpo. Estira la espalda y empuja los talones al suelo."},
+            {"nombre": "Postura del Guerrero I (Virabhadrasana I)", "series": 3, "repeticiones": "1 min por lado", "descripcion": "Da un paso amplio atrás, flexiona la rodilla delantera a 90 grados y eleva tus brazos firmes."},
+            {"nombre": "Postura del Niño (Balasana)", "series": 2, "repeticiones": "2 min", "descripcion": "Arrodíllate y apoya la frente en el suelo con los brazos relajados extendidos. Relaja los hombros."},
+            {"nombre": "Postura de la Cobra (Bhujangasana)", "series": 3, "repeticiones": "1 min", "descripcion": "Tumbada boca abajo, presiona el suelo con las palmas y eleva el pecho manteniendo hombros relajados."}
+        ]
+        return {
+            "tipo_sesion": "Yoga",
+            "explicacion_tipo": explicacion,
+            "ejercicios": ejercicios,
+            "mensaje_adaptacion": None,
+            "mensaje": mensaje_warning
+        }
     else:
         carrera_templates = [
             [
@@ -429,6 +447,7 @@ async def generar_rutina_mock(tipo: str, mensaje_warning: str = None) -> dict:
         }
 
 
+
 async def registrar_en_intervals(payload: ActividadCompletadaPayload) -> bool:
     """
     Registers a completed workout as a real activity in Intervals.icu.
@@ -447,9 +466,18 @@ async def registrar_en_intervals(payload: ActividadCompletadaPayload) -> bool:
     from datetime import datetime
     now_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
-    name = f"{'💪 Fuerza' if payload.tipo == 'Fuerza' else '🏃 Carrera'} — Verofit AI"
+    if payload.tipo == "Fuerza":
+        activity_type = "WeightTraining"
+        name = "💪 Fuerza — Verofit AI"
+    elif payload.tipo == "Yoga":
+        activity_type = "Yoga"
+        name = "🧘‍♀️ Yoga — Verofit AI"
+    else:
+        activity_type = "Run"
+        name = "🏃 Carrera — Verofit AI"
 
     description_lines = ["Sesión generada y guiada por Verofit — Entrenador Personal IA."]
+
 
     if payload.esfuerzo_subjetivo:
         emoji = {"facil": "😊", "optimo": "⚡", "agotador": "🥵"}.get(payload.esfuerzo_subjetivo, "")
@@ -768,6 +796,77 @@ async def get_musclewiki_exercises(category: str = "all", categoria: str = None,
         "data": filtered
     }
 
+@app.get("/api/yoga-poses")
+async def get_yoga_poses():
+    """
+    Yoga API Proxy Endpoint.
+    Proxies alexcumplido/yoga-api (Render Hosted version).
+    Falls back to a solid local database of 5 essential yoga poses if offline/slow.
+    """
+    url = "https://yoga-api-nzy4.onrender.com/v1/poses"
+    try:
+        async with httpx.AsyncClient() as client:
+            res = await client.get(url, timeout=5.0)
+            if res.status_code == 200:
+                data = res.json()
+                return {"status": "ok", "source": "YogaAPI", "poses": data}
+            else:
+                print(f"[Yoga API Proxy] Status {res.status_code}: {res.text[:150]}")
+    except Exception as e:
+        print(f"[Yoga API Proxy Exception]: {e}")
+
+    # Solid offline fallback
+    fallback_poses = [
+        {
+            "id": 1,
+            "english_name": "Mountain Pose",
+            "sanskrit_name": "Tadasana",
+            "translation_name": "tada = mountain, asana = pose",
+            "pose_description": "Stand tall with feet together, arms at your sides, distributing weight evenly. Breathe deeply.",
+            "pose_benefits": "Improves posture, strengthens thighs, knees, and ankles.",
+            "url_svg": "https://upload.wikimedia.org/wikipedia/commons/e/ee/Tadasana_Yoga-Pose.svg"
+        },
+        {
+            "id": 2,
+            "english_name": "Downward-Facing Dog",
+            "sanskrit_name": "Adho Mukha Svanasana",
+            "translation_name": "adho = downward, mukha = face, svana = dog, asana = pose",
+            "pose_description": "On all fours, lift hips back and up to form an inverted V shape. Keep heels reaching down.",
+            "pose_benefits": "Stretches shoulders, hamstrings, calves, and hands. Energizes the body.",
+            "url_svg": "https://upload.wikimedia.org/wikipedia/commons/7/71/Adho_Mukha_Svanasana.svg"
+        },
+        {
+            "id": 3,
+            "english_name": "Warrior I",
+            "sanskrit_name": "Virabhadrasana I",
+            "translation_name": "virabhadra = warrior, asana = pose",
+            "pose_description": "Step one foot back, bend front knee to 90 degrees, and raise arms straight overhead.",
+            "pose_benefits": "Strengthens shoulders, arms, legs, and back. Opens hips and chest.",
+            "url_svg": "https://upload.wikimedia.org/wikipedia/commons/7/7a/Warrior_Pose_I.svg"
+        },
+        {
+            "id": 4,
+            "english_name": "Child's Pose",
+            "sanskrit_name": "Balasana",
+            "translation_name": "bala = child, asana = pose",
+            "pose_description": "Kneel, sit back on your heels, fold forward, and rest your forehead on the floor with arms extended.",
+            "pose_benefits": "Gently stretches hips, thighs, and ankles. Calms the mind and relieves fatigue.",
+            "url_svg": "https://upload.wikimedia.org/wikipedia/commons/0/0a/Balasana_Yoga-Pose.svg"
+        },
+        {
+            "id": 5,
+            "english_name": "Cobra Pose",
+            "sanskrit_name": "Bhujangasana",
+            "translation_name": "bhujanga = serpent, asana = pose",
+            "pose_description": "Lie prone, place hands under shoulders, and lift chest up gently keeping pelvis on the mat.",
+            "pose_benefits": "Strengthens spine, stretches chest, shoulders, and abdomen. Firms buttocks.",
+            "url_svg": "https://upload.wikimedia.org/wikipedia/commons/b/b3/Bhujangasana_Yoga-Pose.svg"
+        }
+    ]
+
+    return {"status": "ok", "source": "OfflineFallback", "poses": fallback_poses}
+
+
 
 
 
@@ -863,6 +962,7 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict) -> dict:
         except Exception:
             pass
             
+        yoga_count_7d = 0
         for act in sorted_history:
             act_date_str = act.get("fecha", "")
             if act_date_str >= monday_str:
@@ -874,11 +974,14 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict) -> dict:
                     name_lower = (act.get("nombre") or "").lower()
                     if any(q in name_lower for q in ["fartlek", "interval", "serie", "velocidad", "calidad"]):
                         has_quality_run_7d = True
+                elif t == "Yoga":
+                    yoga_count_7d += 1
 
     # Apply Athletic Directives for Verónica (43a, 1.77m, 59kg, 5kg dumbbells, bands, Alcàsser)
     rec_tipo = "Fuerza"
     razon = ""
-    explicacion_semanal = f"Esta semana (Lunes-Domingo): {fuerza_count_7d}/3 Fuerza • {carrera_count_7d}/2 Carrera."
+    explicacion_semanal = f"Esta semana (Lunes-Domingo): {fuerza_count_7d}/3 Fuerza • {carrera_count_7d}/2 Carrera • {yoga_count_7d} Yoga."
+
 
     if days_inactive >= 2:
         if last_type == "Fuerza":
@@ -904,8 +1007,9 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict) -> dict:
 
     # Calculate dynamic readiness/load score (0-100%)
     # 1. Adherence to weekly volume (max 40 pts)
-    weekly_total = fuerza_count_7d + carrera_count_7d
+    weekly_total = fuerza_count_7d + carrera_count_7d + yoga_count_7d
     adherence_points = min(40.0, (weekly_total / 4.0) * 40.0)  # target is 4 workouts/wk
+
     
     # 2. Recovery / Fatigue status (max 40 pts)
     recovery_points = 40.0
@@ -1010,10 +1114,16 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
             "   - REGLA DE ORO DE CARRERA (EVITAR LESIONES): Los entrenamientos de calidad (Fartleks, series o intervalos de velocidad) son de alta carga de intensidad y fatiga acumulada. Se permite ÚNICAMENTE una (1) sesión de calidad a la semana (últimos 7 días). Todos los demás entrenamientos de carrera de la semana deben ser obligatoriamente de **Rodamiento Suave** (running a ritmo sostenido y cómodo en Zona 2, trote continuo de 35 a 45 minutos de duración, a ritmo conversacional).\n"
             "   - Analiza rigurosamente el historial de los últimos 7 días. Si ya figura cualquier carrera que contenga en su nombre o descripción las palabras 'fartlek', 'intervalos', 'series', 'velocidad', 'cuestas', o ritmos altos (o si hay una sesión de carrera que no esté marcada explícitamente como rodamiento suave/regenerativo), DEBES generar obligatoriamente un **Rodamiento Suave**.\n"
             "   - Solo si NO figura ningún entrenamiento de calidad en los últimos 7 días del historial, diseña un entrenamiento exigente de intervalos (ej: Calentamiento 5m + 6-8 series de 90s rápido/45s andar + Enfriamiento 5m) o un Fartlek dinámico.\n\n"
+            "3. Si el tipo es 'Yoga':\n"
+            "   - Genera una sesión de yoga y flexibilidad consciente de 20-30 minutos de duración.\n"
+            "   - Selecciona entre 5 y 6 asanas/posturas de yoga fluidas (ej. Tadasana, Balasana, Adho Mukha Svanasana, Bhujangasana, Virabhadrasana).\n"
+            "   - Define series (generalmente 1 o 2) y repeticiones expresadas en tiempo de mantenimiento estático (ej. '3 minutos' o '1 minuto por lado').\n"
+            "   - Rellena una descripción detallando cómo respirar y mantener la alineación corporal durante la asana.\n\n"
             "INSTRUCCIÓN DE ADAPTACIÓN INTELIGENTE:\n"
             "Dosifica las cargas (menos series o ritmos más lentos) solo si el historial revela fatiga extrema o pulsaciones anormalmente elevadas. De lo contrario, genera una sesión altamente retadora.\n\n"
             "Devuelve un JSON estrictamente compatible con RutinaResponse."
         )
+
 
 
         

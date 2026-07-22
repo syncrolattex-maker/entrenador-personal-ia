@@ -89,7 +89,9 @@ const elRecRazonText      = document.getElementById("rec-razon-text");
 const elRecSemanalText    = document.getElementById("rec-semanal-text");
 const elBtnSelectFuerza   = document.getElementById("btn-select-fuerza");
 const elBtnSelectCarrera  = document.getElementById("btn-select-carrera");
+const elBtnSelectYoga     = document.getElementById("btn-select-yoga");
 const elBtnSelectDescanso = document.getElementById("btn-select-descanso");
+
 const elWorkoutCard       = document.getElementById("workout-card");
 const elWorkoutBadge      = document.getElementById("workout-badge");
 const elWorkoutContent    = document.getElementById("workout-content");
@@ -176,7 +178,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // Selection events
   elBtnSelectFuerza.addEventListener("click", () => iniciarGeneracionEntrenamiento("Fuerza"));
   elBtnSelectCarrera.addEventListener("click", () => iniciarGeneracionEntrenamiento("Carrera"));
+  if (elBtnSelectYoga) elBtnSelectYoga.addEventListener("click", () => iniciarGeneracionEntrenamiento("Yoga"));
   elBtnSelectDescanso.addEventListener("click", registrarDescansoHoy);
+
 
   // Chat events
   elBtnSendChat.addEventListener("click", enviarMensajeChat);
@@ -238,7 +242,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v39"; // Dynamic Readiness Score & Weekly Training Load Assessment
+    const APP_VERSION = "v40"; // alexcumplido/yoga-api integration for Yoga sessions
 
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
@@ -488,22 +492,28 @@ function renderWorkout(workout) {
   }
 
   const isFuerza = workout.tipo_sesion === "Fuerza";
+  const isYoga = workout.tipo_sesion === "Yoga";
 
-  if (isFuerza) {
+  if (isFuerza || isYoga) {
     window.currentRoutineExercises = workout.ejercicios;
-    elWorkoutBadge.className = "badge fuerza";
-    elWorkoutBadge.textContent = "Fuerza • Cintas & Pesas 5kg";
+    if (isYoga) {
+      elWorkoutBadge.className = "badge yoga";
+      elWorkoutBadge.textContent = "Yoga • Flexibilidad y Equilibrio";
+    } else {
+      elWorkoutBadge.className = "badge fuerza";
+      elWorkoutBadge.textContent = "Fuerza • Cintas & Pesas 5kg";
+    }
 
     let html = '<div class="exercise-list">';
     workout.ejercicios.forEach((ex, idx) => {
-      const targetMuscle = ex.target_muscle || "Full Body";
-      const equipment = ex.equipment || "Pesas 5kg / Cintas";
+      const targetMuscle = ex.target_muscle || (isYoga ? "Alineación" : "Full Body");
+      const equipment = ex.equipment || (isYoga ? "Esterilla / Yoga" : "Pesas 5kg / Cintas");
       const gifUrl = ex.gif_url || "";
       
       html += `
         <div class="exercise-item-enriched">
           <div class="exercise-thumb-wrapper">
-            ${gifUrl ? `<img src="${gifUrl}" alt="${ex.nombre}" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\'exercise-thumb-icon\'>🏋️</span>'" />` : `<span class="exercise-thumb-icon">⚡</span>`}
+            ${gifUrl ? `<img src="${gifUrl}" alt="${ex.nombre}" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\'exercise-thumb-icon\'>🧘‍♀️</span>'" />` : `<span class="exercise-thumb-icon">🧘‍♀️</span>`}
           </div>
           <div class="exercise-info-content">
             <div class="exercise-title-row">
@@ -516,7 +526,7 @@ function renderWorkout(workout) {
             </div>
             ${ex.descripcion ? `<span class="body-sm-muted" style="margin-top:2px;">${ex.descripcion}</span>` : ""}
             <button class="btn-video-demo-chip" onclick="openExerciseVideoModal(${idx})">
-              <i data-lucide="play-circle" style="width:14px;height:14px;"></i> Ver Técnica y Demostración
+              <i data-lucide="play-circle" style="width:14px;height:14px;"></i> Ver Técnica
             </button>
           </div>
         </div>`;
@@ -526,7 +536,7 @@ function renderWorkout(workout) {
 
 
     elWorkoutActions.innerHTML = `
-      <button id="btn-empezar-fuerza" class="btn btn-primary guided-action-btn">
+      <button id="btn-empezar-fuerza" class="btn btn-primary guided-action-btn ${isYoga ? 'yoga' : ''}">
         <i data-lucide="play" style="width: 20px; height: 20px;"></i>
         Comenzar Sesión Guiada
       </button>
@@ -614,13 +624,45 @@ async function iniciarGeneracionEntrenamiento(tipo) {
       body: JSON.stringify({ tipo: tipo })
     });
     if (res.ok) {
-      state.currentWorkout = await res.json();
+      let workout = await res.json();
+      
+      // If Yoga, enrich poses with vector graphics from alexcumplido/yoga-api
+      if (tipo === "Yoga") {
+        try {
+          const yogaRes = await fetch("/api/yoga-poses");
+          if (yogaRes.ok) {
+            const yogaData = await yogaRes.json();
+            const posesList = yogaData.poses || [];
+            if (workout.ejercicios && posesList.length > 0) {
+              workout.ejercicios.forEach(ex => {
+                const exNameLower = ex.nombre.toLowerCase();
+                const matchedPose = posesList.find(p => 
+                  (p.english_name && exNameLower.includes(p.english_name.toLowerCase())) || 
+                  (p.sanskrit_name && exNameLower.includes(p.sanskrit_name.toLowerCase())) ||
+                  (p.sanskrit_name_adapted && exNameLower.includes(p.sanskrit_name_adapted.toLowerCase()))
+                );
+                if (matchedPose) {
+                  ex.gif_url = matchedPose.url_svg || matchedPose.url_png;
+                  ex.equipment = "Esterilla / Yoga";
+                  ex.target_muscle = matchedPose.translation_name || "Alineación";
+                  ex.tips = matchedPose.pose_benefits || "";
+                }
+              });
+            }
+          }
+        } catch (yogaErr) {
+          console.error("Error enriching yoga poses:", yogaErr);
+        }
+      }
+
+      state.currentWorkout = workout;
       localStorage.setItem("cached_workout", JSON.stringify(state.currentWorkout));
       localStorage.setItem("cached_workout_date", new Date().toDateString());
       renderWorkout(state.currentWorkout);
     } else {
       showError("No pudimos generar el entrenamiento de la IA.");
     }
+
   } catch (err) {
     console.error("Generar entreno error:", err);
     showError("Error de conexión al generar entrenamiento.");
@@ -707,7 +749,7 @@ function startGuidedSession() {
   if (!workout) return;
 
   guided.tipo       = workout.tipo_sesion;
-  guided.exercises  = workout.tipo_sesion === "Fuerza" ? workout.ejercicios : workout.phases;
+  guided.exercises  = (workout.tipo_sesion === "Fuerza" || workout.tipo_sesion === "Yoga") ? workout.ejercicios : workout.phases;
   guided.exIndex    = 0;
   guided.setIndex   = 0;
   guided.totalSeries= 0;
@@ -720,9 +762,13 @@ function startGuidedSession() {
   elBtnGuardarSesion.setAttribute("disabled", "true");
 
   // Reset progress bar colour
-  elGuidedProgressFill.className = guided.tipo === "Carrera"
-    ? "guided-progress-fill carrera"
-    : "guided-progress-fill";
+  if (guided.tipo === "Carrera") {
+    elGuidedProgressFill.className = "guided-progress-fill carrera";
+  } else if (guided.tipo === "Yoga") {
+    elGuidedProgressFill.className = "guided-progress-fill yoga";
+  } else {
+    elGuidedProgressFill.className = "guided-progress-fill";
+  }
 
   elGuidedOverlay.style.display = "flex";
   lucide.createIcons();
@@ -730,11 +776,12 @@ function startGuidedSession() {
   unlockAudio();
   playGoSound();
 
-  if (guided.tipo === "Fuerza") {
+  if (guided.tipo === "Fuerza" || guided.tipo === "Yoga") {
     showFuerzaExercise();
   } else {
     showCarreraPhase();
   }
+
 }
 
 function closeGuided() {
@@ -1020,8 +1067,9 @@ async function onGuardarSesion() {
     tipo:                   guided.tipo,
     duracion_segundos:      elapsed,
     esfuerzo_subjetivo:     guided.selectedFeedback,
-    series_completadas:     guided.tipo === "Fuerza" ? guided.totalSeries : null,
-    ejercicios_completados: guided.tipo === "Fuerza" ? guided.exercises.length : null,
+    series_completadas:     (guided.tipo === "Fuerza" || guided.tipo === "Yoga") ? guided.totalSeries : null,
+    ejercicios_completados: (guided.tipo === "Fuerza" || guided.tipo === "Yoga") ? guided.exercises.length : null,
+
     distancia_km:           null,
     calorias:               null,
     frecuencia_cardiaca_media: null
@@ -1682,7 +1730,26 @@ function updateGuidedVideo(exerciseName, exerciseDesc) {
 
   videoCard.style.display = "flex";
 
+  if (state.currentWorkout && state.currentWorkout.tipo_sesion === "Yoga") {
+    if (muscleEl) muscleEl.textContent = "YOGA • FLEXIBILIDAD Y CONEXIÓN";
+    if (tempoEl) tempoEl.textContent = "Respiración Controlada (Pranayama)";
+    if (descEl) descEl.textContent = exerciseDesc || "Mantén la postura respirando con calma.";
+
+    const currentEx = state.currentWorkout.ejercicios[guided.exIndex];
+    if (currentEx && currentEx.gif_url) {
+      if (imgEl) {
+        imgEl.src = currentEx.gif_url;
+        imgEl.style.display = "block";
+      }
+      if (canvasEl) {
+        canvasEl.style.display = "none";
+      }
+      return;
+    }
+  }
+
   const nameLower = (exerciseName || "").toLowerCase();
+
   let match = EXERCISE_MEDIA_MAP.find(item => item.keywords.some(k => nameLower.includes(k)));
 
   if (!match) {
@@ -1761,13 +1828,21 @@ function openExerciseVideoModal(arg1, arg2, arg3) {
   const instructions = exData?.instructions;
   const tips = exData?.tips || desc || (match ? match.cues : "");
 
-  if (muscleEl) muscleEl.textContent = `🎯 MÚSCULO: ${targetMuscle.toUpperCase()}`;
-  if (tempoEl) tempoEl.textContent = match ? match.tempo : "3s Bajada • 1s Pausa • 1s Empuje";
+  const isYogaSession = state.currentWorkout && state.currentWorkout.tipo_sesion === "Yoga";
 
-  if (canvasEl) {
-    canvasEl.style.display = "flex";
-    canvasEl.className = `biomechanics-canvas ${match ? match.animClass : 'anim-squat'}`;
+  if (isYogaSession) {
+    if (muscleEl) muscleEl.textContent = `🧘‍♀️ TIPO: YOGA / FLEXIBILIDAD`;
+    if (tempoEl) tempoEl.textContent = "Respiración Controlada Consciente";
+    if (canvasEl) canvasEl.style.display = "none";
+  } else {
+    if (muscleEl) muscleEl.textContent = `🎯 MÚSCULO: ${targetMuscle.toUpperCase()}`;
+    if (tempoEl) tempoEl.textContent = match ? match.tempo : "3s Bajada • 1s Pausa • 1s Empuje";
+    if (canvasEl) {
+      canvasEl.style.display = "flex";
+      canvasEl.className = `biomechanics-canvas ${match ? match.animClass : 'anim-squat'}`;
+    }
   }
+
 
   if (gifUrl && imgEl) {
     imgEl.src = gifUrl;
