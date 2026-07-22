@@ -548,6 +548,7 @@ def webhook_iphone(payload: WebhookPayload):
         db["ultimo_entreno"] = payload.tipo
         db["siguiente_bloque"] = "Carrera" if payload.tipo == "Fuerza" else "Fuerza"
         
+        from datetime import date
         db["historial_entrenamientos"].append({
             "tipo": payload.tipo,
             "completado": True,
@@ -556,18 +557,20 @@ def webhook_iphone(payload: WebhookPayload):
             "calorias_activas": payload.calorias_activas,
             "distancia_km": payload.distancia_km,
             "esfuerzo_subjetivo": payload.esfuerzo_subjetivo,
-            "fecha": "Hoy"
+            "fecha": date.today().isoformat()
         })
     else:
+        from datetime import date
         db["dias_sin_entrenar"] += 1
         db["historial_entrenamientos"].append({
             "tipo": payload.tipo,
             "completado": False,
             "dias_sin_entrenar_acumulados": db["dias_sin_entrenar"],
-            "fecha": "Hoy"
+            "fecha": date.today().isoformat()
         })
         
     return {"status": "ok", "msg": "Estado actualizado", "db": db}
+
 
 
 @app.post("/registrar-actividad")
@@ -585,6 +588,7 @@ async def post_registrar_actividad(payload: ActividadCompletadaPayload):
     db["ultimo_entreno"] = payload.tipo
     db["siguiente_bloque"] = "Carrera" if payload.tipo == "Fuerza" else "Fuerza"
 
+    from datetime import date
     db["historial_entrenamientos"].append({
         "tipo": payload.tipo,
         "completado": True,
@@ -595,8 +599,9 @@ async def post_registrar_actividad(payload: ActividadCompletadaPayload):
         "esfuerzo_subjetivo": payload.esfuerzo_subjetivo,
         "series_completadas": payload.series_completadas,
         "ejercicios_completados": payload.ejercicios_completados,
-        "fecha": "Hoy"
+        "fecha": date.today().isoformat()
     })
+
 
     registrado = await registrar_en_intervals(payload)
 
@@ -944,8 +949,29 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict) -> dict:
     Evaluates Verónica's real Intervals.icu history according to sports science directives
     without consuming Gemini API tokens.
     """
-    from datetime import datetime
+    from datetime import datetime, date
     
+    if not real_history:
+        real_history = []
+        for item in db.get("historial_entrenamientos", []):
+            if item.get("completado"):
+                f = item.get("fecha", "")
+                if f == "Hoy":
+                    f = date.today().isoformat()
+                elif f == "Ayer":
+                    f = (date.today() - timedelta(days=1)).isoformat()
+                
+                real_history.append({
+                    "tipo": item.get("tipo", "Fuerza"),
+                    "raw_tipo": item.get("tipo", "Fuerza"),
+                    "nombre": f"Sesión de {item.get('tipo', 'Fuerza')}",
+                    "fecha": f,
+                    "duracion_minutos": item.get("duracion_minutos", 45.0),
+                    "frecuencia_cardiaca_media": item.get("frecuencia_cardiaca_media"),
+                    "calorias_activas": item.get("calorias_activas"),
+                    "distancia_km": item.get("distancia_km")
+                })
+
     ultimo_detalles = None
     last_type = db.get("ultimo_entreno", "")
     days_inactive = db.get("dias_sin_entrenar", 0)
@@ -954,6 +980,7 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict) -> dict:
     carrera_count_7d = 0
     has_quality_run_7d = False
     trained_yesterday = False
+
     
     if real_history:
         sorted_history = sorted(real_history, key=lambda x: x["fecha"], reverse=True)

@@ -242,7 +242,8 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v44"; // Responsive centered ring typography & alignment
+    const APP_VERSION = "v45"; // Local history fallback recommendation sync and ISO dates
+
 
 
 
