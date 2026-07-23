@@ -242,7 +242,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v49"; // Fix: dashboard ÚLTIMO/SIGUIENTE synced with real Intervals.icu history
+    const APP_VERSION = "v50"; // ExerciseDB RapidAPI: real images, videos, instructions in "Ver Técnica"
 
 
 
@@ -1854,6 +1854,7 @@ function openExerciseVideoModal(arg1, arg2, arg3) {
   const titleEl = document.getElementById("modal-video-title");
   const canvasEl = document.getElementById("modal-biomechanics-canvas");
   const imgEl = document.getElementById("modal-exercise-img");
+  const videoEl = document.getElementById("modal-exercise-video");
   const muscleEl = document.getElementById("modal-muscle-name");
   const tempoEl = document.getElementById("modal-video-tempo");
   const cuesEl = document.getElementById("modal-video-cues");
@@ -1866,6 +1867,7 @@ function openExerciseVideoModal(arg1, arg2, arg3) {
   let match = EXERCISE_MEDIA_MAP.find(item => item.keywords.some(k => nameLower.includes(k)));
 
   const gifUrl = exData?.gif_url || (match ? match.gif : "");
+  const videoUrl = exData?.video_url || null;
   const targetMuscle = exData?.target_muscle || (match ? match.muscle : "TREN INFERIOR Y SUPERIOR");
   const instructions = exData?.instructions;
   const tips = exData?.tips || desc || (match ? match.cues : "");
@@ -1885,51 +1887,106 @@ function openExerciseVideoModal(arg1, arg2, arg3) {
     }
   }
 
+  // ── Media priority: real video > image > SVG canvas ──────────────────────
+  function _showVideo(url) {
+    if (!videoEl) return;
+    videoEl.src = url;
+    videoEl.style.display = "block";
+    if (imgEl) imgEl.style.display = "none";
+    if (canvasEl) canvasEl.style.display = "none";
+    videoEl.load();
+    videoEl.play().catch(() => {});
+  }
 
-  if (gifUrl && imgEl) {
-    imgEl.src = gifUrl;
+  function _showImage(url) {
+    if (!imgEl) return;
+    imgEl.src = url;
     imgEl.style.display = "block";
-    if (isYogaSession) {
-      imgEl.style.background = "#f9f9fb";
-      imgEl.style.padding = "14px";
-      imgEl.style.objectFit = "contain";
-    } else {
-      imgEl.style.background = "#080808";
-      imgEl.style.padding = "0";
-      imgEl.style.objectFit = "contain";
-    }
-    imgEl.onload = () => {
-      imgEl.style.display = "block";
-    };
+    if (videoEl) videoEl.style.display = "none";
+    if (!isYogaSession && canvasEl) canvasEl.style.display = "none";
+    imgEl.style.background = isYogaSession ? "#f9f9fb" : "#080808";
+    imgEl.style.padding = isYogaSession ? "14px" : "0";
+    imgEl.style.objectFit = "contain";
     imgEl.onerror = () => {
       imgEl.style.display = "none";
       if (!isYogaSession && canvasEl) canvasEl.style.display = "flex";
     };
-  } else if (imgEl) {
-    imgEl.style.display = "none";
-    if (!isYogaSession && canvasEl) canvasEl.style.display = "flex";
   }
 
+  // Reset media elements
+  if (videoEl) { videoEl.pause(); videoEl.src = ""; videoEl.style.display = "none"; }
+  if (imgEl)   imgEl.style.display = "none";
 
-  if (instructions && instructions.length > 0) {
-    let stepsHtml = `<span class="label-caps" style="color: var(--secondary); display: block; margin-bottom: 6px;">TÉCNICA PASO A PASO:</span><ol class="exercise-instructions-list">`;
-    instructions.forEach(step => { stepsHtml += `<li>${step}</li>`; });
-    stepsHtml += `</ol>`;
-    if (tips) {
-      stepsHtml += `<div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-glass);"><span class="label-caps" style="color: var(--primary); display: block; margin-bottom: 2px;">CONSEJO DE TÉCNICA:</span><p class="body-sm" style="margin: 0; color: var(--on-surface); line-height:1.4;">${tips}</p></div>`;
+  if (videoUrl) {
+    _showVideo(videoUrl);
+  } else if (gifUrl) {
+    _showImage(gifUrl);
+  } else if (!isYogaSession && canvasEl) {
+    canvasEl.style.display = "flex";
+  }
+
+  // ── Instructions and tips ─────────────────────────────────────────────────
+  function _renderCues(instructions, tips) {
+    if (instructions && instructions.length > 0) {
+      let stepsHtml = `<span class="label-caps" style="color: var(--secondary); display: block; margin-bottom: 6px;">TÉCNICA PASO A PASO:</span><ol class="exercise-instructions-list">`;
+      instructions.forEach(step => { stepsHtml += `<li>${step}</li>`; });
+      stepsHtml += `</ol>`;
+      if (tips) {
+        stepsHtml += `<div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-glass);"><span class="label-caps" style="color: var(--primary); display: block; margin-bottom: 2px;">CONSEJO DE TÉCNICA:</span><p class="body-sm" style="margin: 0; color: var(--on-surface); line-height:1.4;">${tips}</p></div>`;
+      }
+      if (cuesEl) cuesEl.innerHTML = stepsHtml;
+    } else {
+      if (cuesEl) cuesEl.textContent = tips || "Mantén la postura erguida y tensión constante con tus pesas de 5kg o cintas.";
     }
-    if (cuesEl) cuesEl.innerHTML = stepsHtml;
-  } else {
-    if (cuesEl) cuesEl.textContent = tips || "Mantén la postura erguida y tensión constante con tus pesas de 5kg o cintas.";
+  }
+
+  _renderCues(instructions, tips);
+
+  // ── Lazy-fetch full detail if exercise_id available and not yet enriched ──
+  const exerciseId = exData?.exercise_id;
+  if (exerciseId && (!videoUrl || !instructions || instructions.length === 0)) {
+    const cacheKey = `edb_detail_${exerciseId}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        const detail = JSON.parse(cached);
+        if (!videoUrl && detail.videoUrl) _showVideo(detail.videoUrl);
+        if ((!instructions || instructions.length === 0) && detail.instructions) {
+          const tips2 = (detail.exerciseTips || [])[0] || tips;
+          _renderCues(detail.instructions, tips2);
+        }
+      } catch(e) {}
+    } else {
+      fetch(`/ejercicio-detalle/${exerciseId}`)
+        .then(r => r.json())
+        .then(res => {
+          if (res.status === "ok" && res.data) {
+            const detail = res.data;
+            localStorage.setItem(cacheKey, JSON.stringify(detail));
+            // Only update if modal still open for this exercise
+            if (document.getElementById("modal-video-title")?.textContent === name) {
+              if (!videoUrl && detail.videoUrl) _showVideo(detail.videoUrl);
+              if ((!instructions || instructions.length === 0) && detail.instructions) {
+                const tips2 = (detail.exerciseTips || [])[0] || tips;
+                _renderCues(detail.instructions, tips2);
+              }
+            }
+          }
+        })
+        .catch(e => console.warn("[EDB] lazy detail fetch failed:", e));
+    }
   }
 
   modal.style.display = "flex";
   if (window.lucide) lucide.createIcons();
 }
 
+
 function closeExerciseVideoModal() {
   const modal = document.getElementById("exercise-video-modal");
   if (modal) modal.style.display = "none";
+  const videoEl = document.getElementById("modal-exercise-video");
+  if (videoEl) { videoEl.pause(); videoEl.src = ""; }
 }
 
 

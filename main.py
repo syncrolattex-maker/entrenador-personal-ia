@@ -10,10 +10,21 @@ import requests
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-import exercisedb
-import musclewiki
 
 load_dotenv()
+
+# ── ExerciseDB RapidAPI (AscendAPI) ──────────────────────────────────────────
+EXERCISEDB_KEY  = "894945d817msh8622b11c7f9f712p171acajsnb3339e41c2f6"
+EXERCISEDB_HOST = "edb-with-videos-and-images-by-ascendapi.p.rapidapi.com"
+EXERCISEDB_BASE = f"https://{EXERCISEDB_HOST}/api/v1"
+EXERCISEDB_HEADERS = {
+    "x-rapidapi-key":  EXERCISEDB_KEY,
+    "x-rapidapi-host": EXERCISEDB_HOST,
+    "Content-Type":    "application/json",
+}
+# In-memory cache: { exercise_name_lower: {...details} } and { exercise_id: {...details} }
+_edb_name_cache: dict = {}
+_edb_id_cache:   dict = {}
 
 app = FastAPI(title="Fitness PWA Backend")
 
@@ -83,6 +94,8 @@ class Ejercicio(BaseModel):
     repeticiones: str
     descripcion: Optional[str] = None  # Brief execution tip for the user
     gif_url: Optional[str] = None
+    video_url: Optional[str] = None     # Real mp4 from ExerciseDB
+    exercise_id: Optional[str] = None  # ExerciseDB exerciseId for lazy detail fetch
     equipment: Optional[str] = None
     target_muscle: Optional[str] = None
     secondary_muscles: Optional[List[str]] = None
@@ -306,30 +319,131 @@ async def enviar_a_intervals(phases: List[FaseCarrera]):
         print(f"Failed to connect to Intervals.icu: {str(e)}")
         return False
 
+async def _edb_fetch_exercise_detail(exercise_id: str) -> dict:
+    """Fetches full exercise detail (videoUrl, instructions, tips) from ExerciseDB by ID."""
+    if exercise_id in _edb_id_cache:
+        return _edb_id_cache[exercise_id]
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            r = await client.get(
+                f"{EXERCISEDB_BASE}/exercises/{exercise_id}",
+                headers=EXERCISEDB_HEADERS
+            )
+            if r.status_code == 200:
+                data = r.json().get("data", {})
+                _edb_id_cache[exercise_id] = data
+                return data
+    except Exception as e:
+        print(f"[EDB] detail fetch error for {exercise_id}: {e}")
+    return {}
+
+
+async def _edb_search_exercise(nombre: str) -> dict:
+    """
+    Searches ExerciseDB for a strength exercise matching the given name.
+    Prioritizes DUMBBELL and BODY WEIGHT equipment (Verónica's gear).
+    Returns a dict with: exercise_id, gif_url, video_url, target_muscle,
+    secondary_muscles, instructions, tips.
+    """
+    key = nombre.lower().strip()
+    if key in _edb_name_cache:
+        return _edb_name_cache[key]
+
+    # Extract meaningful search keywords from the Spanish name
+    stop_words = {"con", "de", "la", "el", "en", "un", "una", "los", "las",
+                  "del", "al", "por", "y", "a", "su", "sus", "mancuerna",
+                  "pesas", "banda", "cinta", "cintas", "resistencia", "kg",
+                  "5kg", "unilateral", "isométrica", "isometrica"}
+    words = [w for w in key.split() if w not in stop_words and len(w) > 2]
+    search_term = " ".join(words[:3]) if words else key
+
+    result = {}
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # Try name-based search first
+            r = await client.get(
+                f"{EXERCISEDB_BASE}/exercises",
+                params={"limit": 50, "search": search_term},
+                headers=EXERCISEDB_HEADERS
+            )
+            candidates = []
+            if r.status_code == 200:
+                candidates = r.json().get("data", [])
+
+            # If no search param, fallback: get by body weight / dumbbell pool
+            if not candidates:
+                r2 = await client.get(
+                    f"{EXERCISEDB_BASE}/exercises",
+                    params={"limit": 100, "equipment": "BODY WEIGHT"},
+                    headers=EXERCISEDB_HEADERS
+                )
+                if r2.status_code == 200:
+                    candidates = r2.json().get("data", [])
+
+            if candidates:
+                # Score by name similarity
+                key_words = set(search_term.lower().split())
+                best = None
+                best_score = -1
+                for ex in candidates:
+                    ex_words = set((ex.get("name") or "").lower().split())
+                    score = len(key_words & ex_words)
+                    # Boost preferred equipment
+                    eq_list = [e.upper() for e in (ex.get("equipments") or [])]
+                    if "DUMBBELL" in eq_list or "BODY WEIGHT" in eq_list:
+                        score += 1
+                    if score > best_score:
+                        best_score = score
+                        best = ex
+
+                if best:
+                    ex_id = best.get("exerciseId", "")
+                    # Fetch full detail for videoUrl and instructions
+                    detail = await _edb_fetch_exercise_detail(ex_id) if ex_id else {}
+                    muscles = best.get("targetMuscles") or []
+                    secondary = best.get("secondaryMuscles") or []
+                    result = {
+                        "exercise_id":       ex_id,
+                        "gif_url":           best.get("imageUrl") or detail.get("imageUrl"),
+                        "video_url":         detail.get("videoUrl"),
+                        "target_muscle":     ", ".join(muscles) if muscles else "FULL BODY",
+                        "secondary_muscles": secondary,
+                        "instructions":      detail.get("instructions") or [],
+                        "tips":              (detail.get("exerciseTips") or [""])[0] if detail.get("exerciseTips") else None,
+                    }
+    except Exception as e:
+        print(f"[EDB] search error for '{nombre}': {e}")
+
+    _edb_name_cache[key] = result
+    return result
+
+
 async def enrich_routine_data(routine: Any) -> Any:
-    """Enriches strength exercises in a routine dictionary or model with ExerciseDB metadata."""
+    """Enriches strength exercises with real ExerciseDB RapidAPI data (images, videos, instructions)."""
     if not routine:
         return routine
-        
+
     routine_dict = routine if isinstance(routine, dict) else routine.dict()
-    
+
     if routine_dict.get("tipo_sesion") == "Fuerza" and routine_dict.get("ejercicios"):
         enriched_list = []
         for ex in routine_dict["ejercicios"]:
             ex_item = ex if isinstance(ex, dict) else ex.dict() if hasattr(ex, "dict") else dict(ex)
             ex_name = ex_item.get("nombre", "")
             if ex_name:
-                details = await exercisedb.get_enriched_exercise_details(ex_name)
-                ex_item["gif_url"] = details.get("gif_url")
-                ex_item["equipment"] = details.get("equipment")
-                ex_item["target_muscle"] = details.get("target_muscle")
-                ex_item["secondary_muscles"] = details.get("secondary_muscles")
-                ex_item["instructions"] = details.get("instructions")
-                ex_item["tips"] = details.get("tips")
+                details = await _edb_search_exercise(ex_name)
+                if details:
+                    ex_item["exercise_id"]      = details.get("exercise_id")
+                    ex_item["gif_url"]           = details.get("gif_url")
+                    ex_item["video_url"]         = details.get("video_url")
+                    ex_item["target_muscle"]     = details.get("target_muscle")
+                    ex_item["secondary_muscles"] = details.get("secondary_muscles")
+                    ex_item["instructions"]      = details.get("instructions")
+                    ex_item["tips"]              = details.get("tips")
             enriched_list.append(ex_item)
         routine_dict["ejercicios"] = enriched_list
-        
-    return routine_dict if isinstance(routine, dict) else routine_dict
+
+    return routine_dict
 
 
 async def generar_rutina_mock(tipo: str, mensaje_warning: str = None) -> dict:
@@ -1140,6 +1254,35 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict) -> dict:
         "historial_real": real_history,
         "readiness_score": readiness_score
     }
+
+
+@app.get("/ejercicio-detalle/{exercise_id}")
+async def get_ejercicio_detalle(exercise_id: str):
+    """
+    Returns full ExerciseDB detail for a given exerciseId:
+    videoUrl, imageUrls, instructions, exerciseTips, variations, targetMuscles.
+    Results are cached in memory to avoid redundant API calls.
+    """
+    try:
+        detail = await _edb_fetch_exercise_detail(exercise_id)
+        if detail:
+            return {"status": "ok", "data": detail}
+        return {"status": "error", "msg": "Ejercicio no encontrado en ExerciseDB."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/ejercicio-detalle/bodyparts")
+async def get_ejercicio_bodyparts():
+    """Returns the ExerciseDB body-part catalog with image URLs."""
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            r = await client.get(f"{EXERCISEDB_BASE}/bodyparts", headers=EXERCISEDB_HEADERS)
+            if r.status_code == 200:
+                return r.json()
+        return {"success": False, "data": []}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/recomendacion-hoy")
