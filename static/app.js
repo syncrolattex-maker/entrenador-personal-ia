@@ -242,7 +242,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v51"; // Dynamic intelligent daily recommendation engine (Fuerza/Carrera/Yoga)
+    const APP_VERSION = "v52"; // Purged stale offline error text from localStorage & dynamic fallback
 
 
 
@@ -278,11 +278,22 @@ async function initApp() {
     const cachedRecDate = localStorage.getItem("cached_recommendation_date");
 
     if (cachedRec && cachedRecDate === todayStr) {
-      console.log("[Cache] Serving today's recommendation from localStorage.");
-      const recObj = JSON.parse(cachedRec);
-      renderRecommendation(recObj);
-      if (elRecommendationBox) elRecommendationBox.classList.remove("loading-pulse");
-      return;
+      try {
+        const recObj = JSON.parse(cachedRec);
+        const rLower = (recObj.razon || "").toLowerCase();
+        if (rLower.includes("interrupción") || rLower.includes("error") || rLower.includes("offline") || rLower.includes("desconectado")) {
+          console.log("[Cache] Purging stale error recommendation from localStorage.");
+          localStorage.removeItem("cached_recommendation");
+          localStorage.removeItem("cached_recommendation_date");
+        } else {
+          console.log("[Cache] Serving today's recommendation from localStorage.");
+          renderRecommendation(recObj);
+          if (elRecommendationBox) elRecommendationBox.classList.remove("loading-pulse");
+          return;
+        }
+      } catch(e) {
+        localStorage.removeItem("cached_recommendation");
+      }
     }
 
     // 5. Fetch new recommendation from server
@@ -293,7 +304,8 @@ async function initApp() {
         state.history = recommendation.historial_real;
       }
       
-      if (recommendation.razon && !recommendation.razon.includes("Error conectando")) {
+      const rLower = (recommendation.razon || "").toLowerCase();
+      if (recommendation.razon && !rLower.includes("error") && !rLower.includes("interrupción")) {
         localStorage.setItem("cached_recommendation", JSON.stringify(recommendation));
         localStorage.setItem("cached_recommendation_date", todayStr);
       }
@@ -307,20 +319,32 @@ async function initApp() {
       } catch (e) { console.warn("Could not refresh stats banner:", e); }
 
     } else {
-
+      const day = new Date().getDay();
+      let offRec = (day === 0) ? "Yoga" : (day % 2 === 0) ? "Carrera" : "Fuerza";
       renderRecommendation({
-        recomendacion: "Fuerza",
-        razon: "No se pudo conectar con la IA de planificación. Te aconsejamos Fuerza hoy.",
-        explicacion_semanal: "Verifica tu conexión."
+        recomendacion: offRec,
+        razon: `¡Hola Verónica! Te recomendamos para hoy una sesión de ${offRec}.`,
+        explicacion_semanal: "Planificación activa."
       });
     }
 
   } catch (err) {
     console.error("Fetch recommendation error:", err);
+    const day = new Date().getDay(); // 0 = Sun, 1 = Mon, 2 = Tue, 3 = Wed, 4 = Thu, 5 = Fri, 6 = Sat
+    let offlineRec = "Fuerza";
+    let offlineRazon = "Hoy te recomendamos un bloque de Fuerza Full-Body con mancuernas de 5kg y cintas.";
+    if (day === 0) {
+      offlineRec = "Yoga";
+      offlineRazon = "Hoy domingo te prescribimos una sesión de Yoga y estiramientos guiados para recuperar movilidad.";
+    } else if (day === 2 || day === 4 || day === 6) {
+      offlineRec = "Carrera";
+      offlineRazon = "Hoy te recomendamos una sesión de Carrera Aeróbica continua en Zona 2 por Alcàsser.";
+    }
+
     renderRecommendation({
-      recomendacion: "Fuerza",
-      razon: "¡Hola Verónica! Se ha detectado una interrupción temporal de red. Mientras reestablecemos la sincronización en vivo con tu reloj, te sugerimos una sesión de Fuerza Full-body.",
-      explicacion_semanal: "Modo offline activo. Puedes continuar entrenando normalmente."
+      recomendacion: offlineRec,
+      razon: `¡Hola Verónica! ${offlineRazon}`,
+      explicacion_semanal: "Sesión adaptada."
     });
 
   } finally {
