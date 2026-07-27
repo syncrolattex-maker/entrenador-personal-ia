@@ -513,6 +513,28 @@ body {
   width: 100%;
 }
 
+.selection-btn.ai-recommended {
+  border: 2px solid var(--primary) !important;
+  background: linear-gradient(135deg, rgba(195, 244, 0, 0.1) 0%, rgba(20, 24, 15, 0.95) 100%) !important;
+  box-shadow: 0 0 22px rgba(195, 244, 0, 0.3) !important;
+}
+
+.ai-recommended-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--primary);
+  color: #000000;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  width: fit-content;
+}
+
 .selection-btn:hover, .selection-btn:active {
   border-color: var(--primary);
   box-shadow: 0 0 20px var(--glow-primary);

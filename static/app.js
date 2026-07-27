@@ -242,7 +242,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v52"; // Purged stale offline error text from localStorage & dynamic fallback
+    const APP_VERSION = "v53"; // Visual AI Coach Briefing & Recommended Option Highlight
 
 
 
@@ -401,6 +401,60 @@ function renderRecommendation(rec) {
   
   elRecRazonText.textContent = rec.razon;
   elRecSemanalText.textContent = rec.explicacion_semanal || "";
+
+  // Populate last workout context box right inside recommendation card
+  const elLastContext = document.getElementById("rec-last-context");
+  if (rec.ultimo_entreno_detalles && elLastContext) {
+    const last = rec.ultimo_entreno_detalles;
+    const mins = Math.round(last.duracion_minutos || 0);
+    const hr = last.frecuencia_cardiaca_media ? ` • ❤️ ${Math.round(last.frecuencia_cardiaca_media)} ppm` : "";
+    const km = last.distancia_km ? ` • 📏 ${last.distancia_km.toFixed(1)} km` : "";
+    
+    let dateLabel = last.fecha;
+    try {
+      const parts = last.fecha.split("-");
+      if (parts.length === 3) {
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        dateLabel = d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+      }
+    } catch(e) {}
+
+    elLastContext.innerHTML = `⌚ <strong>Evaluando tu último registro:</strong> ${last.tipo} (${dateLabel}, ${mins} min${hr}${km})`;
+    elLastContext.style.display = "block";
+  } else if (elLastContext) {
+    elLastContext.style.display = "none";
+  }
+
+  // Visually highlight the selection button prescribed by the AI
+  const btnFuerza = document.getElementById("btn-select-fuerza");
+  const btnCarrera = document.getElementById("btn-select-carrera");
+  const btnYoga = document.getElementById("btn-select-yoga");
+  const btnDescanso = document.getElementById("btn-select-descanso");
+  
+  [btnFuerza, btnCarrera, btnYoga, btnDescanso].forEach(btn => {
+    if (btn) {
+      btn.classList.remove("ai-recommended");
+      const chip = btn.querySelector(".ai-recommended-chip");
+      if (chip) chip.remove();
+    }
+  });
+
+  let targetBtn = null;
+  if (rec.recomendacion === "Fuerza") targetBtn = btnFuerza;
+  else if (rec.recomendacion === "Carrera") targetBtn = btnCarrera;
+  else if (rec.recomendacion === "Yoga") targetBtn = btnYoga;
+  else if (rec.recomendacion === "Descanso") targetBtn = btnDescanso;
+
+  if (targetBtn) {
+    targetBtn.classList.add("ai-recommended");
+    const textWrap = targetBtn.querySelector(".btn-text-wrap");
+    if (textWrap) {
+      const chip = document.createElement("div");
+      chip.className = "ai-recommended-chip";
+      chip.innerHTML = "✨ PRESCRIPCIÓN RECOMENDADA POR IA";
+      textWrap.insertBefore(chip, textWrap.firstChild);
+    }
+  }
 
   // Update dynamic readiness score (Weekly Load Balance Score)
   const elPercent = document.getElementById("daily-goal-percent");
