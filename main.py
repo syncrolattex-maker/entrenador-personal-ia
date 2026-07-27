@@ -1113,7 +1113,11 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict) -> dict:
     Evaluates Verónica's real Intervals.icu history according to sports science directives
     without consuming Gemini API tokens.
     """
-    from datetime import datetime, date
+    from datetime import datetime, date, timedelta
+    
+    today_date = datetime.now().date()
+    weekday = today_date.weekday()  # 0 = Monday, 1 = Tuesday, ..., 6 = Sunday
+    weekday_names = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
     
     if not real_history:
         real_history = []
@@ -1133,43 +1137,43 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict) -> dict:
                     "duracion_minutos": item.get("duracion_minutos", 45.0),
                     "frecuencia_cardiaca_media": item.get("frecuencia_cardiaca_media"),
                     "calorias_activas": item.get("calorias_activas"),
-                    "distancia_km": item.get("distancia_km")
+                    "distancia_km": item.get("distancia_km"),
+                    "esfuerzo_subjetivo": item.get("esfuerzo_subjetivo")
                 })
 
     ultimo_detalles = None
     last_type = db.get("ultimo_entreno", "")
     days_inactive = db.get("dias_sin_entrenar", 0)
+    last_effort = ""
+    last_hr = 0
     
     fuerza_count_7d = 0
     carrera_count_7d = 0
+    yoga_count_7d = 0
     has_quality_run_7d = False
-    trained_yesterday = False
 
-    
     if real_history:
         sorted_history = sorted(real_history, key=lambda x: x["fecha"], reverse=True)
         ultimo_detalles = sorted_history[0]
         last_type = ultimo_detalles.get("tipo", last_type)
+        last_effort = (ultimo_detalles.get("esfuerzo_subjetivo") or "").lower()
+        last_hr = ultimo_detalles.get("frecuencia_cardiaca_media") or 0
         
-        today_date = datetime.now().date()
-        monday_date = today_date - timedelta(days=today_date.weekday())
+        monday_date = today_date - timedelta(days=weekday)
         monday_str = monday_date.strftime("%Y-%m-%d")
         
         try:
             last_date = datetime.strptime(ultimo_detalles["fecha"], "%Y-%m-%d").date()
             diff_days = (today_date - last_date).days
             days_inactive = max(0, diff_days)
-            if diff_days == 1:
-                trained_yesterday = True
         except Exception:
             pass
 
-        # ✅ Sync in-memory db so /estado-db (dashboard banner) reflects real history
+        # Sync in-memory db so /estado-db (dashboard banner) reflects real history
         db["ultimo_entreno"]   = last_type
         db["siguiente_bloque"] = "Carrera" if last_type == "Fuerza" else "Fuerza"
         db["dias_sin_entrenar"] = days_inactive
 
-        yoga_count_7d = 0
         for act in sorted_history:
             act_date_str = act.get("fecha", "")
             if act_date_str >= monday_str:
@@ -1184,60 +1188,83 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict) -> dict:
                 elif t == "Yoga":
                     yoga_count_7d += 1
 
-    # Apply Athletic Directives for Verónica (43a, 1.77m, 59kg, 5kg dumbbells, bands, Alcàsser)
+    # ── Intelligent Decision Tree for Verónica (43a, 1.77m, 59kg, Alcàsser) ──
     rec_tipo = "Fuerza"
     razon = ""
     explicacion_semanal = f"Esta semana (Lunes-Domingo): {fuerza_count_7d}/3 Fuerza • {carrera_count_7d}/2 Carrera • {yoga_count_7d} Yoga."
 
+    # CASE 1: Trained TODAY (days_inactive == 0)
+    if days_inactive == 0:
+        if last_type == "Fuerza":
+            rec_tipo = "Yoga"
+            razon = "¡Excelente trabajo hoy, Verónica! Ya completaste tu bloque de Fuerza Full-Body. Para relajar la musculatura y acelerar la recuperación activa, hoy te recomendamos una sesión suave de Yoga y Flexibilidad de 20 min."
+        elif last_type == "Carrera":
+            rec_tipo = "Yoga"
+            razon = "¡Grandioso entrenamiento hoy, Verónica! Tras tu rodaje de Carrera, te sugerimos estiramientos guiados y Yoga de 20 min para soltar sóleos, isquios y la cadena posterior."
+        else: # Yoga
+            rec_tipo = "Descanso"
+            razon = "¡Sesión de Yoga completada hoy, Verónica! Tu cuerpo está en un estado óptimo de regeneración física y mental. Disfruta del reposo activo."
 
-    if days_inactive >= 2:
+    # CASE 2: High Subjective Fatigue or High HR from last workout
+    elif last_effort == "agotador" or (last_hr > 165 and days_inactive <= 1):
+        rec_tipo = "Yoga"
+        razon = "¡Hola Verónica! Detectamos que tu última sesión requirió un esfuerzo agotador. Para evitar sobrecargas articulares y favorecer la supercompensación muscular, hoy Verofit te prescribe una sesión de Yoga y Flexibilidad."
+
+    # CASE 3: Trained YESTERDAY (days_inactive == 1)
+    elif days_inactive == 1:
         if last_type == "Fuerza":
             rec_tipo = "Carrera"
-            razon = f"¡Hola Verónica! Llevas {days_inactive} días de reposo. Para reactivar tu sistema cardiovascular y favorecer la quema de grasas sin sobrecargar las articulaciones, hoy Verofit te recomienda una sesión de Carrera Aeróbica en Zona 2."
-        else:
+            razon = "¡Hola Verónica! Tras el bloque de Fuerza Full-Body de ayer, hoy alternamos con Carrera Aeróbica continua en Zona 2 (35-45 min a ritmo conversacional) para oxigenar la musculatura."
+        elif last_type == "Carrera":
             rec_tipo = "Fuerza"
-            razon = f"¡Hola Verónica! Tras {days_inactive} días de recuperación muscular, es el momento idóneo para estimular la densidad muscular con una sesión de Fuerza Full-Body con tus mancuernas de 5kg y cintas."
-    elif trained_yesterday:
-        if last_type == "Fuerza":
-            rec_tipo = "Carrera"
-            razon = "¡Hola Verónica! Como ayer completaste un bloque de Fuerza Full-Body, hoy alternamos con Carrera Aeróbica continua en Zona 2. Esto acelera el riego sanguíneo y oxigena la musculatura en fase de recuperación."
-        else:
-            rec_tipo = "Fuerza"
-            razon = "¡Hola Verónica! Tras la sesión de Carrera de ayer, hoy cambiamos el estímulo hacia Fuerza Full-Body. Las mancuernas de 5kg y cintas te permiten trabajar la fuerza-resistencia muscular sin impacto articular."
+            razon = "¡Hola Verónica! Tras la sesión de Carrera de ayer, hoy cambiamos el estímulo hacia Fuerza Full-Body con mancuernas de 5kg y cintas para tonificar la densidad muscular."
+        else: # Yoga yesterday
+            if fuerza_count_7d <= carrera_count_7d:
+                rec_tipo = "Fuerza"
+                razon = "¡Hola Verónica! Tras tu descanso activo de ayer con Yoga, hoy volvemos a la carga con Fuerza Full-Body de 45 minutos."
+            else:
+                rec_tipo = "Carrera"
+                razon = "¡Hola Verónica! Tras la sesión de Yoga de ayer, hoy prescribimos un bloque de Carrera Aeróbica suave en Zona 2 por la huerta de Alcàsser."
+
+    # CASE 4: Inactive 2 or more days (days_inactive >= 2)
     else:
-        if fuerza_count_7d <= carrera_count_7d:
+        if fuerza_count_7d < carrera_count_7d:
             rec_tipo = "Fuerza"
-            razon = "¡Hola Verónica! Para mantener el balance semanal ideal de 2 a 3 sesiones de Fuerza, hoy prescribimos un entrenamiento de Fuerza Full-Body (Cuerpo Completo) de 45 minutos."
-        else:
+            razon = f"¡Hola Verónica! Llevas {days_inactive} días de reposo y esta semana necesitas compensar la carga de Fuerza. Hoy te prescribimos un entrenamiento de Fuerza Full-Body (45-60 min)."
+        elif carrera_count_7d < fuerza_count_7d:
             rec_tipo = "Carrera"
-            razon = "¡Hola Verónica! Para complementar tus bloques de musculación con trabajo cardiovascular de base, hoy Verofit te recomienda una sesión de Carrera aeróbica suave en Zona 2."
+            razon = f"¡Hola Verónica! Llevas {days_inactive} días sin entrenar. Para reactivar tu sistema cardiovascular sin impacto excesivo, hoy Verofit te recomienda Carrera Aeróbica en Zona 2."
+        else:
+            # Counts are tied -> Day-of-Week Schedule Rotation!
+            if weekday in [0, 2, 4]:  # Mon, Wed, Fri
+                rec_tipo = "Fuerza"
+                razon = f"¡Hola Verónica! Feliz {weekday_names[weekday]}. Para mantener la masa muscular y el tono físico, hoy te recomendamos una sesión de Fuerza Full-Body con pesas de 5kg y cintas."
+            elif weekday in [1, 3, 5]:  # Tue, Thu, Sat
+                rec_tipo = "Carrera"
+                razon = f"¡Hola Verónica! Feliz {weekday_names[weekday]}. Hoy toca trabajo cardiovascular: Carrera Aeróbica continua en Zona 2 (35-45 min) por Alcàsser."
+            else:  # Sunday (6)
+                rec_tipo = "Yoga"
+                razon = "¡Hola Verónica! Es domingo, el día ideal para descargar tensiones articulares. Hoy te prescribimos una sesión guiada de Yoga y Flexibilidad de 25 minutos."
 
     # Calculate dynamic readiness/load score (0-100%)
-    # 1. Adherence to weekly volume (max 40 pts)
     weekly_total = fuerza_count_7d + carrera_count_7d + yoga_count_7d
     adherence_points = min(40.0, (weekly_total / 4.0) * 40.0)  # target is 4 workouts/wk
 
-    
-    # 2. Recovery / Fatigue status (max 40 pts)
     recovery_points = 40.0
     if days_inactive == 0:
         recovery_points = 30.0
     elif days_inactive == 1:
-        recovery_points = 40.0  # 1 day rest is optimal!
+        recovery_points = 40.0  # 1 day rest is optimal
     elif days_inactive == 2:
         recovery_points = 35.0
     elif days_inactive >= 3:
         recovery_points = max(15.0, 40.0 - (days_inactive - 2) * 5.0)
 
-    # Subjective fatigue deduction from last workout
-    last_workout = next((x for x in reversed(db.get("historial_entrenamientos", [])) if x.get("completado")), None)
-    if last_workout:
-        if last_workout.get("esfuerzo_subjetivo") == "agotador":
-            recovery_points = max(10.0, recovery_points - 15.0)
-        elif last_workout.get("esfuerzo_subjetivo") == "moderado":
-            recovery_points = max(10.0, recovery_points - 5.0)
+    if last_effort == "agotador":
+        recovery_points = max(10.0, recovery_points - 15.0)
+    elif last_effort == "moderado":
+        recovery_points = max(10.0, recovery_points - 5.0)
 
-    # 3. Stimulus Balance / Variety (max 20 pts)
     balance_points = 20.0
     recent_workouts = [x.get("tipo") for x in reversed(db.get("historial_entrenamientos", [])) if x.get("completado")][:3]
     if len(recent_workouts) >= 2 and len(set(recent_workouts)) == 1:
@@ -1289,10 +1316,10 @@ async def get_ejercicio_bodyparts():
 async def get_recomendacion_hoy():
     """
     Generates today's personalized recommendation for Verónica (43, 1.77m, 59kg, Alcàsser)
-    evaluating her actual activity history from Intervals.icu via Plan B engine.
+    evaluating her actual activity history from Intervals.icu via Gemini AI or Plan B engine.
     """
     global cached_recommendation_data
-    from datetime import date
+    from datetime import date, datetime
     today_str = date.today().isoformat()
     if cached_recommendation_data["date"] == today_str and cached_recommendation_data["data"] is not None:
         print("[Cache Server] Returning cached recommendation for today.")
@@ -1300,8 +1327,50 @@ async def get_recomendacion_hoy():
 
     try:
         real_history = await get_intervals_history()
-        # PLAN B ENGINE: Fast, reliable, 0 token consumption!
         rec_data = await generar_analisis_plan_b(real_history, db)
+
+        # Try Gemini AI if API key is available
+        api_key = os.getenv("GEMINI_API_KEY")
+        if api_key:
+            try:
+                client = genai.Client(api_key=api_key)
+                weekday_names = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+                weekday_str = weekday_names[datetime.now().weekday()]
+                
+                system_instruction = (
+                    "Eres la Coach IA de **Verofit**, entrenadora personal de **Verónica** (43 años, 1.77m, 59kg, Alcàsser).\n"
+                    "Tu objetivo es prescribir la recomendación diaria de entrenamiento ('Fuerza', 'Carrera' o 'Yoga').\n"
+                    "REGLAS DE PLANIFICACIÓN:\n"
+                    "1. Varía el estímulo diariamente. Alterna entre Fuerza, Carrera y Yoga. No repitas la misma disciplina dos días seguidos.\n"
+                    "2. Si la atleta ya entrenó hoy o reportó esfuerzo 'agotador', prescribe 'Yoga' o 'Descanso'.\n"
+                    "3. Dirígete a ella siempre como 'Verónica' en un tono súper motivador, cercano y profesional.\n"
+                    "4. Explica brevemente la razón fisiológica adaptada a sus mancuernas de 5kg, cintas y terreno de Alcàsser."
+                )
+                
+                last_type = rec_data.get("ultimo_entreno_detalles", {}).get("tipo", "Ninguno") if rec_data.get("ultimo_entreno_detalles") else "Ninguno"
+                prompt = f"""
+                Hoy es {weekday_str} ({today_str}).
+                Días sin entrenar: {db.get('dias_sin_entrenar', 0)}.
+                Último entrenamiento completado: {last_type}.
+                Estado de la semana: {rec_data.get('explicacion_semanal', '')}.
+                
+                Genera la recomendación diaria: recomendacion ('Fuerza', 'Carrera' o 'Yoga'), razon (1-2 frases motivadoras), explicacion_semanal.
+                """
+                
+                ai_rec = await generate_gemini_content_with_retry(
+                    client=client,
+                    contents=prompt,
+                    system_instruction=system_instruction,
+                    response_schema=GeminiRecomendacionResponse,
+                    temperature=0.7
+                )
+                if ai_rec and isinstance(ai_rec, dict) and ai_rec.get("recomendacion"):
+                    rec_data["recomendacion"] = ai_rec["recomendacion"]
+                    rec_data["razon"] = ai_rec["razon"]
+                    if ai_rec.get("explicacion_semanal"):
+                        rec_data["explicacion_semanal"] = ai_rec["explicacion_semanal"]
+            except Exception as gem_err:
+                print("Gemini recommendation fallback to Plan B:", gem_err)
         
         cached_recommendation_data["date"] = today_str
         cached_recommendation_data["data"] = rec_data

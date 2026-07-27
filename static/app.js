@@ -242,7 +242,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v50"; // ExerciseDB RapidAPI: real images, videos, instructions in "Ver Técnica"
+    const APP_VERSION = "v51"; // Dynamic intelligent daily recommendation engine (Fuerza/Carrera/Yoga)
 
 
 
