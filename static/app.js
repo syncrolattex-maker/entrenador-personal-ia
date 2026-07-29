@@ -242,7 +242,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v53"; // Visual AI Coach Briefing & Recommended Option Highlight
+    const APP_VERSION = "v54"; // Advanced WKO5 Banister Impulse-Response Model Telemetry (CTL, ATL, TSB)
 
 
 

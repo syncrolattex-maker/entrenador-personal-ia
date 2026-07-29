@@ -226,6 +226,66 @@ async def get_intervals_history() -> List[dict]:
         print(f"Exception fetching Intervals history: {str(e)}")
         return []
 
+async def get_wko5_metrics() -> dict:
+    """
+    Fetches WKO5 (Banister Impulse-Response Model) physiological metrics from Intervals.icu.
+    Petición GET a https://intervals.icu/api/v1/athlete/0/fitness pasando como parámetros
+    oldest y newest la fecha de hoy (YYYY-MM-DD).
+    Autenticación: Basic Auth con ("API_KEY", os.getenv("INTERVALS_API_KEY")).
+    Returns: { "ctl_fitness": float, "atl_fatiga": float, "tsb_forma": float }
+    """
+    api_key = os.getenv("INTERVALS_API_KEY")
+    default_metrics = {"ctl_fitness": 0.0, "atl_fatiga": 0.0, "tsb_forma": 0.0}
+
+    if not api_key or api_key == "YOUR_INTERVALS_API_KEY":
+        return default_metrics
+
+    from datetime import date
+    today_str = date.today().isoformat()
+    auth = ("API_KEY", api_key)
+    params = {"oldest": today_str, "newest": today_str}
+
+    # Primary endpoint per specification, fallback to wellness endpoint if 404
+    endpoints = [
+        "https://intervals.icu/api/v1/athlete/0/fitness",
+        "https://intervals.icu/api/v1/athlete/0/wellness"
+    ]
+
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            for url in endpoints:
+                try:
+                    response = await client.get(url, auth=auth, params=params)
+                    if response.status_code == 200:
+                        data = response.json()
+                        item = None
+                        if isinstance(data, list) and len(data) > 0:
+                            item = data[0]
+                        elif isinstance(data, dict):
+                            item = data
+
+                        if item and isinstance(item, dict):
+                            ctl = float(item.get("ctl") or 0.0)
+                            atl = float(item.get("atl") or 0.0)
+                            tsb_raw = item.get("tsb")
+                            if tsb_raw is not None:
+                                tsb = float(tsb_raw)
+                            else:
+                                tsb = ctl - atl
+
+                            return {
+                                "ctl_fitness": round(ctl, 1),
+                                "atl_fatiga": round(atl, 1),
+                                "tsb_forma": round(tsb, 1)
+                            }
+                except Exception as ep_err:
+                    print(f"[WKO5] Endpoint attempt error for {url}: {ep_err}")
+    except Exception as e:
+        print(f"[WKO5] Exception in get_wko5_metrics: {e}")
+
+    return default_metrics
+
+
 async def enviar_a_intervals(phases: List[FaseCarrera]):
     """
     Sends structured workout phases to Intervals.icu API.
@@ -1107,14 +1167,17 @@ async def generate_gemini_content_with_retry(client, contents, system_instructio
     
     raise last_exception
 
-async def generar_analisis_plan_b(real_history: List[dict], db: dict) -> dict:
+
+async def generar_analisis_plan_b(real_history: List[dict], db: dict, wko5_data: Optional[dict] = None) -> dict:
     """
     Autonomous Athletic Diagnostic & Recommendation Engine (Plan B).
-    Evaluates Verónica's real Intervals.icu history according to sports science directives
-    without consuming Gemini API tokens.
+    Evaluates Verónica's real Intervals.icu history and WKO5 metrics according to sports science directives.
     """
     from datetime import datetime, date, timedelta
-    
+
+    if wko5_data is None:
+        wko5_data = await get_wko5_metrics()
+
     today_date = datetime.now().date()
     weekday = today_date.weekday()  # 0 = Monday, 1 = Tuesday, ..., 6 = Sunday
     weekday_names = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
@@ -1188,13 +1251,23 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict) -> dict:
                 elif t == "Yoga":
                     yoga_count_7d += 1
 
+    # WKO5 Banister Telemetry
+    tsb_val = wko5_data.get("tsb_forma", 0.0)
+    ctl_val = wko5_data.get("ctl_fitness", 0.0)
+    atl_val = wko5_data.get("atl_fatiga", 0.0)
+
     # ── Intelligent Decision Tree for Verónica (43a, 1.77m, 59kg, Alcàsser) ──
     rec_tipo = "Fuerza"
     razon = ""
     explicacion_semanal = f"Esta semana (Lunes-Domingo): {fuerza_count_7d}/3 Fuerza • {carrera_count_7d}/2 Carrera • {yoga_count_7d} Yoga."
 
+    # WKO5 High Fatigue Rule Override (TSB < -15)
+    if tsb_val < -15.0 and days_inactive <= 1:
+        rec_tipo = "Yoga"
+        razon = f"¡Hola Verónica! Según la telemetría WKO5 (TSB = {tsb_val}, Fatiga ATL = {atl_val}), tus reservas de recuperación están comprometidas. Forzamos una sesión regenerativa de Yoga y Flexibilidad para proteger tus articulaciones."
+
     # CASE 1: Trained TODAY (days_inactive == 0)
-    if days_inactive == 0:
+    elif days_inactive == 0:
         if last_type == "Fuerza":
             rec_tipo = "Yoga"
             razon = "¡Excelente trabajo hoy, Verónica! Ya completaste tu bloque de Fuerza Full-Body. Para relajar la musculatura y acelerar la recuperación activa, hoy te recomendamos una sesión suave de Yoga y Flexibilidad de 20 min."
@@ -1246,7 +1319,7 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict) -> dict:
                 rec_tipo = "Yoga"
                 razon = "¡Hola Verónica! Es domingo, el día ideal para descargar tensiones articulares. Hoy te prescribimos una sesión guiada de Yoga y Flexibilidad de 25 minutos."
 
-    # Calculate dynamic readiness/load score (0-100%)
+    # Calculate dynamic readiness/load score (0-100%) incorporating WKO5 TSB Form
     weekly_total = fuerza_count_7d + carrera_count_7d + yoga_count_7d
     adherence_points = min(40.0, (weekly_total / 4.0) * 40.0)  # target is 4 workouts/wk
 
@@ -1259,6 +1332,15 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict) -> dict:
         recovery_points = 35.0
     elif days_inactive >= 3:
         recovery_points = max(15.0, 40.0 - (days_inactive - 2) * 5.0)
+
+    # WKO5 TSB Form Adjustment on Readiness Score
+    if tsb_val != 0.0 or ctl_val != 0.0:
+        if tsb_val < -15.0:
+            recovery_points = max(5.0, recovery_points - 18.0)
+        elif -10.0 <= tsb_val <= 5.0:
+            recovery_points = min(40.0, recovery_points + 5.0)
+        elif tsb_val > 10.0:
+            recovery_points = min(35.0, recovery_points)
 
     if last_effort == "agotador":
         recovery_points = max(10.0, recovery_points - 15.0)
@@ -1279,7 +1361,8 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict) -> dict:
         "explicacion_semanal": explicacion_semanal,
         "ultimo_entreno_detalles": ultimo_detalles,
         "historial_real": real_history,
-        "readiness_score": readiness_score
+        "readiness_score": readiness_score,
+        "wko5_metrics": wko5_data
     }
 
 
@@ -1327,7 +1410,8 @@ async def get_recomendacion_hoy():
 
     try:
         real_history = await get_intervals_history()
-        rec_data = await generar_analisis_plan_b(real_history, db)
+        wko5_data = await get_wko5_metrics()
+        rec_data = await generar_analisis_plan_b(real_history, db, wko5_data=wko5_data)
 
         # Try Gemini AI if API key is available
         api_key = os.getenv("GEMINI_API_KEY")
@@ -1340,11 +1424,16 @@ async def get_recomendacion_hoy():
                 system_instruction = (
                     "Eres la Coach IA de **Verofit**, entrenadora personal de **Verónica** (43 años, 1.77m, 59kg, Alcàsser).\n"
                     "Tu objetivo es prescribir la recomendación diaria de entrenamiento ('Fuerza', 'Carrera' o 'Yoga').\n"
-                    "REGLAS DE PLANIFICACIÓN:\n"
-                    "1. Varía el estímulo diariamente. Alterna entre Fuerza, Carrera y Yoga. No repitas la misma disciplina dos días seguidos.\n"
-                    "2. Si la atleta ya entrenó hoy o reportó esfuerzo 'agotador', prescribe 'Yoga' o 'Descanso'.\n"
-                    "3. Dirígete a ella siempre como 'Verónica' en un tono súper motivador, cercano y profesional.\n"
-                    "4. Explica brevemente la razón fisiológica adaptada a sus mancuernas de 5kg, cintas y terreno de Alcàsser."
+                    "TELEMETRÍA FISIOLÓGICA WKO5:\n"
+                    f"- CTL (Fitness): {wko5_data.get('ctl_fitness')}\n"
+                    f"- ATL (Fatiga): {wko5_data.get('atl_fatiga')}\n"
+                    f"- TSB (Forma): {wko5_data.get('tsb_forma')}\n\n"
+                    "REGLAS DE PLANIFICACIÓN Y PRESCRIPCIÓN SEGÚN TSB:\n"
+                    "1. Si TSB < -15 (Fatiga alta): Prescribe obligatoriamente 'Yoga' o 'Descanso'.\n"
+                    "2. Si -10 <= TSB <= +5 (Zona óptima): Prescribe 'Fuerza' o 'Carrera' según alternancia diaria.\n"
+                    "3. Si TSB > +10 (Frescura extrema): Incrementar estímulo.\n"
+                    "4. Varía el estímulo diariamente. Alterna entre Fuerza, Carrera y Yoga. No repitas la misma disciplina dos días seguidos.\n"
+                    "5. Dirígete a ella siempre como 'Verónica' en un tono súper motivador, cercano y profesional."
                 )
                 
                 last_type = rec_data.get("ultimo_entreno_detalles", {}).get("tipo", "Ninguno") if rec_data.get("ultimo_entreno_detalles") else "Ninguno"
@@ -1352,6 +1441,7 @@ async def get_recomendacion_hoy():
                 Hoy es {weekday_str} ({today_str}).
                 Días sin entrenar: {db.get('dias_sin_entrenar', 0)}.
                 Último entrenamiento completado: {last_type}.
+                Métricas WKO5: CTL={wko5_data.get('ctl_fitness')}, ATL={wko5_data.get('atl_fatiga')}, TSB={wko5_data.get('tsb_forma')}.
                 Estado de la semana: {rec_data.get('explicacion_semanal', '')}.
                 
                 Genera la recomendación diaria: recomendacion ('Fuerza', 'Carrera' o 'Yoga'), razon (1-2 frases motivadoras), explicacion_semanal.
@@ -1380,14 +1470,11 @@ async def get_recomendacion_hoy():
         return await generar_analisis_plan_b([], db)
 
 
-
-
-
 @app.post("/generar-entrenamiento")
 async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
     """
     Generates a detailed workout routine (exercises for Strength, or phases for Running)
-    adapted in volume and intensity based on the Intervals.icu history for Verónica.
+    adapted in volume and intensity based on the Intervals.icu history and WKO5 metrics for Verónica.
     """
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
@@ -1395,13 +1482,24 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
         
     try:
         real_history = await get_intervals_history()
+        wko5_data = await get_wko5_metrics()
         client = genai.Client(api_key=api_key)
         
+        ctl_val = wko5_data.get("ctl_fitness", 0.0)
+        atl_val = wko5_data.get("atl_fatiga", 0.0)
+        tsb_val = wko5_data.get("tsb_forma", 0.0)
+
         system_instruction = (
             "Eres la Coach IA de **Verofit**, la aplicación de entrenamiento personal exclusiva de **Verónica**, una atleta de 43 años, de Alcàsser (Valencia), "
-            "que mide 1.77 m y pesa 59 kg (cuerpo atlético, extremidades largas, excelente palanca). "
-
-            "Ella busca rutinas intensas, retadoras y de mayor duración.\n\n"
+            "que mide 1.77 m y pesa 59 kg (cuerpo atlético, extremidades largas, excelente palanca).\n\n"
+            "TELEMETRÍA FISIOLÓGICA MODELO WKO5 (BANISTER):\n"
+            f"- Carga Crónica (Fitness / CTL): {ctl_val}\n"
+            f"- Carga Aguda (Fatiga / ATL): {atl_val}\n"
+            f"- Equilibrio de Estrés (Forma / TSB): {tsb_val}\n\n"
+            "DIRECTRICES DE PRESCRIPCIÓN FISIOLÓGICA SEGÚN TSB:\n"
+            "1. Si TSB < -15 (Fatiga alta): Forzar sesión regenerativa obligatoria (Rodamiento Suave Z2 de 35 min o Yoga/Flexibilidad) para reducir riesgo de sobreentrenamiento/lesión.\n"
+            "2. Si -10 <= TSB <= +5 (Zona óptima de asimilación): Autorizar sesiones exigentes de Fuerza Full-Body o Intervalos/Calidad de Carrera.\n"
+            "3. Si TSB > +10 (Desentrenamiento/frescura extrema): Incrementar el volumen e intensidad de la sesión para volver a estimular la subida del CTL (Fitness).\n\n"
             f"Tu tarea hoy es generar la sesión detallada para el tipo seleccionado: '{payload.tipo}'.\n\n"
             "INSTRUCCIONES DE MATERIALES Y ENFOQUE DE FUERZA:\n"
             "Verónica solo dispone de **bandas de resistencia (cintas)** y **mancuernas de 5 kg (pesas de 5 kg)**.\n"
@@ -1413,25 +1511,21 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
             "   - Genera una rutina exigente de Cuerpo Completo (Full-Body) de entre 45 y 60 minutos de duración.\n"
             "   - Diseña entre 5 y 6 ejercicios exigentes, especificando 4 o 5 series de 15-22 repeticiones (el rango de repeticiones debe ser alto dada la carga de 5 kg).\n"
             "   - Incluye siempre un ejercicio de core estático o dinámico por tiempo (ej. Plancha isométrica, Bicho muerto, o Escaladores de 45-60 segundos).\n"
-            "   - Rellena obligatoriamente una 'descripcion' corta y clara sobre la ejecución para cada ejercicio detallando el tempo (ej: 'bajada en 3 segundos') y el uso de las cintas o pesas de 5 kg.\n"
-
+            "   - Rellena obligatoriamente una 'descripcion' corta y clara sobre la ejecución para cada ejercicio detallando el tempo (ej: 'bajada en 3 segundos') y el uso de las cintas o pesas de 5 kg.\n\n"
             "2. Si el tipo es 'Carrera':\n"
             "   - REGLA DE ORO DE CARRERA (EVITAR LESIONES): Los entrenamientos de calidad (Fartleks, series o intervalos de velocidad) son de alta carga de intensidad y fatiga acumulada. Se permite ÚNICAMENTE una (1) sesión de calidad a la semana (últimos 7 días). Todos los demás entrenamientos de carrera de la semana deben ser obligatoriamente de **Rodamiento Suave** (running a ritmo sostenido y cómodo en Zona 2, trote continuo de 35 a 45 minutos de duración, a ritmo conversacional).\n"
             "   - Analiza rigurosamente el historial de los últimos 7 días. Si ya figura cualquier carrera que contenga en su nombre o descripción las palabras 'fartlek', 'intervalos', 'series', 'velocidad', 'cuestas', o ritmos altos (o si hay una sesión de carrera que no esté marcada explícitamente como rodamiento suave/regenerativo), DEBES generar obligatoriamente un **Rodamiento Suave**.\n"
-            "   - Solo si NO figura ningún entrenamiento de calidad en los últimos 7 días del historial, diseña un entrenamiento exigente de intervalos (ej: Calentamiento 5m + 6-8 series de 90s rápido/45s andar + Enfriamiento 5m) o un Fartlek dinámico.\n\n"
+            "   - Solo si NO figura ningún entrenamiento de calidad en los últimos 7 días del historial y TSB >= -10, diseña un entrenamiento exigente de intervalos (ej: Calentamiento 5m + 6-8 series de 90s rápido/45s andar + Enfriamiento 5m) o un Fartlek dinámico.\n\n"
             "3. Si el tipo es 'Yoga':\n"
             "   - Genera una sesión de yoga y flexibilidad consciente de 20-30 minutos de duración.\n"
             "   - Selecciona entre 5 y 6 asanas/posturas de yoga fluidas (ej. Tadasana, Balasana, Adho Mukha Svanasana, Bhujangasana, Virabhadrasana).\n"
             "   - Define series (generalmente 1 o 2) y repeticiones expresadas en tiempo de mantenimiento estático (ej. '3 minutos' o '1 minuto por lado').\n"
             "   - Rellena una descripción detallando cómo respirar y mantener la alineación corporal durante la asana.\n\n"
             "INSTRUCCIÓN DE ADAPTACIÓN INTELIGENTE:\n"
-            "Dosifica las cargas (menos series o ritmos más lentos) solo si el historial revela fatiga extrema o pulsaciones anormalmente elevadas. De lo contrario, genera una sesión altamente retadora.\n\n"
+            "Dosifica las cargas (menos series o ritmos más lentos) si el historial o WKO5 revela TSB < -15 o fatiga acumulada. De lo contrario, genera una sesión altamente retadora.\n\n"
             "Devuelve un JSON estrictamente compatible con RutinaResponse."
         )
 
-
-
-        
         historial_str = ""
         if real_history:
             historial_str = "Historial de entrenamientos reales (últimos 10 días de Intervals.icu):\n"
@@ -1445,9 +1539,10 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
         prompt = f"""
         Tipo de entrenamiento solicitado: {payload.tipo}.
         Días sin entrenar: {db['dias_sin_entrenar']}.
+        Telemetría WKO5 actual: Carga Crónica CTL (Fitness) = {ctl_val}, Carga Aguda ATL (Fatiga) = {atl_val}, Equilibrio de Estrés TSB (Forma) = {tsb_val}.
         {historial_str}
         
-        Genera la sesión adaptada y detallada de {payload.tipo} para Verónica.
+        Genera la sesión adaptada y detallada de {payload.tipo} para Verónica ajustada a su nivel TSB actual.
         """
         
         workout = await generate_gemini_content_with_retry(

@@ -1,4 +1,4 @@
-const CACHE_NAME = "verofit-cache-v53";
+const CACHE_NAME = "verofit-cache-v54";
 const ASSETS = [
   "/",
   "/index.html",
