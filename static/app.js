@@ -236,13 +236,15 @@ async function initApp() {
     if (elRecRazonText) elRecRazonText.textContent = "Analizando tu actividad con la Coach Verónica...";
   }
 
+  cargarPreferenciasGuardadas();
+
   try {
     // 1. Get database status
     const dbRes = await fetch("/estado-db");
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v54"; // Advanced WKO5 Banister Impulse-Response Model Telemetry (CTL, ATL, TSB)
+    const APP_VERSION = "v55"; // Persistent Workout Rules & Preferences (fuerza/carrera days, equip, max quality)
 
 
 
@@ -1678,10 +1680,13 @@ function renderMetricsTab(history, coachText) {
     });
   }
   
-  if (elMetricFuerzaCount) elMetricFuerzaCount.innerHTML = `${fuerzaCount}<small> / 3 ses</small>`;
-  if (elMetricFuerzaBar) elMetricFuerzaBar.style.width = `${Math.min(100, Math.round((fuerzaCount / 3) * 100))}%`;
-  if (elMetricCarreraCount) elMetricCarreraCount.innerHTML = `${carreraCount}<small> / 2 ses</small>`;
-  if (elMetricCarreraBar) elMetricCarreraBar.style.width = `${Math.min(100, Math.round((carreraCount / 2) * 100))}%`;
+  const targetFuerza = state.prefFuerzaDays || 3;
+  const targetCarrera = state.prefCarreraDays || 2;
+
+  if (elMetricFuerzaCount) elMetricFuerzaCount.innerHTML = `${fuerzaCount}<small> / ${targetFuerza} ses</small>`;
+  if (elMetricFuerzaBar) elMetricFuerzaBar.style.width = `${Math.min(100, Math.round((fuerzaCount / targetFuerza) * 100))}%`;
+  if (elMetricCarreraCount) elMetricCarreraCount.innerHTML = `${carreraCount}<small> / ${targetCarrera} ses</small>`;
+  if (elMetricCarreraBar) elMetricCarreraBar.style.width = `${Math.min(100, Math.round((carreraCount / targetCarrera) * 100))}%`;
 
   if (elMetricsHistoryList) {
     if (!history || history.length === 0) {
@@ -1722,6 +1727,45 @@ function renderMetricsTab(history, coachText) {
 // Profile Workout Rules & Preference Selectors
 state.prefFuerzaDays = 3;
 state.prefCarreraDays = 2;
+
+function updateEquipChip(checkboxEl) {
+  if (!checkboxEl) return;
+  const chipLabel = checkboxEl.closest(".equip-chip");
+  if (chipLabel) {
+    if (checkboxEl.checked) {
+      chipLabel.classList.add("active");
+    } else {
+      chipLabel.classList.remove("active");
+    }
+  }
+}
+
+function cargarPreferenciasGuardadas() {
+  const savedStr = localStorage.getItem("user_workout_preferences");
+  if (!savedStr) return;
+  try {
+    const prefs = JSON.parse(savedStr);
+    if (prefs.fuerzaDays) setFuerzaPreference(parseInt(prefs.fuerzaDays));
+    if (prefs.carreraDays) setCarreraPreference(parseInt(prefs.carreraDays));
+    
+    if (prefs.maxCalidad !== undefined) {
+      const elMax = document.getElementById("pref-max-calidad");
+      if (elMax) elMax.checked = !!prefs.maxCalidad;
+    }
+    
+    if (prefs.equipment) {
+      const elMan = document.getElementById("equip-mancuernas");
+      const elCin = document.getElementById("equip-cintas");
+      const elWat = document.getElementById("equip-watch");
+      
+      if (elMan) { elMan.checked = !!prefs.equipment.mancuernas5kg; updateEquipChip(elMan); }
+      if (elCin) { elCin.checked = !!prefs.equipment.cintas; updateEquipChip(elCin); }
+      if (elWat) { elWat.checked = !!prefs.equipment.appleWatch; updateEquipChip(elWat); }
+    }
+  } catch (e) {
+    console.error("Error loading saved workout preferences:", e);
+  }
+}
 
 function setFuerzaPreference(days) {
   state.prefFuerzaDays = days;
@@ -1766,10 +1810,17 @@ function guardarPreferenciasEntrenamiento() {
 
   localStorage.setItem("user_workout_preferences", JSON.stringify(userPrefs));
   
-  // Update metrics bars target count with new goals
-      if (state.history) {
+  // Clear cached recommendation so dashboard re-evaluates immediately with new preferences
+  localStorage.removeItem("cached_recommendation");
+  localStorage.removeItem("cached_recommendation_date");
+
+  // Re-render metrics tab with new target goals
+  if (state.history) {
     renderMetricsTab(state.history, state.lastCoachText || "");
   }
+
+  // Refresh recommendation on dashboard
+  fetchRecommendation();
 
   showSuccessBanner("✨ Reglas y preferencias de entrenamiento guardadas.");
 }
