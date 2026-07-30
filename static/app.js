@@ -244,7 +244,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v55"; // Persistent Workout Rules & Preferences (fuerza/carrera days, equip, max quality)
+    const APP_VERSION = "v56"; // Fully Stateless Architecture via Intervals.icu (Vercel Cold Start Fix)
 
 
 

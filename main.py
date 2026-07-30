@@ -286,6 +286,55 @@ async def get_wko5_metrics() -> dict:
     return default_metrics
 
 
+async def calcular_estado_atleta() -> dict:
+    """
+    Calculates current athlete state dynamically from real Intervals.icu history (Single Source of Truth).
+    Eliminates dependency on in-memory ephemeral state for Vercel serverless / cold starts.
+    Returns:
+    {
+        "ultimo_entreno": str,
+        "dias_sin_entrenar": int,
+        "siguiente_bloque": str
+    }
+    """
+    from datetime import datetime, date
+    today_date = date.today()
+
+    history = await get_intervals_history()
+    
+    ultimo_entreno = "Carrera"
+    dias_sin_entrenar = 1
+    siguiente_bloque = "Fuerza"
+
+    if history:
+        # Sort history from newest to oldest by date
+        sorted_history = sorted(history, key=lambda x: str(x.get("fecha", "")), reverse=True)
+        if sorted_history:
+            last_workout = sorted_history[0]
+            ultimo_entreno = last_workout.get("tipo", "Carrera")
+            
+            # Parse last workout date
+            fecha_str = str(last_workout.get("fecha", ""))[:10]
+            try:
+                last_date = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+                diff_days = (today_date - last_date).days
+                dias_sin_entrenar = max(0, diff_days)
+            except Exception as e:
+                print(f"[calcular_estado_atleta] Date parse error for '{fecha_str}': {e}")
+
+            # Define siguiente_bloque logic
+            if ultimo_entreno == "Fuerza":
+                siguiente_bloque = "Carrera"
+            else:  # Carrera or Yoga
+                siguiente_bloque = "Fuerza"
+
+    return {
+        "ultimo_entreno": ultimo_entreno,
+        "dias_sin_entrenar": dias_sin_entrenar,
+        "siguiente_bloque": siguiente_bloque
+    }
+
+
 async def enviar_a_intervals(phases: List[FaseCarrera]):
     """
     Sends structured workout phases to Intervals.icu API.
@@ -752,9 +801,17 @@ async def registrar_en_intervals(payload: ActividadCompletadaPayload) -> bool:
 # --- API Endpoints ---
 
 @app.get("/estado-db")
-def get_estado_db():
-    """Helper endpoint to check current database status from frontend"""
-    return db
+async def get_estado_db():
+    """
+    Helper endpoint to check current athlete status dynamically calculated from Intervals.icu.
+    Provides stateless Single Source of Truth for frontend PWA status banner on Vercel cold starts.
+    """
+    estado = await calcular_estado_atleta()
+    history = await get_intervals_history()
+    
+    response = dict(estado)
+    response["historial_entrenamientos"] = history
+    return response
 
 @app.post("/webhook-iphone")
 def webhook_iphone(payload: WebhookPayload):
@@ -1178,6 +1235,8 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict, wko5_data:
     if wko5_data is None:
         wko5_data = await get_wko5_metrics()
 
+    estado_atleta = await calcular_estado_atleta()
+
     today_date = datetime.now().date()
     weekday = today_date.weekday()  # 0 = Monday, 1 = Tuesday, ..., 6 = Sunday
     weekday_names = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
@@ -1205,8 +1264,8 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict, wko5_data:
                 })
 
     ultimo_detalles = None
-    last_type = db.get("ultimo_entreno", "")
-    days_inactive = db.get("dias_sin_entrenar", 0)
+    last_type = estado_atleta["ultimo_entreno"]
+    days_inactive = estado_atleta["dias_sin_entrenar"]
     last_effort = ""
     last_hr = 0
     
@@ -1232,7 +1291,7 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict, wko5_data:
         except Exception:
             pass
 
-        # Sync in-memory db so /estado-db (dashboard banner) reflects real history
+        # Sync in-memory db so local debugging reflects real history
         db["ultimo_entreno"]   = last_type
         db["siguiente_bloque"] = "Carrera" if last_type == "Fuerza" else "Fuerza"
         db["dias_sin_entrenar"] = days_inactive
@@ -1411,6 +1470,7 @@ async def get_recomendacion_hoy():
     try:
         real_history = await get_intervals_history()
         wko5_data = await get_wko5_metrics()
+        estado_atleta = await calcular_estado_atleta()
         rec_data = await generar_analisis_plan_b(real_history, db, wko5_data=wko5_data)
 
         # Try Gemini AI if API key is available
@@ -1436,10 +1496,10 @@ async def get_recomendacion_hoy():
                     "5. Dirígete a ella siempre como 'Verónica' en un tono súper motivador, cercano y profesional."
                 )
                 
-                last_type = rec_data.get("ultimo_entreno_detalles", {}).get("tipo", "Ninguno") if rec_data.get("ultimo_entreno_detalles") else "Ninguno"
+                last_type = estado_atleta["ultimo_entreno"]
                 prompt = f"""
                 Hoy es {weekday_str} ({today_str}).
-                Días sin entrenar: {db.get('dias_sin_entrenar', 0)}.
+                Días sin entrenar: {estado_atleta['dias_sin_entrenar']}.
                 Último entrenamiento completado: {last_type}.
                 Métricas WKO5: CTL={wko5_data.get('ctl_fitness')}, ATL={wko5_data.get('atl_fatiga')}, TSB={wko5_data.get('tsb_forma')}.
                 Estado de la semana: {rec_data.get('explicacion_semanal', '')}.
@@ -1483,6 +1543,7 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
     try:
         real_history = await get_intervals_history()
         wko5_data = await get_wko5_metrics()
+        estado_atleta = await calcular_estado_atleta()
         client = genai.Client(api_key=api_key)
         
         ctl_val = wko5_data.get("ctl_fitness", 0.0)
@@ -1538,7 +1599,8 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
 
         prompt = f"""
         Tipo de entrenamiento solicitado: {payload.tipo}.
-        Días sin entrenar: {db['dias_sin_entrenar']}.
+        Días sin entrenar: {estado_atleta['dias_sin_entrenar']}.
+        Último entrenamiento completado: {estado_atleta['ultimo_entreno']}.
         Telemetría WKO5 actual: Carga Crónica CTL (Fitness) = {ctl_val}, Carga Aguda ATL (Fatiga) = {atl_val}, Equilibrio de Estrés TSB (Forma) = {tsb_val}.
         {historial_str}
         
