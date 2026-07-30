@@ -181,6 +181,11 @@ document.addEventListener("DOMContentLoaded", () => {
   if (elBtnSelectYoga) elBtnSelectYoga.addEventListener("click", () => iniciarGeneracionEntrenamiento("Yoga"));
   elBtnSelectDescanso.addEventListener("click", registrarDescansoHoy);
 
+  const elBtnDiaGris = document.getElementById("btnDiaGris");
+  if (elBtnDiaGris) {
+    elBtnDiaGris.addEventListener("click", () => iniciarGeneracionEntrenamiento("Yoga", true));
+  }
+
 
   // Chat events
   elBtnSendChat.addEventListener("click", enviarMensajeChat);
@@ -244,7 +249,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v57"; // Increased Running Prescription Intensity (2 Quality Runs/Wk, 170 BPM Fatigue Threshold)
+    const APP_VERSION = "v58"; // Día Gris Rescue Mode (10-min ultra-gentle routine) & Post-workout Recovery Nutrition
 
 
 
@@ -710,13 +715,14 @@ function renderWorkout(workout) {
 // ============================================================
 // WORKOUT GENERATION AND ACTIONS
 // ============================================================
-async function iniciarGeneracionEntrenamiento(tipo) {
-  showLoading(true, "La IA está diseñando tu entrenamiento...");
+async function iniciarGeneracionEntrenamiento(tipo, modoRescate = false) {
+  const loadingMsg = modoRescate ? "Preparando algo suave para ti..." : "La IA está diseñando tu entrenamiento...";
+  showLoading(true, loadingMsg);
   try {
     const res = await fetch("/generar-entrenamiento", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tipo: tipo })
+      body: JSON.stringify({ tipo: tipo, modo_rescate: modoRescate })
     });
     if (res.ok) {
       let workout = await res.json();
@@ -755,12 +761,20 @@ async function iniciarGeneracionEntrenamiento(tipo) {
       localStorage.setItem("cached_workout_date", new Date().toDateString());
       renderWorkout(state.currentWorkout);
     } else {
-      showError("No pudimos generar el entrenamiento de la IA.");
+      if (modoRescate) {
+        showError("Incluso la app está cansada hoy. ¡Tómate el día libre sin culpa!");
+      } else {
+        showError("No pudimos generar el entrenamiento de la IA.");
+      }
     }
 
   } catch (err) {
     console.error("Generar entreno error:", err);
-    showError("Error de conexión al generar entrenamiento.");
+    if (modoRescate) {
+      showError("Incluso la app está cansada hoy. ¡Tómate el día libre sin culpa!");
+    } else {
+      showError("Error de conexión al generar entrenamiento.");
+    }
   } finally {
     showLoading(false);
   }

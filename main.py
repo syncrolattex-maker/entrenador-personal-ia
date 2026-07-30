@@ -140,6 +140,7 @@ class GeminiRecomendacionResponse(BaseModel):
 
 class GenerarEntrenamientoPayload(BaseModel):
     tipo: Literal["Fuerza", "Carrera", "Yoga"]
+    modo_rescate: Optional[bool] = False
 
 
 class SincronizarCarreraPayload(BaseModel):
@@ -555,14 +556,33 @@ async def enrich_routine_data(routine: Any) -> Any:
     return routine_dict
 
 
-async def generar_rutina_mock(tipo: str, mensaje_warning: str = None) -> dict:
+async def generar_rutina_mock(tipo: str, mensaje_warning: str = None, modo_rescate: bool = False) -> dict:
     """
-    Generates a localized mock routine with dynamic daily rotation and fatigue adaptation.
+    Generates a localized mock routine with dynamic daily rotation, fatigue adaptation, or rescue mode.
     Conforms to the RutinaResponse schema.
     """
     from datetime import datetime
     day_seed = datetime.now().timetuple().tm_yday
     
+    if modo_rescate:
+        explicacion = (
+            "🔋 Modo Rescate (Día Gris): Sesión ultra-suave de movilidad y relajación de 10 minutos. "
+            "Hoy lo único importante es mantener el hábito sin ninguna exigencia ni culpa. ¡Orgullosas de ti, Verónica!\n\n"
+            "🥗 Consejo de nutrición post-entreno: Una infusión tibia de manzanilla o té verde junto con 1/2 tostada integral con aguacate o mantequilla de almendras (opción vegetal muy ligera de ~150 kcal) para reponer minerales y calmar el sistema nervioso."
+        )
+        ejercicios = [
+            {"nombre": "Postura del Niño (Child's Pose)", "series": 1, "repeticiones": "3 min", "descripcion": "Arrodíllate suavemente en la esterilla, apoya la frente y relaja brazos a los lados. Respira profundo."},
+            {"nombre": "Gato-Vaca Suave (Cat-Cow Stretch)", "series": 1, "repeticiones": "3 min", "descripcion": "En cuadrupedia, arquea y redondea la columna al ritmo de tu respiración suave sin forzar ningún rango."},
+            {"nombre": "Postura del Cadáver (Corpse Pose)", "series": 1, "repeticiones": "4 min", "descripcion": "Túmbate boca arriba con palmas hacia el cielo. Suelta cualquier tensión muscular y asimila la calma."}
+        ]
+        return {
+            "tipo_sesion": "Yoga",
+            "explicacion_tipo": explicacion,
+            "ejercicios": ejercicios,
+            "mensaje_adaptacion": "Sesión de rescate de 10 min activada. Cero presión hoy.",
+            "mensaje": mensaje_warning
+        }
+
     is_fatigued = False
     last_workout = next((x for x in reversed(db["historial_entrenamientos"]) if x.get("completado")), None)
     if last_workout:
@@ -1534,11 +1554,11 @@ async def get_recomendacion_hoy():
 async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
     """
     Generates a detailed workout routine (exercises for Strength, or phases for Running)
-    adapted in volume and intensity based on the Intervals.icu history and WKO5 metrics for Verónica.
+    adapted in volume and intensity based on the Intervals.icu history, WKO5 metrics, or modo_rescate for Verónica.
     """
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        return await generar_rutina_mock(payload.tipo, "Modo local offline.")
+        return await generar_rutina_mock(payload.tipo, "Modo local offline.", modo_rescate=payload.modo_rescate)
         
     try:
         real_history = await get_intervals_history()
@@ -1553,6 +1573,10 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
         system_instruction = (
             "Eres la Coach IA de **Verofit**, la aplicación de entrenamiento personal exclusiva de **Verónica**, una atleta de 43 años, de Alcàsser (Valencia), "
             "que mide 1.77 m y pesa 59 kg (cuerpo atlético, extremidades largas, excelente palanca).\n\n"
+            "CONDICIÓN SUPREMA - MODO RESCATE (DÍA GRIS):\n"
+            "Si el modo de rescate está activado (modo_rescate == True), IGNORA todas las reglas de intensidad y fatiga. Tu única tarea es generar una sesión ultra-suave y reconfortante de Yoga o Movilidad de máximo 10 minutos (2-3 ejercicios muy fáciles). El mensaje motivacional debe ser extremadamente comprensivo, validando que lo importante hoy es simplemente moverse un poco y mantener el hábito, sin culpa.\n\n"
+            "NUTRICIÓN DE RECUPERACIÓN AUTOMATIZADA POST-ENTRENO:\n"
+            "Al final de la explicación del entrenamiento ('explicacion_tipo'), añade siempre un breve consejo de nutrición post-entreno. Este consejo debe calcularse intuitivamente según las calorías quemadas históricamente en ese tipo de sesión. Además, las sugerencias deben consistir en opciones bajas en carne y estar estructuradas para ser muy controladas en calorías, priorizando proteínas vegetales o fuentes muy ligeras para favorecer la recuperación.\n\n"
             "TELEMETRÍA FISIOLÓGICA MODELO WKO5 (BANISTER):\n"
             f"- Carga Crónica (Fitness / CTL): {ctl_val}\n"
             f"- Carga Aguda (Fatiga / ATL): {atl_val}\n"
@@ -1582,7 +1606,7 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
             "   - Rellena una descripción detallando cómo respirar y mantener la alineación corporal durante la asana.\n\n"
             "INSTRUCCIÓN DE ADAPTACIÓN INTELIGENTE:\n"
             "Dosifica las cargas (menos series o ritmos más lentos) si el historial o WKO5 revela TSB < -15 o fatiga acumulada. De lo contrario, genera una sesión altamente retadora.\n\n"
-            "Devuelve un JSON estrictamente compatible con RutinaResponse."
+            "Devuelve un JSON strictly compatible con RutinaResponse."
         )
 
         historial_str = ""
@@ -1597,12 +1621,13 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
 
         prompt = f"""
         Tipo de entrenamiento solicitado: {payload.tipo}.
+        Modo de rescate (Día Gris) activado: {payload.modo_rescate}.
         Días sin entrenar: {estado_atleta['dias_sin_entrenar']}.
         Último entrenamiento completado: {estado_atleta['ultimo_entreno']}.
         Telemetría WKO5 actual: Carga Crónica CTL (Fitness) = {ctl_val}, Carga Aguda ATL (Fatiga) = {atl_val}, Equilibrio de Estrés TSB (Forma) = {tsb_val}.
         {historial_str}
         
-        Genera la sesión adaptada y detallada de {payload.tipo} para Verónica ajustada a su nivel TSB actual.
+        Genera la sesión adaptada y detallada de {payload.tipo} para Verónica ajustada a su nivel TSB actual (o la sesión de rescate de 10 min si modo_rescate es True).
         """
         
         workout = await generate_gemini_content_with_retry(
@@ -1616,7 +1641,7 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
         
     except Exception as e:
         print("Gemini generation error:", e)
-        return await generar_rutina_mock(payload.tipo, "Modo de respaldo activo por alta demanda de red.")
+        return await generar_rutina_mock(payload.tipo, "Modo de respaldo activo por alta demanda de red.", modo_rescate=payload.modo_rescate)
 
 
 @app.post("/sincronizar-carrera")

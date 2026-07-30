@@ -540,6 +540,38 @@ body {
   box-shadow: 0 0 20px var(--glow-primary);
 }
 
+/* Botón de Rescate (Día Gris / Cero Energía) */
+.btn-rescate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 14px;
+  padding: 12px 18px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #cfd8dc;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: none;
+  backdrop-filter: blur(8px);
+}
+
+.btn-rescate:hover, .btn-rescate:active {
+  background: rgba(186, 230, 253, 0.15);
+  border-color: rgba(186, 230, 253, 0.4);
+  color: #e0f2fe;
+  transform: translateY(-1px);
+}
+
+.btn-rescate .emoji {
+  font-size: 1.1rem;
+}
+
 .btn-icon-wrap {
   width: 44px;
   height: 44px;
