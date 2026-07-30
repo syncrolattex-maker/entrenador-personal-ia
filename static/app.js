@@ -244,7 +244,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v56"; // Fully Stateless Architecture via Intervals.icu (Vercel Cold Start Fix)
+    const APP_VERSION = "v57"; // Increased Running Prescription Intensity (2 Quality Runs/Wk, 170 BPM Fatigue Threshold)
 
 
 

@@ -566,7 +566,7 @@ async def generar_rutina_mock(tipo: str, mensaje_warning: str = None) -> dict:
     is_fatigued = False
     last_workout = next((x for x in reversed(db["historial_entrenamientos"]) if x.get("completado")), None)
     if last_workout:
-        if last_workout.get("esfuerzo_subjetivo") == "agotador" or (last_workout.get("frecuencia_cardiaca_media") or 0) > 165:
+        if last_workout.get("esfuerzo_subjetivo") == "agotador" or (last_workout.get("frecuencia_cardiaca_media") or 0) > 170:
             is_fatigued = True
 
     explicacion = f"Sesión de {tipo} diseñada con periodización variada y retadora para Verónica."
@@ -644,8 +644,8 @@ async def generar_rutina_mock(tipo: str, mensaje_warning: str = None) -> dict:
         }
 
     else:
-        # Check if she already did a quality running session this week
-        has_quality_run_7d = False
+        # Check how many quality running sessions she did this week (allow up to 2)
+        quality_runs_7d = 0
         try:
             today_date = datetime.now().date()
             monday_date = today_date - timedelta(days=today_date.weekday())
@@ -656,7 +656,7 @@ async def generar_rutina_mock(tipo: str, mensaje_warning: str = None) -> dict:
                     if f_date >= monday_str:
                         n_lower = (item.get("nombre") or "").lower()
                         if any(q in n_lower for q in ["fartlek", "interval", "serie", "velocidad", "calidad"]):
-                            has_quality_run_7d = True
+                            quality_runs_7d += 1
         except Exception:
             pass
 
@@ -703,13 +703,13 @@ async def generar_rutina_mock(tipo: str, mensaje_warning: str = None) -> dict:
         is_quality = len(phases) > 5  # Templates 2 and 4 are quality
         
         msg_adapt = None
-        if is_fatigued or (is_quality and has_quality_run_7d):
+        if is_fatigued or (is_quality and quality_runs_7d >= 2):
             phases = [
                 {"name": "Calentamiento: Trote suave y movilidad", "duration_seconds": 300, "type": "WARMUP"},
                 {"name": "Rodamiento Suave de Asimilación (Zona 2)", "duration_seconds": 1500, "type": "WORK"},
                 {"name": "Enfriamiento: Vuelta a la calma caminando", "duration_seconds": 300, "type": "COOLDOWN"}
             ]
-            msg_adapt = "Adaptación inteligente: Ajustado a Rodamiento de Recuperación por fatiga previa o por haber realizado ya la sesión de calidad semanal."
+            msg_adapt = "Adaptación inteligente: Ajustado a Rodamiento de Recuperación por fatiga previa o por haber alcanzado el límite semanal de 2 sesiones de calidad."
 
         return {
             "tipo_sesion": "Carrera",
@@ -1338,7 +1338,7 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict, wko5_data:
             razon = "¡Sesión de Yoga completada hoy, Verónica! Tu cuerpo está en un estado óptimo de regeneración física y mental. Disfruta del reposo activo."
 
     # CASE 2: High Subjective Fatigue or High HR from last workout
-    elif last_effort == "agotador" or (last_hr > 165 and days_inactive <= 1):
+    elif last_effort == "agotador" or (last_hr > 170 and days_inactive <= 1):
         rec_tipo = "Yoga"
         razon = "¡Hola Verónica! Detectamos que tu última sesión requirió un esfuerzo agotador. Para evitar sobrecargas articulares y favorecer la supercompensación muscular, hoy Verofit te prescribe una sesión de Yoga y Flexibilidad."
 
@@ -1574,9 +1574,7 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
             "   - Incluye siempre un ejercicio de core estático o dinámico por tiempo (ej. Plancha isométrica, Bicho muerto, o Escaladores de 45-60 segundos).\n"
             "   - Rellena obligatoriamente una 'descripcion' corta y clara sobre la ejecución para cada ejercicio detallando el tempo (ej: 'bajada en 3 segundos') y el uso de las cintas o pesas de 5 kg.\n\n"
             "2. Si el tipo es 'Carrera':\n"
-            "   - REGLA DE ORO DE CARRERA (EVITAR LESIONES): Los entrenamientos de calidad (Fartleks, series o intervalos de velocidad) son de alta carga de intensidad y fatiga acumulada. Se permite ÚNICAMENTE una (1) sesión de calidad a la semana (últimos 7 días). Todos los demás entrenamientos de carrera de la semana deben ser obligatoriamente de **Rodamiento Suave** (running a ritmo sostenido y cómodo en Zona 2, trote continuo de 35 a 45 minutos de duración, a ritmo conversacional).\n"
-            "   - Analiza rigurosamente el historial de los últimos 7 días. Si ya figura cualquier carrera que contenga en su nombre o descripción las palabras 'fartlek', 'intervalos', 'series', 'velocidad', 'cuestas', o ritmos altos (o si hay una sesión de carrera que no esté marcada explícitamente como rodamiento suave/regenerativo), DEBES generar obligatoriamente un **Rodamiento Suave**.\n"
-            "   - Solo si NO figura ningún entrenamiento de calidad en los últimos 7 días del historial y TSB >= -10, diseña un entrenamiento exigente de intervalos (ej: Calentamiento 5m + 6-8 series de 90s rápido/45s andar + Enfriamiento 5m) o un Fartlek dinámico.\n\n"
+            "   - REGLA DE ORO DE CARRERA: Se permiten hasta DOS (2) sesiones de calidad a la semana (últimos 7 días). Analiza el historial: si ya figuran DOS sesiones que contengan palabras como 'fartlek', 'intervalos', 'series', 'velocidad' o ritmos altos en los últimos 7 días, DEBES generar obligatoriamente un Rodamiento Suave. Si hay menos de dos, puedes diseñar un entrenamiento exigente de intervalos o un Fartlek dinámico.\n\n"
             "3. Si el tipo es 'Yoga':\n"
             "   - Genera una sesión de yoga y flexibilidad consciente de 20-30 minutos de duración.\n"
             "   - Selecciona entre 5 y 6 asanas/posturas de yoga fluidas (ej. Tadasana, Balasana, Adho Mukha Svanasana, Bhujangasana, Virabhadrasana).\n"
