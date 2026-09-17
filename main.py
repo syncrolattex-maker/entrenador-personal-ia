@@ -336,6 +336,44 @@ async def calcular_estado_atleta() -> dict:
     }
 
 
+def get_wiki_context() -> str:
+    """
+    Reads and aggregates the LLM Wiki viva markdown knowledge base (/wiki)
+    so the AI Coach and workout generator possess durable athlete memory and context.
+    """
+    wiki_dir = os.path.join(os.path.dirname(__file__), "wiki")
+    if not os.path.exists(wiki_dir):
+        return ""
+
+    context_parts = []
+    # Prioritized order of core wiki knowledge files
+    priority_files = [
+        os.path.join(wiki_dir, "profile", "fisiologia_ciclo.md"),
+        os.path.join(wiki_dir, "profile", "respuestas_estres.md"),
+        os.path.join(wiki_dir, "training", "adaptaciones_rescate.md"),
+        os.path.join(wiki_dir, "training", "biblioteca_ejercicios.md"),
+        os.path.join(wiki_dir, "nutrition", "pautas_energia.md"),
+        os.path.join(wiki_dir, "log.md")
+    ]
+
+    for fpath in priority_files:
+        if os.path.isfile(fpath):
+            try:
+                rel_path = os.path.relpath(fpath, wiki_dir)
+                with open(fpath, "r", encoding="utf-8-sig") as f:
+                    content = f.read().strip()
+                    if content:
+                        context_parts.append(f"### [WIKI: {rel_path}]\n{content}")
+            except Exception as e:
+                print(f"[WIKI Context] Error reading {fpath}: {e}")
+
+    if not context_parts:
+        return ""
+
+    return "=== BASE DE CONOCIMIENTO VIVA DE VERÓNICA (LLM WIKI) ===\n" + "\n\n".join(context_parts)
+
+
+
 async def enviar_a_intervals(phases: List[FaseCarrera]):
     """
     Sends structured workout phases to Intervals.icu API.
@@ -1564,6 +1602,7 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
         real_history = await get_intervals_history()
         wko5_data = await get_wko5_metrics()
         estado_atleta = await calcular_estado_atleta()
+        wiki_context = get_wiki_context()
         client = genai.Client(api_key=api_key)
         
         ctl_val = wko5_data.get("ctl_fitness", 0.0)
@@ -1626,8 +1665,10 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
         Último entrenamiento completado: {estado_atleta['ultimo_entreno']}.
         Telemetría WKO5 actual: Carga Crónica CTL (Fitness) = {ctl_val}, Carga Aguda ATL (Fatiga) = {atl_val}, Equilibrio de Estrés TSB (Forma) = {tsb_val}.
         {historial_str}
+
+        {wiki_context}
         
-        Genera la sesión adaptada y detallada de {payload.tipo} para Verónica ajustada a su nivel TSB actual (o la sesión de rescate de 10 min si modo_rescate es True).
+        Genera la sesión adaptada y detallada de {payload.tipo} para Verónica ajustada a su nivel TSB actual, respetando los aprendizajes y directrices de su Wiki (o la sesión de rescate de 10 min si modo_rescate es True).
         """
         
         workout = await generate_gemini_content_with_retry(
@@ -1668,11 +1709,16 @@ async def post_chat_coach(payload: ChatCoachRequest):
         
     try:
         real_history = await get_intervals_history()
+        wiki_context = get_wiki_context()
         client = genai.Client(api_key=api_key)
         
         system_instruction = (
             "Eres el Coach y Entrenador de Fitness personal de **Verónica**, una atleta de 43 años, "
             "de Alcàsser (Valencia), que mide 1.77 m y pesa 59 kg (cuerpo atlético y magro, de raza blanca).\n\n"
+            "ACCESO A BASE DE CONOCIMIENTO VIVA (LLM WIKI):\n"
+            "Tienes acceso completo a la base de conocimiento viva de Verónica (/wiki), incluyendo su perfil fisiológico, "
+            "respuestas de estrés, biblioteca de adaptaciones y ejercicios, protocolos de día gris y directrices nutricionales. "
+            "DEBES consultar y respetar siempre este contexto al responderle o proponer ajustes a su plan.\n\n"
             "DIRECTRICES DE PERSONALIDAD Y COACHING:\n"
             "1. Tono: Súper cercano, motivador, profesional y empático. Dirígete a ella siempre como 'Verónica'.\n"
             "2. Contexto físico y Materiales: Tiene 43 años, mide 1.77m y pesa 59kg. Para entrenar en casa dispone únicamente de **bandas de resistencia (cintas)** y **mancuernas de 5 kg (pesas de 5 kg)**. Sus rutinas de Fuerza son siempre de **Cuerpo Completo (Full-Body)**.\n"
@@ -1704,6 +1750,8 @@ async def post_chat_coach(payload: ChatCoachRequest):
         - Estatura: 1.77 m | Peso: 59 kg (Cuerpo atlético)
         - Historial físico real:
         {historial_str}
+
+        {wiki_context}
         """
         
         for msg in payload.historial:
