@@ -1,32 +1,10 @@
-﻿---
-name: ingest-session
-description: Procesa y destila una sesión de entrenamiento (log JSON o telemetría) en la LLM Wiki viva de Verofit
 ---
-
-# Workflow: /ingest-session
-
-Este workflow ingesta un log de sesión crudo desde aw/sessions/ y actualiza la LLM Wiki viva con las adaptaciones fisiológicas correspondientes.
-
+description: Ingesta un log o feedback de entrenamiento y propaga los aprendizajes a la wiki.
 ---
-
-## Pasos de Ejecución
-
-1. **Localizar el Archivo Raw**:
-   - Identificar el archivo de sesión más reciente o especificado en aw/sessions/ (ej: aw/sessions/YYYY-MM-DD_session_log.json).
-
-2. **Extraer Métricas Clave**:
-   - Disciplina (Fuerza, Carrera, Yoga).
-   - Duración (minutos), FC media / máxima, calorías activas, distancia (si aplica).
-   - Esfuerzo subjetivo reportado (acil, optimo, gotador).
-   - Métricas WKO5 asociadas si existen (ctl_fitness, tl_fatiga, 	sb_forma).
-
-3. **Actualizar el Registro Cronológico**:
-   - Añadir una nueva entrada en wiki/log.md con la fecha, tipo de sesión, resumen de telemetría y síntesis de asimilación.
-
-4. **Reflejar Cambios en Perfil y Entrenamiento**:
-   - Si hubo esfuerzo agotador o FC > 170 ppm: actualizar wiki/profile/respuestas_estres.md.
-   - Si se utilizó una variación de ejercicios o modo rescate: actualizar wiki/training/biblioteca_ejercicios.md o wiki/training/adaptaciones_rescate.md.
-   - Si se reportó gasto calórico específico: contrastar con wiki/nutrition/pautas_energia.md.
-
-5. **Verificación de Enlaces**:
-   - Asegurar que wiki/index.md mantiene todas las referencias actualizadas.
+1. Lee el feedback o archivo indicado por el usuario (en `/raw/sessions/`).
+2. Lee `/wiki/index.md` para identificar qué páginas conceptuales pueden estar afectadas.
+3. Lee las páginas relevantes (por ejemplo, `adaptaciones_rescate.md` si hubo baja energía, o `biblioteca_ejercicios.md` si hubo molestias).
+4. Aplica las ediciones necesarias en dichas páginas Markdown reflejando el nuevo aprendizaje.
+5. Actualiza `/wiki/index.md` si se crearon conceptos nuevos.
+6. Añade la entrada correspondiente en `/wiki/log.md`.
+7. Presenta un breve resumen (walkthrough) de las páginas actualizadas.
