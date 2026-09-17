@@ -1,0 +1,20 @@
+﻿{
+  session_id: 2026-09-17_run_01,
+  athlete: Verónica,
+  date: 2026-09-17,
+  type: Carrera,
+  name: 🏃 Rodaje Suave Zona 2 — Huerta de Alcàsser,
+  duration_seconds: 2400,
+  duration_minutes: 40.0,
+  distance_km: 6.85,
+  average_heartrate: 138,
+  max_heartrate: 152,
+  calories_burned: 385,
+  subjective_effort: optimo,
+  wko5: {
+    ctl_fitness: 24.5,
+    atl_fatiga: 28.2,
+    tsb_forma: -3.7
+  },
+  notes: Excelente sensaciones a ritmo conversacional continuo por pistas de tierra en Alcàsser. TSB en zona óptima de asimilación (-3.7).
+}
