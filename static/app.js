@@ -249,7 +249,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v58"; // Día Gris Rescue Mode (10-min ultra-gentle routine) & Post-workout Recovery Nutrition
+    const APP_VERSION = "v59"; // Clean & Friendly Aesthetic Redesign (Luminous White & Soft Glassmorphism)
 
 
 
