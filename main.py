@@ -308,8 +308,14 @@ async def calcular_estado_atleta() -> dict:
     siguiente_bloque = "Fuerza"
 
     if history:
+        # Filter for actual athletic training sessions (exclude active recovery walks/caminatas)
+        sports_history = [
+            act for act in history 
+            if act.get("tipo") in ["Fuerza", "Carrera", "Yoga"] or act.get("raw_tipo") in ["Run", "WeightTraining", "Yoga"]
+        ]
+        
         # Sort history from newest to oldest by date
-        sorted_history = sorted(history, key=lambda x: str(x.get("fecha", "")), reverse=True)
+        sorted_history = sorted(sports_history if sports_history else history, key=lambda x: str(x.get("fecha", "")), reverse=True)
         if sorted_history:
             last_workout = sorted_history[0]
             ultimo_entreno = last_workout.get("tipo", "Carrera")
@@ -1321,6 +1327,11 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict, wko5_data:
                     "esfuerzo_subjetivo": item.get("esfuerzo_subjetivo")
                 })
 
+    sports_history = [
+        act for act in real_history 
+        if act.get("tipo") in ["Fuerza", "Carrera", "Yoga"] or act.get("raw_tipo") in ["Run", "WeightTraining", "Yoga"]
+    ]
+
     ultimo_detalles = None
     last_type = estado_atleta["ultimo_entreno"]
     days_inactive = estado_atleta["dias_sin_entrenar"]
@@ -1332,8 +1343,10 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict, wko5_data:
     yoga_count_7d = 0
     has_quality_run_7d = False
 
-    if real_history:
-        sorted_history = sorted(real_history, key=lambda x: x["fecha"], reverse=True)
+    history_to_eval = sports_history if sports_history else real_history
+
+    if history_to_eval:
+        sorted_history = sorted(history_to_eval, key=lambda x: x["fecha"], reverse=True)
         ultimo_detalles = sorted_history[0]
         last_type = ultimo_detalles.get("tipo", last_type)
         last_effort = (ultimo_detalles.get("esfuerzo_subjetivo") or "").lower()
@@ -1465,8 +1478,11 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict, wko5_data:
         recovery_points = max(10.0, recovery_points - 5.0)
 
     balance_points = 20.0
-    recent_workouts = [x.get("tipo") for x in reversed(db.get("historial_entrenamientos", [])) if x.get("completado")][:3]
-    if len(recent_workouts) >= 2 and len(set(recent_workouts)) == 1:
+    # Evaluate balance using actual real sports history first, falling back to db
+    recent_sports = [x.get("tipo") for x in history_to_eval if x.get("tipo") in ["Fuerza", "Carrera", "Yoga"]][:3]
+    if not recent_sports:
+        recent_sports = [x.get("tipo") for x in reversed(db.get("historial_entrenamientos", [])) if x.get("completado")][:3]
+    if len(recent_sports) >= 2 and len(set(recent_sports)) == 1:
         balance_points = 10.0
 
     readiness_score = int(adherence_points + recovery_points + balance_points)
@@ -1530,6 +1546,7 @@ async def get_recomendacion_hoy():
         wko5_data = await get_wko5_metrics()
         estado_atleta = await calcular_estado_atleta()
         rec_data = await generar_analisis_plan_b(real_history, db, wko5_data=wko5_data)
+        wiki_context = get_wiki_context()
 
         # Try Gemini AI if API key is available
         api_key = os.getenv("GEMINI_API_KEY")
@@ -1541,28 +1558,29 @@ async def get_recomendacion_hoy():
                 
                 system_instruction = (
                     "Eres la Coach IA de **Verofit**, entrenadora personal de **Verónica** (43 años, 1.77m, 59kg, Alcàsser).\n"
-                    "Tu objetivo es prescribir la recomendación diaria de entrenamiento ('Fuerza', 'Carrera' o 'Yoga').\n"
+                    "Tu misión es motivarla y explicarle la recomendación de hoy basándote en su estado fisiológico y en su base de conocimiento viva.\n"
+                    f"{wiki_context}\n\n"
                     "TELEMETRÍA FISIOLÓGICA WKO5:\n"
                     f"- CTL (Fitness): {wko5_data.get('ctl_fitness')}\n"
                     f"- ATL (Fatiga): {wko5_data.get('atl_fatiga')}\n"
                     f"- TSB (Forma): {wko5_data.get('tsb_forma')}\n\n"
-                    "REGLAS DE PLANIFICACIÓN Y PRESCRIPCIÓN SEGÚN TSB:\n"
-                    "1. Si TSB < -15 (Fatiga alta): Prescribe obligatoriamente 'Yoga' o 'Descanso'.\n"
-                    "2. Si -10 <= TSB <= +5 (Zona óptima): Prescribe 'Fuerza' o 'Carrera' según alternancia diaria.\n"
-                    "3. Si TSB > +10 (Frescura extrema): Incrementar estímulo.\n"
-                    "4. Varía el estímulo diariamente. Alterna entre Fuerza, Carrera y Yoga. No repitas la misma disciplina dos días seguidos.\n"
-                    "5. Dirígete a ella siempre como 'Verónica' en un tono súper motivador, cercano y profesional."
+                    "REGLA DE COHERENCIA ATLÉTICA:\n"
+                    f"El motor de prescripción deportiva de Verofit ha determinado que hoy le corresponde: '{rec_data['recomendacion']}'.\n"
+                    f"Razón técnica: {rec_data['razon']}.\n"
+                    "Mantén dicha disciplina ('recomendacion': '" + rec_data['recomendacion'] + "') para evitar contradicciones o cambios erráticos entre refrescos, "
+                    "y redacta una razón ('razon') motivadora, fresca, comprensiva y profesional, dirigida a Verónica.\n"
+                    "Devuelve también 'explicacion_semanal' resumiendo el volumen semanal."
                 )
                 
                 last_type = estado_atleta["ultimo_entreno"]
                 prompt = f"""
                 Hoy es {weekday_str} ({today_str}).
                 Días sin entrenar: {estado_atleta['dias_sin_entrenar']}.
-                Último entrenamiento completado: {last_type}.
+                Último entrenamiento deportivo completado: {last_type}.
                 Métricas WKO5: CTL={wko5_data.get('ctl_fitness')}, ATL={wko5_data.get('atl_fatiga')}, TSB={wko5_data.get('tsb_forma')}.
-                Estado de la semana: {rec_data.get('explicacion_semanal', '')}.
+                Balance semanal: {rec_data.get('explicacion_semanal', '')}.
                 
-                Genera la recomendación diaria: recomendacion ('Fuerza', 'Carrera' o 'Yoga'), razon (1-2 frases motivadoras), explicacion_semanal.
+                Prescribe '{rec_data['recomendacion']}' y genera una razón inspiradora y cercana que tome en cuenta su evolución física.
                 """
                 
                 ai_rec = await generate_gemini_content_with_retry(
@@ -1570,7 +1588,7 @@ async def get_recomendacion_hoy():
                     contents=prompt,
                     system_instruction=system_instruction,
                     response_schema=GeminiRecomendacionResponse,
-                    temperature=0.7
+                    temperature=0.3
                 )
                 if ai_rec and isinstance(ai_rec, dict) and ai_rec.get("recomendacion"):
                     rec_data["recomendacion"] = ai_rec["recomendacion"]

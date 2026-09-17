@@ -234,11 +234,17 @@ async function initApp() {
   const elRecommendationBox = document.getElementById("recommendation-box");
   const elRecTipoLabel = document.getElementById("rec-tipo-label");
   const elRecRazonText = document.getElementById("rec-razon-text");
+  const elPercent = document.getElementById("daily-goal-percent");
+  const elRingArc = document.getElementById("daily-ring-arc");
+  const elBtnComenzarHoy = document.getElementById("btn-comenzar-hoy");
   
   if (elRecommendationBox) {
     elRecommendationBox.classList.add("loading-pulse");
     if (elRecTipoLabel) elRecTipoLabel.textContent = "...";
     if (elRecRazonText) elRecRazonText.textContent = "Analizando tu actividad con la Coach Verónica...";
+    if (elPercent) elPercent.innerHTML = `--<small>%</small>`;
+    if (elRingArc) elRingArc.style.strokeDashoffset = 364; // empty ring while analyzing
+    if (elBtnComenzarHoy) elBtnComenzarHoy.style.display = "none";
   }
 
   cargarPreferenciasGuardadas();
@@ -249,7 +255,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v59"; // Clean & Friendly Aesthetic Redesign (Luminous White & Soft Glassmorphism)
+    const APP_VERSION = "v61"; // Autonomous workout generation & deterministic readiness engine
 
 
 
@@ -463,10 +469,34 @@ function renderRecommendation(rec) {
     }
   }
 
+  // Configure Direct Start Button in Daily Card
+  const elBtnComenzarHoy = document.getElementById("btn-comenzar-hoy");
+  const elBtnComenzarTexto = document.getElementById("btn-comenzar-hoy-texto");
+  if (elBtnComenzarHoy && rec.recomendacion) {
+    elBtnComenzarHoy.style.display = "flex";
+    if (rec.recomendacion === "Fuerza") {
+      if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "⚡ Comenzar Fuerza Full-Body";
+      elBtnComenzarHoy.className = "btn btn-primary";
+      elBtnComenzarHoy.onclick = () => iniciarGeneracionEntrenamiento("Fuerza");
+    } else if (rec.recomendacion === "Carrera") {
+      if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "⚡ Comenzar Carrera Estructurada";
+      elBtnComenzarHoy.className = "btn btn-primary";
+      elBtnComenzarHoy.onclick = () => iniciarGeneracionEntrenamiento("Carrera");
+    } else if (rec.recomendacion === "Yoga") {
+      if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "🧘‍♀️ Comenzar Yoga Regenerativo";
+      elBtnComenzarHoy.className = "btn btn-primary yoga";
+      elBtnComenzarHoy.onclick = () => iniciarGeneracionEntrenamiento("Yoga");
+    } else if (rec.recomendacion === "Descanso") {
+      if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "🛌 Registrar Día de Descanso";
+      elBtnComenzarHoy.className = "btn btn-ghost";
+      elBtnComenzarHoy.onclick = registrarDescansoHoy;
+    }
+  }
+
   // Update dynamic readiness score (Weekly Load Balance Score)
   const elPercent = document.getElementById("daily-goal-percent");
   const elRingArc = document.getElementById("daily-ring-arc");
-  const score = rec.readiness_score || 85;
+  const score = rec.readiness_score !== undefined ? rec.readiness_score : 80;
   if (elPercent) {
     elPercent.innerHTML = `${score}<small>%</small>`;
   }

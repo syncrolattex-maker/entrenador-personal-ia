@@ -88,7 +88,7 @@
               <circle id="daily-ring-arc" class="ring-fill" cx="70" cy="70" r="58"></circle>
             </svg>
             <div class="ring-text-center">
-              <span id="daily-goal-percent" class="metric-xl">85<small>%</small></span>
+              <span id="daily-goal-percent" class="metric-xl">--<small>%</small></span>
               <span class="label-caps">ESTADO ÓPTIMO</span>
             </div>
           </div>
@@ -105,6 +105,11 @@
 
             <p id="rec-razon-text" class="body-md">Analizando tu historial en Intervals.icu...</p>
             <p id="rec-semanal-text" class="body-sm-muted"></p>
+
+            <button id="btn-comenzar-hoy" class="btn btn-primary" style="display: none; margin-top: 10px; width: 100%; font-size: 1.05rem; padding: 14px 20px;">
+              <i data-lucide="play" style="width: 20px; height: 20px;"></i>
+              <span id="btn-comenzar-hoy-texto">Comenzar Entrenamiento de Hoy</span>
+            </button>
           </div>
         </div>
 
