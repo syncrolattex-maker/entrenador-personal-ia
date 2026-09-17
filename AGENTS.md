@@ -47,3 +47,27 @@ Este archivo define las reglas de comportamiento, la visión del producto y las 
 
 5. **Sincronización Tecnológica**:
    * Sincronizar entrenamientos estructurados con Intervals.icu ➔ Watchletic en el Apple Watch.
+
+---
+
+## ⚡ 4. Operativa Diaria con la LLM Wiki viva en Antigravity
+
+1. **Cuando añadas un log o feedback de sesión**:
+   * Pega el feedback o guarda el JSON exportado en `/raw/sessions/` (ej: `/raw/sessions/2026-09-17_entreno.json`) y ejecuta en el chat:
+     ```text
+     /ingest-session raw/sessions/2026-09-17_entreno.json
+     ```
+   * Antigravity creará el plan, mostrará los diffs en los archivos Markdown afectados (por ejemplo, actualizando recomendaciones de descarga o molestias articulares) y solo tendrás que aceptar los cambios.
+
+2. **Para planificar o programar en la app**:
+   * Consulta directa de alta fidelidad:
+     ```text
+     /query-wiki ¿Qué estrategia de series y descansos nos ha funcionado mejor cuando reporta fatiga por ciclo menstrual?
+     ```
+
+3. **Mantenimiento mensual**:
+   * Saneamiento y coherencia del árbol de notas:
+     ```text
+     /lint-wiki
+     ```
+   * Audita enlaces rotos `[[...]]`, contradicciones y dependencias conceptuales.
