@@ -1398,15 +1398,13 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict, wko5_data:
 
     # CASE 1: Trained TODAY (days_inactive == 0)
     elif days_inactive == 0:
-        if last_type == "Fuerza":
-            rec_tipo = "Yoga"
-            razon = "¡Excelente trabajo hoy, Verónica! Ya completaste tu bloque de Fuerza Full-Body. Para relajar la musculatura y acelerar la recuperación activa, hoy te recomendamos una sesión suave de Yoga y Flexibilidad de 20 min."
-        elif last_type == "Carrera":
-            rec_tipo = "Yoga"
-            razon = "¡Grandioso entrenamiento hoy, Verónica! Tras tu rodaje de Carrera, te sugerimos estiramientos guiados y Yoga de 20 min para soltar sóleos, isquios y la cadena posterior."
-        else: # Yoga
-            rec_tipo = "Descanso"
-            razon = "¡Sesión de Yoga completada hoy, Verónica! Tu cuerpo está en un estado óptimo de regeneración física y mental. Disfruta del reposo activo."
+        rec_tipo = "Descanso"
+        if last_type == "Carrera":
+            razon = "¡Objetivo cumplido hoy, Verónica! Ya has completado tu entrenamiento de Carrera. Para evitar sobrecargas articulares y asimilar el estímulo, el resto del día es de reposo y asimilación. Si te apetece soltar piernas, puedes hacer un Yoga suave opcional."
+        elif last_type == "Fuerza":
+            razon = "¡Excelente sesión hoy, Verónica! Tu bloque de Fuerza Full-Body ya está completado. Toca reposo y nutrición para que la musculatura repare y supercompense."
+        else:
+            razon = "¡Sesión de Yoga completada hoy, Verónica! Tu cuerpo está en un estado óptimo de regeneración física y mental. Disfruta del reposo."
 
     # CASE 2: High Subjective Fatigue or High HR from last workout
     elif last_effort == "agotador" or (last_hr > 170 and days_inactive <= 1):

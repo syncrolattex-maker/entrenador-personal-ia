@@ -255,7 +255,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v61"; // Autonomous workout generation & deterministic readiness engine
+    const APP_VERSION = "v62"; // Today's workout completed state & smart rest logic
 
 
 
@@ -469,27 +469,36 @@ function renderRecommendation(rec) {
     }
   }
 
-  // Configure Direct Start Button in Daily Card
+  // Adapt selection card header & direct button if already trained today
+  const elSelectionTitle = document.getElementById("selection-card-title");
   const elBtnComenzarHoy = document.getElementById("btn-comenzar-hoy");
   const elBtnComenzarTexto = document.getElementById("btn-comenzar-hoy-texto");
-  if (elBtnComenzarHoy && rec.recomendacion) {
-    elBtnComenzarHoy.style.display = "flex";
-    if (rec.recomendacion === "Fuerza") {
-      if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "⚡ Comenzar Fuerza Full-Body";
-      elBtnComenzarHoy.className = "btn btn-primary";
-      elBtnComenzarHoy.onclick = () => iniciarGeneracionEntrenamiento("Fuerza");
-    } else if (rec.recomendacion === "Carrera") {
-      if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "⚡ Comenzar Carrera Estructurada";
-      elBtnComenzarHoy.className = "btn btn-primary";
-      elBtnComenzarHoy.onclick = () => iniciarGeneracionEntrenamiento("Carrera");
-    } else if (rec.recomendacion === "Yoga") {
-      if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "🧘‍♀️ Comenzar Yoga Regenerativo";
+
+  if (rec.recomendacion === "Descanso") {
+    if (elSelectionTitle) elSelectionTitle.textContent = "✅ ENTRENAMIENTO YA COMPLETADO HOY (OPCIONES ADICIONALES)";
+    if (elBtnComenzarHoy) {
+      elBtnComenzarHoy.style.display = "flex";
+      if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "🧘‍♀️ Estiramiento y Yoga Suave (Opcional)";
       elBtnComenzarHoy.className = "btn btn-primary yoga";
       elBtnComenzarHoy.onclick = () => iniciarGeneracionEntrenamiento("Yoga");
-    } else if (rec.recomendacion === "Descanso") {
-      if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "🛌 Registrar Día de Descanso";
-      elBtnComenzarHoy.className = "btn btn-ghost";
-      elBtnComenzarHoy.onclick = registrarDescansoHoy;
+    }
+  } else {
+    if (elSelectionTitle) elSelectionTitle.textContent = "¿QUÉ VAS A ENTRENAR HOY?";
+    if (elBtnComenzarHoy && rec.recomendacion) {
+      elBtnComenzarHoy.style.display = "flex";
+      if (rec.recomendacion === "Fuerza") {
+        if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "⚡ Comenzar Fuerza Full-Body";
+        elBtnComenzarHoy.className = "btn btn-primary";
+        elBtnComenzarHoy.onclick = () => iniciarGeneracionEntrenamiento("Fuerza");
+      } else if (rec.recomendacion === "Carrera") {
+        if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "⚡ Comenzar Carrera Estructurada";
+        elBtnComenzarHoy.className = "btn btn-primary";
+        elBtnComenzarHoy.onclick = () => iniciarGeneracionEntrenamiento("Carrera");
+      } else if (rec.recomendacion === "Yoga") {
+        if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "🧘‍♀️ Comenzar Yoga Regenerativo";
+        elBtnComenzarHoy.className = "btn btn-primary yoga";
+        elBtnComenzarHoy.onclick = () => iniciarGeneracionEntrenamiento("Yoga");
+      }
     }
   }
 
