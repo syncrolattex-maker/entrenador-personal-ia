@@ -196,9 +196,9 @@
 
             <!-- Routine Display Card -->
             <div id="workout-card" class="glass-card workout-display-card" style="display: none;">
-              <div class="workout-display-header">
+              <div class="workout-display-header" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <h2 class="headline-md" style="margin:0;">Rutina de Hoy</h2>
                 <span id="workout-badge" class="upcoming-badge">SESIÓN DESIGNADA</span>
-                <h2 class="headline-md">Rutina de Hoy</h2>
               </div>
 
               <div id="adaptation-banner" class="banner-box adaptation" style="display: none;">
@@ -315,7 +315,7 @@
               <div id="race-goal-banner" class="race-banner-box" style="display:none;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                   <strong id="race-banner-name" style="color: var(--on-surface); font-size:0.9rem;">—</strong>
-                  <span id="race-banner-days" class="label-caps tabular-num" style="color: var(--primary);">—</span>
+                  <span id="race-banner-days" class="label-caps tabular-num" style="color: var(--primary-text);">—</span>
                 </div>
                 <span id="race-banner-phase" class="body-sm-muted" style="font-size:0.78rem; display:block; margin-top:2px;">—</span>
               </div>
@@ -375,10 +375,10 @@
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
               <h2 class="headline-sm" style="margin:0;">Training Log (12 semanas)</h2>
               <div style="display:flex; gap:4px;" id="training-log-filters">
-                <button type="button" class="strava-chip-btn active" onclick="filterTrainingLog('Todo', this)" style="padding:3px 9px; font-size:0.68rem;">Todo</button>
-                <button type="button" class="strava-chip-btn" onclick="filterTrainingLog('Carrera', this)" style="padding:3px 9px; font-size:0.68rem;">Carrera</button>
-                <button type="button" class="strava-chip-btn" onclick="filterTrainingLog('Ciclismo', this)" style="padding:3px 9px; font-size:0.68rem;">Bici</button>
-                <button type="button" class="strava-chip-btn" onclick="filterTrainingLog('Fuerza', this)" style="padding:3px 9px; font-size:0.68rem;">Fuerza</button>
+                <button type="button" class="strava-chip-btn active" onclick="filterTrainingLog('Todo', this)" style="padding:4px 10px; font-size:0.75rem;">Todo</button>
+                <button type="button" class="strava-chip-btn" onclick="filterTrainingLog('Carrera', this)" style="padding:4px 10px; font-size:0.75rem;">Carrera</button>
+                <button type="button" class="strava-chip-btn" onclick="filterTrainingLog('Ciclismo', this)" style="padding:4px 10px; font-size:0.75rem;">Bici</button>
+                <button type="button" class="strava-chip-btn" onclick="filterTrainingLog('Fuerza', this)" style="padding:4px 10px; font-size:0.75rem;">Fuerza</button>
               </div>
             </div>
             <div id="summit-bubble-grid" class="summit-bubble-grid"></div>
@@ -483,8 +483,8 @@
               <span class="coach-status-dot"></span>
             </div>
             <div class="coach-info">
-              <h3 class="headline-sm">Coach Personal IA</h3>
-              <span class="label-caps" style="color: var(--primary);">ACTIVO • RECONFIGURACIÓN EN TIEMPO REAL</span>
+              <h2 class="headline-sm" style="margin:0;">Coach Personal IA</h2>
+              <span class="label-caps" style="color: var(--primary-text);">ACTIVO • RECONFIGURACIÓN EN TIEMPO REAL</span>
             </div>
           </div>
 
@@ -554,7 +554,7 @@
             </div>
 
             <div id="garmin-login-form" style="display:flex; flex-direction:column; gap:10px; padding-top:8px; border-top:1px solid var(--border-glass);">
-              <span id="garmin-write-status" class="label-caps" style="color: var(--primary); font-size:0.7rem;">CONEXIÓN GARMIN CONNECT (CLAVE PERSONAL O CUENTA)</span>
+              <span id="garmin-write-status" class="label-caps" style="color: var(--primary-text); font-size:0.75rem;">CONEXIÓN GARMIN CONNECT (CLAVE PERSONAL O CUENTA)</span>
               <input type="text" id="garmin-apikey-input" class="strava-input" placeholder="Clave Personal Garmin (GCDC_...)">
               <button type="button" class="btn btn-ghost" onclick="saveGarminPersonalKey()">
                 Guardar Clave GCDC_ (Lectura Garmin)
@@ -652,14 +652,14 @@
       <span id="guided-counter" class="label-caps tabular-num">1/5</span>
     </div>
 
-    <div id="guided-phase-label" class="label-caps" style="color: var(--primary); font-size: 0.9rem;">PREPARADO</div>
+    <div id="guided-phase-label" class="label-caps" style="color: var(--primary-text); font-size: 0.9rem;">PREPARADO</div>
 
     <div class="guided-main">
       <!-- ================== SISTEMA DE FUERZA (ESTILO STRAVA) ================== -->
       <div id="guided-strength-container" style="display:none; width:100%; flex-direction:column; align-items:center; gap:10px;">
         <div id="guided-video-card" class="guided-video-card">
           <div class="video-container" style="position:relative; background:#F7F7FA;">
-            <button type="button" id="btn-toggle-ex-photo" onclick="toggleGuidedMediaMode()" style="position:absolute; top:8px; right:8px; z-index:12; background:#FFFFFF; border:1px solid #E5E5EA; color:#242428; font-size:0.68rem; font-weight:700; padding:4px 9px; border-radius:999px; cursor:pointer;">
+            <button type="button" id="btn-toggle-ex-photo" onclick="toggleGuidedMediaMode()" style="position:absolute; top:8px; right:8px; z-index:12; background:#FFFFFF; border:1px solid #E5E5EA; color:#242428; font-size:0.75rem; font-weight:700; padding:4px 10px; border-radius:999px; cursor:pointer;">
               Ver Foto
             </button>
 
@@ -685,16 +685,16 @@
                 <circle id="rig-db-f" cx="144" cy="96" r="8" fill="#FC5200"/>
               </svg>
               <div class="media-tech-badge">
-                <span id="guided-muscle-name" class="label-caps" style="color: #FC5200;">GLÚTEOS • CUÁDRICEPS</span>
+                <span id="guided-muscle-name" class="label-caps" style="color: var(--primary-text);">GLÚTEOS • CUÁDRICEPS</span>
               </div>
             </div>
 
-            <img id="guided-exercise-img" class="guided-video-element" src="" alt="Demostración de ejercicio" style="display:none;" />
+            <img id="guided-exercise-img" class="guided-video-element" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Demostración de ejercicio" style="display:none;" />
           </div>
 
           <div class="technique-tempo-bar">
             <span class="label-caps" style="color: var(--text-secondary);">TEMPO STRAVA:</span>
-            <span id="guided-tempo-text" class="label-caps" style="color: #FC5200;">3s Bajar • 1s Pausa • 1s Subir</span>
+            <span id="guided-tempo-text" class="label-caps" style="color: var(--primary-text);">3s Bajar • 1s Pausa • 1s Subir</span>
           </div>
         </div>
 
@@ -731,7 +731,7 @@
 
           <div class="strava-heatmap-container">
             <div class="strava-heatmap-header">
-              <span class="label-caps" style="color: #FC5200; font-size: 0.72rem;">ACTIVACIÓN MUSCULAR</span>
+              <span class="label-caps" style="color: var(--primary-text); font-size: 0.75rem;">ACTIVACIÓN MUSCULAR</span>
               <span id="strava-active-muscles-text" class="body-xs" style="color: var(--text-secondary);">Tren Inferior</span>
             </div>
             <div class="strava-body-heatmap">
@@ -820,7 +820,7 @@
             </div>
             <div class="runna-hud-item">
               <span class="body-xs" style="color: var(--text-muted);">ZONA FC</span>
-              <span id="runna-hud-hr" class="headline-sm tabular-num" style="color: var(--primary);">Z3 Tempo</span>
+              <span id="runna-hud-hr" class="headline-sm tabular-num" style="color: var(--primary-text);">Z3 Tempo</span>
             </div>
           </div>
         </div>
@@ -894,7 +894,7 @@
         <button onclick="closeActivityDetailModal()" class="guided-close-btn" aria-label="Cerrar detalle">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
-        <span id="detail-modal-sport" class="label-caps" style="color: var(--primary);">ACTIVIDAD GARMIN</span>
+        <span id="detail-modal-sport" class="label-caps" style="color: var(--primary-text);">ACTIVIDAD GARMIN</span>
         <span id="detail-modal-date" class="label-caps tabular-num" style="color:var(--text-muted);">—</span>
       </div>
 
@@ -903,7 +903,7 @@
         <div class="detail-stats-row">
           <div class="p-stat-box"><span class="label-caps">DISTANCIA</span><span id="detail-stat-dist" class="p-stat-val tabular-num">—</span></div>
           <div class="p-stat-box"><span class="label-caps">RITMO / VEL</span><span id="detail-stat-pace" class="p-stat-val tabular-num">—</span></div>
-          <div class="p-stat-box"><span class="label-caps">DESNIVEL</span><span id="detail-stat-elev" class="p-stat-val tabular-num" style="color: var(--primary);">—</span></div>
+          <div class="p-stat-box"><span class="label-caps">DESNIVEL</span><span id="detail-stat-elev" class="p-stat-val tabular-num" style="color: var(--primary-text);">—</span></div>
         </div>
       </div>
 
@@ -957,7 +957,7 @@
             <line x1="40" y1="152" x2="160" y2="152" stroke="#D1D5DB" stroke-width="4" stroke-linecap="round"/>
           </svg>
           <div class="media-tech-badge">
-            <span id="modal-muscle-name" class="label-caps" style="color: var(--primary);">TREN INFERIOR • GLÚTEOS</span>
+            <span id="modal-muscle-name" class="label-caps" style="color: var(--primary-text);">TREN INFERIOR • GLÚTEOS</span>
           </div>
         </div>
 
@@ -966,12 +966,12 @@
                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; background: #F7F7FA; display: none;">
         </video>
 
-        <img id="modal-exercise-img" class="guided-video-element" src="" alt="Demostración" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; background: #F7F7FA; display: none;" />
+        <img id="modal-exercise-img" class="guided-video-element" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Demostración" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; background: #F7F7FA; display: none;" />
       </div>
 
       <div class="technique-tempo-bar" style="border-radius: var(--rounded-md); margin-bottom: 12px;">
         <span class="label-caps" style="color: var(--text-secondary);">TEMPO Y RITMO:</span>
-        <span id="modal-video-tempo" class="label-caps" style="color: var(--primary);">3s Bajada • 1s Pausa • 1s Empuje</span>
+        <span id="modal-video-tempo" class="label-caps" style="color: var(--primary-text);">3s Bajada • 1s Pausa • 1s Empuje</span>
       </div>
 
       <div style="background: var(--surface-dim); padding: 12px; border-radius: var(--rounded-md); border: 1px solid var(--border-glass);">

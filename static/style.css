@@ -20,20 +20,21 @@
 
   /* Single Accent: Strava Orange */
   --primary: #FC5200;
+  --primary-text: #C23B00;
   --primary-fixed-dim: #E04800;
   --on-primary: #FFFFFF;
   --primary-container: rgba(252, 82, 0, 0.08);
-  --on-primary-container: #FC5200;
+  --on-primary-container: #C23B00;
 
-  /* Subtle Secondary & Semantic */
-  --secondary: #0077CC;
-  --secondary-container: rgba(0, 119, 204, 0.08);
-  --success: #16A34A;
-  --runna-green: #16A34A;
+  /* Subtle Secondary & Semantic (WCAG AA >= 4.5:1 on light surfaces) */
+  --secondary: #0066B3;
+  --secondary-container: rgba(0, 102, 179, 0.08);
+  --success: #15803D;
+  --runna-green: #15803D;
 
   --text-primary: #242428;
-  --text-secondary: #6D6D78;
-  --text-muted: #8E8E98;
+  --text-secondary: #595963;
+  --text-muted: #5E5E68;
   --outline: #E5E5EA;
   --border-glass: #E5E5EA;
   --bg-glass: #FFFFFF;
@@ -156,17 +157,17 @@ body {
   font-size: 1.15rem;
   font-weight: 900;
   letter-spacing: -0.03em;
-  color: var(--primary);
+  color: var(--primary-text);
 }
 
 .version-tag {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  color: var(--primary);
+  color: var(--primary-text);
   background: var(--primary-container);
   border: 1px solid rgba(252, 82, 0, 0.25);
-  padding: 2px 6px;
+  padding: 2px 7px;
   border-radius: var(--rounded-sm);
 }
 
@@ -264,9 +265,9 @@ body {
 }
 
 .label-caps {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--text-secondary);
 }
@@ -285,7 +286,7 @@ body {
 }
 
 .body-xs {
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
 }
 
@@ -396,7 +397,7 @@ body {
 
 .status-val.accent,
 .status-val.lime {
-  color: var(--primary);
+  color: var(--primary-text);
 }
 
 /* Daily Goal / Recommendation Ring Card */
@@ -445,12 +446,13 @@ body {
 }
 
 .ring-text-center .metric-xl {
-  font-size: 1.4rem;
+  font-size: 1.35rem;
   line-height: 1.1;
 }
 
 .ring-text-center .label-caps {
-  font-size: 0.56rem;
+  font-size: 11px;
+  letter-spacing: 0.02em;
 }
 
 .daily-goal-content {
@@ -483,7 +485,7 @@ body {
   align-items: center;
   padding: 3px 9px;
   border-radius: 999px;
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -494,7 +496,7 @@ body {
 .pill-tag.orange,
 .pill-tag.lime {
   background: rgba(252, 82, 0, 0.10);
-  color: var(--primary);
+  color: var(--primary-text);
 }
 
 .pill-tag.cyan {
@@ -535,7 +537,7 @@ body {
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--primary-fixed-dim);
+  background: #C23B00;
 }
 
 .btn-ghost {
@@ -649,10 +651,10 @@ body {
   flex-shrink: 0;
 }
 
-.orange-tint { background: rgba(252, 82, 0, 0.10); color: #FC5200; }
-.blue-tint   { background: rgba(0, 119, 204, 0.10); color: #0077CC; }
-.green-tint  { background: rgba(22, 163, 74, 0.10); color: #16A34A; }
-.rest-tint   { background: #F0F0F5; color: #6D6D78; }
+.orange-tint { background: rgba(252, 82, 0, 0.10); color: #C23B00; }
+.blue-tint   { background: rgba(0, 102, 179, 0.10); color: #0066B3; }
+.green-tint  { background: rgba(21, 128, 61, 0.10); color: #15803D; }
+.rest-tint   { background: #F0F0F5; color: #595963; }
 
 .btn-text-wrap {
   flex: 1;
@@ -696,16 +698,16 @@ body {
 
 .btn-rescate:hover {
   border-color: var(--primary);
-  color: var(--primary);
+  color: var(--primary-text);
 }
 
 /* Generated Workout Display */
 .upcoming-badge {
   display: inline-block;
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 800;
-  letter-spacing: 0.06em;
-  color: var(--primary);
+  letter-spacing: 0.05em;
+  color: var(--primary-text);
   background: var(--primary-container);
   padding: 3px 8px;
   border-radius: 4px;
@@ -947,7 +949,7 @@ body {
 }
 
 .stat-chip {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-secondary);
   background: #F7F7FA;
@@ -1037,7 +1039,7 @@ body {
 
 .chat-chip:hover {
   border-color: var(--primary);
-  color: var(--primary);
+  color: var(--primary-text);
 }
 
 .chat-messages-container {
@@ -1136,9 +1138,9 @@ body {
   margin-top: -10px;
   background: var(--primary);
   color: #FFFFFF;
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 800;
-  padding: 2px 8px;
+  padding: 2px 9px;
   border-radius: 999px;
 }
 
@@ -1190,17 +1192,17 @@ body {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  color: #6D6D78;
+  color: #595963;
   cursor: pointer;
 }
 
 .nav-tab-btn .tab-label {
-  font-size: 0.64rem;
+  font-size: 11px;
   color: inherit;
 }
 
 .nav-tab-btn.active {
-  color: #FC5200;
+  color: var(--primary-text);
 }
 
 .fab-btn {
@@ -1320,6 +1322,7 @@ body {
 .video-container {
   width: 100%;
   height: 185px;
+  padding: 12px;
   border-radius: 6px;
   overflow: hidden;
   border: 1px solid #E5E5EA;
@@ -1363,9 +1366,9 @@ body {
 
 .strava-badge,
 .runna-badge {
-  font-size: 0.66rem;
+  font-size: 0.75rem;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   background: var(--primary);
   color: #FFFFFF;
   padding: 3px 8px;
@@ -1393,7 +1396,7 @@ body {
 }
 
 .strava-input-label {
-  font-size: 0.66rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--text-secondary);
 }
@@ -1457,13 +1460,13 @@ body {
   position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  height: 24px;
+  height: 26px;
   border-radius: 6px;
   overflow: hidden;
-  font-size: 0.64rem;
+  font-size: 0.75rem;
   font-weight: 700;
   text-align: center;
-  line-height: 24px;
+  line-height: 26px;
 }
 
 .pace-zone-seg.zone-slow   { background: #F0F0F5; color: #6D6D78; }
@@ -1535,7 +1538,7 @@ body {
 .guided-feedback-btn.selected {
   border-color: var(--primary);
   background: #FFF7F3;
-  color: var(--primary);
+  color: var(--primary-text);
 }
 
 /* Activity Detail Modal */
@@ -1660,7 +1663,7 @@ body {
   }
 
   .desktop-nav-btn.active {
-    color: #FC5200;
+    color: var(--primary-text);
     border-bottom-color: #FC5200;
   }
 
@@ -1680,7 +1683,7 @@ body {
   }
 
   .desktop-sync-btn:hover {
-    background: #E04800;
+    background: #C23B00;
   }
 
   .app-container {
