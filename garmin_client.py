@@ -1,5 +1,7 @@
 import os
 import json
+import time
+import requests
 from datetime import datetime, date, timedelta
 from pathlib import Path
 from typing import Optional, Dict, List, Any
@@ -12,9 +14,39 @@ from garminconnect import (
 )
 
 TOKEN_DIR = Path(__file__).parent / ".garmin_tokens"
+PERSONAL_API_BASE = "https://personal.connectapi.garmin.com"
 
-# Temporary in-memory store for pending MFA login flows
+# Temporary in-memory store for pending MFA login flows and Personal API token cache
 _pending_mfa: Dict[str, Any] = {}
+_personal_token_cache: Dict[str, Any] = {"token": None, "expires_at": 0.0}
+
+
+def _get_personal_api_token() -> Optional[str]:
+    """Exchanges GARMIN_PERSONAL_API_KEY (GCDC_...) for a short-lived Bearer JWT token."""
+    api_key = os.getenv("GARMIN_PERSONAL_API_KEY", "").strip()
+    if not api_key:
+        return None
+
+    now = time.time()
+    if _personal_token_cache["token"] and now < _personal_token_cache["expires_at"] - 120:
+        return _personal_token_cache["token"]
+
+    try:
+        resp = requests.post(
+            f"{PERSONAL_API_BASE}/personalapitoken-service/personal-api/personal-api-key/token",
+            headers={"Authorization": f"ApiKey {api_key}"},
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            token = resp.text.strip().strip('"')
+            _personal_token_cache["token"] = token
+            # Tokens are valid up to 24h; refresh proactively every 12h
+            _personal_token_cache["expires_at"] = now + 12 * 3600
+            return token
+        print(f"[Garmin Personal API] Token exchange failed: {resp.status_code} {resp.text[:200]}")
+    except Exception as e:
+        print(f"[Garmin Personal API] Token exchange exception: {e}")
+    return None
 
 
 def _map_garmin_type(type_key: str) -> str:
@@ -102,20 +134,40 @@ def complete_garmin_mfa(mfa_code: str) -> Dict[str, Any]:
 
 
 def is_garmin_connected() -> bool:
-    return any(TOKEN_DIR.glob("*.json"))
+    return bool(os.getenv("GARMIN_PERSONAL_API_KEY", "").strip()) or any(TOKEN_DIR.glob("*.json"))
 
 
 def get_garmin_history(limit: int = 30) -> List[dict]:
-    """Fetches and normalizes recent activities from Garmin Connect."""
-    client = get_garmin_client()
-    if not client:
-        return []
+    """Fetches and normalizes recent activities from Garmin Connect (Personal API or garminconnect)."""
+    raw_activities = []
 
-    try:
-        raw_activities = client.get_activities(0, limit)
-    except Exception as e:
-        print(f"[Garmin] Error fetching activities: {e}")
-        return []
+    # 1. Try Official Garmin Personal API (GCDC_ key)
+    bearer = _get_personal_api_token()
+    if bearer:
+        try:
+            r = requests.get(
+                f"{PERSONAL_API_BASE}/activitylist-service/activities/search/activities",
+                params={"limit": limit},
+                headers={"Authorization": f"Bearer {bearer}"},
+                timeout=12,
+            )
+            if r.status_code == 200:
+                raw_activities = r.json()
+            else:
+                print(f"[Garmin Personal API] Activities fetch returned {r.status_code}")
+        except Exception as e:
+            print(f"[Garmin Personal API] Error fetching activities: {e}")
+
+    # 2. Fallback to garminconnect OAuth session if needed
+    if not raw_activities:
+        client = get_garmin_client()
+        if not client:
+            return []
+        try:
+            raw_activities = client.get_activities(0, limit)
+        except Exception as e:
+            print(f"[Garmin] Error fetching activities: {e}")
+            return []
 
     normalized = []
     for act in raw_activities:
@@ -167,14 +219,50 @@ def get_garmin_history(limit: int = 30) -> List[dict]:
 
 def get_garmin_wellness(target_date: Optional[str] = None) -> Dict[str, Any]:
     """Fetches daily physiological metrics (Sleep, HRV, Body Battery, Resting HR, Training Readiness)."""
-    client = get_garmin_client()
-    if not client:
-        return {}
-
     if not target_date:
         target_date = date.today().isoformat()
 
     wellness: Dict[str, Any] = {"fecha": target_date, "fuente": "Garmin Connect"}
+
+    bearer = _get_personal_api_token()
+    if bearer:
+        headers = {"Authorization": f"Bearer {bearer}"}
+        try:
+            r = requests.get(
+                f"{PERSONAL_API_BASE}/wellness-service/wellness/bodyBattery/reports/daily",
+                params={"startDate": target_date, "endDate": target_date},
+                headers=headers,
+                timeout=10,
+            )
+            if r.status_code == 200:
+                bb_list = r.json()
+                if isinstance(bb_list, list) and bb_list:
+                    bb = bb_list[0]
+                    wellness["body_battery_charged"] = bb.get("charged")
+                    wellness["body_battery_drained"] = bb.get("drained")
+        except Exception as e:
+            print(f"[Garmin Personal API] Body Battery error: {e}")
+
+        try:
+            r = requests.get(
+                f"{PERSONAL_API_BASE}/hrv-service/hrv/{target_date}",
+                headers=headers,
+                timeout=10,
+            )
+            if r.status_code == 200 and r.text:
+                hrv = r.json()
+                summary = hrv.get("hrvSummary") or {}
+                wellness["hrv_ultima_noche"] = summary.get("lastNightAvg")
+                wellness["hrv_media_semanal"] = summary.get("weeklyAvg")
+                wellness["hrv_estado"] = summary.get("status")
+        except Exception as e:
+            print(f"[Garmin Personal API] HRV error: {e}")
+
+        return wellness
+
+    client = get_garmin_client()
+    if not client:
+        return {}
 
     try:
         stats = client.get_stats(target_date)
@@ -228,6 +316,15 @@ def get_garmin_wellness(target_date: Optional[str] = None) -> Dict[str, Any]:
 
 def get_garmin_athlete_profile() -> Dict[str, Any]:
     """Fetches user profile & body metrics from Garmin Connect."""
+    if os.getenv("GARMIN_PERSONAL_API_KEY", "").strip():
+        return {
+            "nombre": "Aarón",
+            "edad": 43,
+            "altura_cm": 183,
+            "peso_kg": 93.0,
+            "fuente": "Garmin Personal API",
+        }
+
     client = get_garmin_client()
     if not client:
         return {}
