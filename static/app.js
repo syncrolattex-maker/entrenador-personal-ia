@@ -179,12 +179,11 @@ document.addEventListener("DOMContentLoaded", () => {
   // Selection events
   elBtnSelectFuerza.addEventListener("click", () => iniciarGeneracionEntrenamiento("Fuerza"));
   elBtnSelectCarrera.addEventListener("click", () => iniciarGeneracionEntrenamiento("Carrera"));
-  if (elBtnSelectYoga) elBtnSelectYoga.addEventListener("click", () => iniciarGeneracionEntrenamiento("Yoga"));
   elBtnSelectDescanso.addEventListener("click", registrarDescansoHoy);
 
   const elBtnDiaGris = document.getElementById("btnDiaGris");
   if (elBtnDiaGris) {
-    elBtnDiaGris.addEventListener("click", () => iniciarGeneracionEntrenamiento("Yoga", true));
+    elBtnDiaGris.addEventListener("click", () => iniciarGeneracionEntrenamiento("Fuerza", true));
   }
 
 
@@ -334,7 +333,7 @@ async function initApp() {
 
     } else {
       const day = new Date().getDay();
-      let offRec = (day === 0) ? "Yoga" : (day % 2 === 0) ? "Carrera" : "Fuerza";
+      let offRec = (day === 0) ? "Descanso" : (day % 2 === 0) ? "Carrera" : "Fuerza";
       renderRecommendation({
         recomendacion: offRec,
         razon: `¡Hola Aarón! Te recomendamos para hoy una sesión de ${offRec}.`,
@@ -346,10 +345,10 @@ async function initApp() {
     console.error("Fetch recommendation error:", err);
     const day = new Date().getDay(); // 0 = Sun, 1 = Mon, 2 = Tue, 3 = Wed, 4 = Thu, 5 = Fri, 6 = Sat
     let offlineRec = "Fuerza";
-    let offlineRazon = "Hoy te recomendamos un bloque de Fuerza Full-Body con mancuernas de 5kg y cintas.";
+    let offlineRazon = "Hoy te recomendamos un bloque de Fuerza estilo Strava con mancuernas de 5kg y cintas.";
     if (day === 0) {
-      offlineRec = "Yoga";
-      offlineRazon = "Hoy domingo te prescribimos una sesión de Yoga y estiramientos guiados para recuperar movilidad.";
+      offlineRec = "Descanso";
+      offlineRazon = "Hoy domingo toca recuperación activa y asimilación muscular.";
     } else if (day === 2 || day === 4 || day === 6) {
       offlineRec = "Carrera";
       offlineRazon = "Hoy te recomendamos una sesión de Carrera Aeróbica continua en Zona 2.";
@@ -476,29 +475,29 @@ function renderRecommendation(rec) {
   const elBtnComenzarTexto = document.getElementById("btn-comenzar-hoy-texto");
 
   if (rec.recomendacion === "Descanso") {
-    if (elSelectionTitle) elSelectionTitle.textContent = "✅ ENTRENAMIENTO YA COMPLETADO HOY (OPCIONES ADICIONALES)";
+    if (elSelectionTitle) elSelectionTitle.textContent = "✅ DÍA DE RECUPERACIÓN (OPCIONES ADICIONALES)";
     if (elBtnComenzarHoy) {
       elBtnComenzarHoy.style.display = "flex";
-      if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "🧘‍♀️ Estiramiento y Yoga Suave (Opcional)";
-      elBtnComenzarHoy.className = "btn btn-primary yoga";
-      elBtnComenzarHoy.onclick = () => iniciarGeneracionEntrenamiento("Yoga");
+      if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "🔋 Rutina Suave de Movilidad (10 min)";
+      elBtnComenzarHoy.className = "btn btn-primary";
+      elBtnComenzarHoy.onclick = () => iniciarGeneracionEntrenamiento("Fuerza", true);
     }
   } else {
     if (elSelectionTitle) elSelectionTitle.textContent = "¿QUÉ VAS A ENTRENAR HOY?";
     if (elBtnComenzarHoy && rec.recomendacion) {
       elBtnComenzarHoy.style.display = "flex";
       if (rec.recomendacion === "Fuerza") {
-        if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "⚡ Comenzar Fuerza Full-Body";
+        if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "⚡ Comenzar Fuerza (Strava)";
         elBtnComenzarHoy.className = "btn btn-primary";
         elBtnComenzarHoy.onclick = () => iniciarGeneracionEntrenamiento("Fuerza");
       } else if (rec.recomendacion === "Carrera") {
-        if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "⚡ Comenzar Carrera Estructurada";
+        if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "⚡ Comenzar Carrera (Runna)";
         elBtnComenzarHoy.className = "btn btn-primary";
         elBtnComenzarHoy.onclick = () => iniciarGeneracionEntrenamiento("Carrera");
-      } else if (rec.recomendacion === "Yoga") {
-        if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "🧘‍♀️ Comenzar Yoga Regenerativo";
-        elBtnComenzarHoy.className = "btn btn-primary yoga";
-        elBtnComenzarHoy.onclick = () => iniciarGeneracionEntrenamiento("Yoga");
+      } else {
+        if (elBtnComenzarTexto) elBtnComenzarTexto.textContent = "🔋 Rutina Suave de Movilidad (10 min)";
+        elBtnComenzarHoy.className = "btn btn-primary";
+        elBtnComenzarHoy.onclick = () => iniciarGeneracionEntrenamiento("Fuerza", true);
       }
     }
   }
@@ -719,32 +718,28 @@ function renderWorkout(workout) {
     elWorkoutContent.innerHTML = `
       <div class="carrera-container">
         <div class="watch-icon-wrapper">
-          <i data-lucide="watch" style="width:40px;height:40px;color:var(--accent-carrera);"></i>
+          <i data-lucide="watch" style="width:40px;height:40px;color:#00E676;"></i>
         </div>
-        <h3 class="carrera-title">Día de Carrera Estructurada</h3>
-        ${watchBadge}
+        <h3 class="carrera-title">Carrera Guiada (Estilo Runna)</h3>
         <p class="carrera-instructions" style="margin-top:4px;">
-          Tu entrenamiento de running está listo en tu <strong>Apple Watch</strong> vía Intervals.icu.<br>
-          Pulsa <strong>"▶ Empezar sesión"</strong> para seguirlo también desde aquí con timer.
+          Bloques estructurados por ritmo y zonas para tu <strong>reloj Garmin</strong>.<br>
+          Pulsa <strong>"▶ Comenzar Carrera (Runna)"</strong> para seguir los intervalos con audio-coach y medidor de ritmo.
         </p>
         ${stepsHtml}
       </div>`;
 
     elWorkoutActions.innerHTML = `
-      <button id="btn-sync-watch" class="btn btn-primary guided-action-btn carrera" style="background-color: #FC5200; margin-bottom: 8px;">
-        <i data-lucide="watch" style="width: 20px; height: 20px;"></i>
-        Sincronizar Apple Watch
-      </button>
-      <button id="btn-empezar-carrera" class="btn btn-primary guided-action-btn carrera" style="background-color: #FC5200;">
+      <button id="btn-empezar-carrera" class="btn btn-primary guided-action-btn carrera" style="background: linear-gradient(135deg, #00E676 0%, #00B0FF 100%); color: #000; border: none;">
         <i data-lucide="play" style="width: 20px; height: 20px;"></i>
-        Comenzar Carrera (Timer)
+        Comenzar Carrera (Runna)
       </button>
       <button id="btn-volver" class="btn btn-secondary">
         Atrás
       </button>
     `;
 
-    document.getElementById("btn-sync-watch").addEventListener("click", sincronizarAppleWatch);
+    const btnSyncWatch = document.getElementById("btn-sync-watch");
+    if (btnSyncWatch) btnSyncWatch.addEventListener("click", sincronizarAppleWatch);
     document.getElementById("btn-empezar-carrera").addEventListener("click", startGuidedSession);
     document.getElementById("btn-volver").addEventListener("click", mostrarPantallaSeleccion);
   }

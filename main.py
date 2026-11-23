@@ -1411,27 +1411,27 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict, wko5_data:
     # ── Intelligent Decision Tree for Aarón (43a, 1.83m, 93kg) ──
     rec_tipo = "Fuerza"
     razon = ""
-    explicacion_semanal = f"Esta semana (Lunes-Domingo): {fuerza_count_7d}/3 Fuerza • {carrera_count_7d}/2 Carrera • {yoga_count_7d} Yoga."
+    explicacion_semanal = f"Esta semana (Lunes-Domingo): {fuerza_count_7d}/3 Fuerza • {carrera_count_7d}/2 Carrera."
 
     # WKO5 High Fatigue Rule Override (TSB < -15)
     if tsb_val < -15.0 and days_inactive <= 1:
-        rec_tipo = "Yoga"
-        razon = f"¡Hola Aarón! Según la telemetría (TSB = {tsb_val}, Fatiga ATL = {atl_val}), tus reservas de recuperación están comprometidas. Forzamos una sesión regenerativa de Yoga y Movilidad para proteger tus articulaciones."
+        rec_tipo = "Descanso"
+        razon = f"¡Hola Aarón! Según la telemetría (TSB = {tsb_val}, Fatiga ATL = {atl_val}), tus reservas de recuperación están comprometidas. Hoy toca descanso activo y asimilación para proteger tus articulaciones."
 
     # CASE 1: Trained TODAY (days_inactive == 0)
     elif days_inactive == 0:
         rec_tipo = "Descanso"
         if last_type == "Carrera":
-            razon = "¡Objetivo cumplido hoy, Aarón! Ya has completado tu entrenamiento de Carrera. Para evitar sobrecargas articulares y asimilar el estímulo, el resto del día es de reposo y asimilación. Si te apetece soltar piernas, puedes hacer un Yoga suave opcional."
+            razon = "¡Objetivo cumplido hoy, Aarón! Ya has completado tu entrenamiento de Carrera. Para evitar sobrecargas articulares y asimilar el estímulo, el resto del día es de reposo y asimilación."
         elif last_type == "Fuerza":
             razon = "¡Excelente sesión hoy, Aarón! Tu bloque de Fuerza ya está completado. Toca reposo y nutrición para que la musculatura repare y supercompense."
         else:
-            razon = "¡Sesión de Yoga completada hoy, Aarón! Tu cuerpo está en un estado óptimo de regeneración física y mental. Disfruta del reposo."
+            razon = "¡Buen entrenamiento hoy, Aarón! Tu cuerpo está en fase de asimilación física. Disfruta del descanso."
 
     # CASE 2: High Subjective Fatigue or High HR from last workout
     elif last_effort == "agotador" or (last_hr > 170 and days_inactive <= 1):
-        rec_tipo = "Yoga"
-        razon = "¡Hola Aarón! Detectamos que tu última sesión requirió un esfuerzo muy exigente. Para evitar sobrecargas articulares y favorecer la supercompensación muscular, hoy te prescribo una sesión de Yoga y Movilidad."
+        rec_tipo = "Descanso"
+        razon = "¡Hola Aarón! Detectamos que tu última sesión requirió un esfuerzo muy exigente (FC alta / esfuerzo máximo). Para evitar sobrecargas articulares y favorecer la supercompensación muscular, hoy te prescribo descanso o movilidad muy suave."
 
     # CASE 3: Trained YESTERDAY (days_inactive == 1)
     elif days_inactive == 1:
@@ -1441,13 +1441,13 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict, wko5_data:
         elif last_type == "Carrera":
             rec_tipo = "Fuerza"
             razon = "¡Hola Aarón! Tras la sesión de Carrera de ayer, hoy cambiamos el estímulo hacia Fuerza estilo Strava con tus mancuernas de 5 kg y cintas elásticas para mantener densidad muscular y control articular."
-        else: # Yoga yesterday
+        else: # Other activity (e.g. Ciclismo) yesterday
             if fuerza_count_7d <= carrera_count_7d:
                 rec_tipo = "Fuerza"
-                razon = "¡Hola Aarón! Tras tu descarga activa de ayer con Yoga, hoy volvemos a la carga con Fuerza estilo Strava de 45 minutos."
+                razon = "¡Hola Aarón! Tras tu sesión de ayer, hoy toca equilibrar con Fuerza estilo Strava de 45 minutos."
             else:
                 rec_tipo = "Carrera"
-                razon = "¡Hola Aarón! Tras la sesión de Yoga de ayer, hoy prescribimos un bloque de Carrera Aeróbica en Zona 2 guiado estilo Runna."
+                razon = "¡Hola Aarón! Tras tu sesión de ayer, hoy prescribimos un bloque de Carrera Aeróbica en Zona 2 guiado estilo Runna."
 
     # CASE 4: Inactive 2 or more days (days_inactive >= 2)
     else:
@@ -1466,8 +1466,8 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict, wko5_data:
                 rec_tipo = "Carrera"
                 razon = f"¡Hola Aarón! Feliz {weekday_names[weekday]}. Hoy toca trabajo cardiovascular: Carrera estructurada guiada estilo Runna."
             else:  # Sunday (6)
-                rec_tipo = "Yoga"
-                razon = "¡Hola Aarón! Es domingo, el día ideal para descargar tensiones articulares. Hoy te prescribimos una sesión guiada de Yoga y Movilidad de 25 minutos."
+                rec_tipo = "Descanso"
+                razon = "¡Hola Aarón! Es domingo, día de descarga articular y recuperación para empezar la semana al 100%."
 
     # Calculate dynamic readiness/load score (0-100%) incorporating WKO5 TSB Form
     weekly_total = fuerza_count_7d + carrera_count_7d + yoga_count_7d
