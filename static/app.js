@@ -1124,8 +1124,18 @@ function startGuidedSession() {
 
 }
 
+let _stravaFrameInterval = null;
+
+function _stopStravaFrameAnim() {
+  if (_stravaFrameInterval) {
+    clearInterval(_stravaFrameInterval);
+    _stravaFrameInterval = null;
+  }
+}
+
 function closeGuided() {
   clearTimer();
+  _stopStravaFrameAnim();
   if (_runnaNeedleInterval) {
     clearInterval(_runnaNeedleInterval);
     _runnaNeedleInterval = null;
@@ -2399,20 +2409,51 @@ function openExerciseVideoModal(arg1, arg2, arg3) {
 
   function _showImage(url) {
     if (!imgEl) return;
-    imgEl.src = url;
+    _stopStravaFrameAnim();
+
+    const frame0 = url;
+    const frame1 = url.includes("/0.jpg") ? url.replace("/0.jpg", "/1.jpg") : null;
+    let showingFrame1 = false;
+
+    imgEl.src = frame0;
     imgEl.style.display = "block";
+    imgEl.style.opacity = "1";
+    imgEl.style.transition = "opacity 0.25s ease-in-out";
     if (videoEl) videoEl.style.display = "none";
-    if (!isYogaSession && canvasEl) canvasEl.style.display = "none";
-    imgEl.style.background = isYogaSession ? "#f9f9fb" : "#080808";
-    imgEl.style.padding = isYogaSession ? "14px" : "0";
+    if (canvasEl) canvasEl.style.display = "none";
+    imgEl.style.background = "#0D1117";
+    imgEl.style.padding = "0";
     imgEl.style.objectFit = "contain";
+
+    // Animate 2-frame Strava-style start <-> contraction sequence
+    if (frame1) {
+      const preload = new Image();
+      preload.src = frame1;
+      _stravaFrameInterval = setInterval(() => {
+        if (!imgEl || imgEl.style.display === "none") return;
+        showingFrame1 = !showingFrame1;
+        imgEl.style.opacity = "0.82";
+        setTimeout(() => {
+          imgEl.src = showingFrame1 ? frame1 : frame0;
+          imgEl.style.opacity = "1";
+          if (tempoEl) {
+            tempoEl.textContent = showingFrame1
+              ? "🔥 CONTRACCIÓN MÁXIMA • 1s Pausa"
+              : "⚡ FASE EXCÉNTRICA • 3s Controlado";
+          }
+        }, 120);
+      }, 1250);
+    }
+
     imgEl.onerror = () => {
+      _stopStravaFrameAnim();
       imgEl.style.display = "none";
-      if (!isYogaSession && canvasEl) canvasEl.style.display = "flex";
+      if (canvasEl) canvasEl.style.display = "flex";
     };
   }
 
   // Reset media elements
+  _stopStravaFrameAnim();
   if (videoEl) { videoEl.pause(); videoEl.src = ""; videoEl.style.display = "none"; }
   if (imgEl)   imgEl.style.display = "none";
 
@@ -2420,7 +2461,7 @@ function openExerciseVideoModal(arg1, arg2, arg3) {
     _showVideo(videoUrl);
   } else if (gifUrl) {
     _showImage(gifUrl);
-  } else if (!isYogaSession && canvasEl) {
+  } else if (canvasEl) {
     canvasEl.style.display = "flex";
   }
 
