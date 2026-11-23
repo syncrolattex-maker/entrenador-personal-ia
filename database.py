@@ -1,6 +1,7 @@
 import os
 import json
 import sqlite3
+from datetime import date
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
@@ -100,9 +101,22 @@ def init_db() -> None:
             initial_km REAL DEFAULT 0,
             logged_km REAL DEFAULT 0,
             alert_km REAL DEFAULT 650,
-            active INTEGER DEFAULT 1
+            active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT ''
         )
     """)
+
+    # Safe migration if gear table already existed without created_at
+    try:
+        if is_pg:
+            cur.execute("ALTER TABLE gear ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT ''")
+        else:
+            cur.execute("PRAGMA table_info(gear)")
+            cols = [r[1] for r in cur.fetchall()]
+            if "created_at" not in cols:
+                cur.execute("ALTER TABLE gear ADD COLUMN created_at TEXT DEFAULT ''")
+    except Exception as e:
+        print(f"[DB] Gear migration note: {e}")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS app_settings (
@@ -283,11 +297,19 @@ def recalculate_gear_and_prs() -> None:
     cur.execute("SELECT * FROM activities")
     acts = _rows_to_dicts(cur, cur.fetchall())
 
-    total_run_km = sum(float(a["distance_km"] or 0) for a in acts if a["sport_type"] == "Carrera")
-    total_bike_km = sum(float(a["distance_km"] or 0) for a in acts if a["sport_type"] == "Ciclismo")
+    cur.execute("SELECT * FROM gear WHERE active = 1")
+    active_gear = _rows_to_dicts(cur, cur.fetchall())
 
-    cur.execute(f"UPDATE gear SET logged_km = {p} WHERE gear_type = 'shoes' AND active = 1", (round(total_run_km, 1),))
-    cur.execute(f"UPDATE gear SET logged_km = {p} WHERE gear_type = 'bike' AND active = 1", (round(total_bike_km, 1),))
+    for g in active_gear:
+        target_sport = "Carrera" if g.get("gear_type") == "shoes" else "Ciclismo"
+        created_dt = (g.get("created_at") or "").strip()[:10]
+        km_sum = sum(
+            float(a["distance_km"] or 0)
+            for a in acts
+            if a.get("sport_type") == target_sport
+            and (not created_dt or (a.get("start_date") or "")[:10] >= created_dt)
+        )
+        cur.execute(f"UPDATE gear SET logged_km = {p} WHERE id = {p}", (round(km_sum, 1), g["id"]))
 
     # Compute running PR estimates (for distances reached) & cycling max distance/elevation
     run_targets = [("1K", 1.0), ("5K", 5.0), ("10K", 10.0), ("21K", 21.1)]
@@ -357,9 +379,10 @@ def add_or_update_gear(name: str, gear_type: str, brand: str, initial_km: float,
     conn = _get_conn()
     cur = conn.cursor()
     p = _ph(conn)
+    today_str = date.today().isoformat()
     cur.execute(
-        f"INSERT INTO gear (name, gear_type, brand, initial_km, logged_km, alert_km, active) VALUES ({','.join([p]*7)})",
-        (name, gear_type, brand, float(initial_km), 0.0, float(alert_km), 1),
+        f"INSERT INTO gear (name, gear_type, brand, initial_km, logged_km, alert_km, active, created_at) VALUES ({','.join([p]*8)})",
+        (name, gear_type, brand, float(initial_km), 0.0, float(alert_km), 1, today_str),
     )
     conn.commit()
     conn.close()

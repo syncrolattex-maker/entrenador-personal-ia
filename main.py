@@ -18,7 +18,7 @@ import database
 load_dotenv()
 
 # ── ExerciseDB RapidAPI (AscendAPI) ──────────────────────────────────────────
-EXERCISEDB_KEY  = "894945d817msh8622b11c7f9f712p171acajsnb3339e41c2f6"
+EXERCISEDB_KEY  = os.getenv("EXERCISEDB_KEY", "")
 EXERCISEDB_HOST = "edb-with-videos-and-images-by-ascendapi.p.rapidapi.com"
 EXERCISEDB_BASE = f"https://{EXERCISEDB_HOST}/api/v1"
 EXERCISEDB_HEADERS = {
@@ -1082,7 +1082,7 @@ async def get_rapidapi_exercises(muscle: str):
     Supports muscle groups: adductor, quadriceps, glutes, hamstrings, shoulders, back, chest, abs.
     Falls back gracefully to local catalog if unsubscribed or offline.
     """
-    rapid_key = os.getenv("RAPIDAPI_KEY", "894945d817msh8622b11c7f9f712p171acajsnb3339e41c2f6")
+    rapid_key = os.getenv("RAPIDAPI_KEY", "")
     rapid_host = os.getenv("RAPIDAPI_HOST", "gym-and-home-exercises.p.rapidapi.com")
 
     clean_muscle = muscle.lower().strip()
@@ -1126,7 +1126,7 @@ async def get_musclewiki_exercises(category: str = "all", categoria: str = None,
     cat_query = categoria or category or "all"
     clean_cat = cat_query.lower().strip()
 
-    mw_key = os.getenv("MUSCLEWIKI_API_KEY", "mw_DlcYcuEWMjyww9sFtjX8JFmb5hNylJRNNLxcpNBUnXM")
+    mw_key = os.getenv("MUSCLEWIKI_API_KEY", "")
     url = "https://api.musclewiki.com/exercises"
     headers = {"X-API-Key": mw_key}
     params = {"limit": 20, "lang": lang}
@@ -1814,7 +1814,7 @@ async def post_chat_coach(payload: ChatCoachRequest):
         {wiki_context}
         """
         
-        for msg in payload.historial:
+        for msg in payload.historial[-6:]:
             contents.append(
                 types.Content(
                     role=msg.role,
@@ -1848,34 +1848,6 @@ async def post_chat_coach(payload: ChatCoachRequest):
             "rutina_actualizada": None
         }
 
-
-@app.get("/api/ejercicios")
-async def get_ejercicios_catalog():
-    """Endpoint returning full ExerciseDB strength catalog with GIFs & technique details"""
-    return {
-        "status": "ok",
-        "ejercicios": exercisedb.get_all_fallback_exercises()
-    }
-
-
-@app.get("/api/musclewiki/categorias")
-async def get_musclewiki_categories_endpoint():
-    """Returns MuscleWiki muscle group categories"""
-    return {
-        "status": "ok",
-        "categorias": musclewiki.MUSCLEWIKI_CATEGORIES
-    }
-
-
-@app.get("/api/musclewiki/ejercicios")
-async def get_musclewiki_ejercicios_endpoint(categoria: Optional[str] = "all"):
-    """Returns MuscleWiki exercises filtered by muscle category"""
-    ejercicios = musclewiki.get_musclewiki_exercises_by_category(categoria)
-    return {
-        "status": "ok",
-        "categoria": categoria,
-        "ejercicios": ejercicios
-    }
 
 def obtener_clima_actual(latitud: float, longitud: float) -> str:
     """
