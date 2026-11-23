@@ -17,7 +17,7 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=77">
+  <link rel="stylesheet" href="/style.css?v=78">
 
   <!-- Icons & Fonts (Hanken Grotesk & JetBrains Mono) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -999,90 +999,190 @@
     </div>
   </div>
 
-  <!-- ===================== ACTIVITY DETAIL MODAL (STRAVA LIGHT DUAL) ===================== -->
+  <!-- ===================== ACTIVITY DETAIL MODAL (STRAVA WEB EXACT) ===================== -->
   <div id="activity-detail-modal" class="guided-overlay detail-modal-overlay" style="display: none; z-index: 35000;">
-    <div class="detail-modal-shell">
-      <div class="guided-header detail-modal-header">
-        <button onclick="closeActivityDetailModal()" class="guided-close-btn" aria-label="Cerrar detalle">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-        <span id="detail-modal-sport" class="label-caps" style="color: var(--primary-text);">ACTIVIDAD GARMIN</span>
-        <span id="detail-modal-date" class="label-caps tabular-num" style="color:var(--text-muted);">—</span>
+    <div class="strava-detail-shell">
+      <div class="strava-detail-topbar">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button onclick="closeActivityDetailModal()" class="guided-close-btn" aria-label="Cerrar detalle">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+          <span id="detail-modal-sport" class="pill-tag orange">ACTIVIDAD GARMIN</span>
+        </div>
+        <span id="detail-modal-date" class="body-xs tabular-num">—</span>
       </div>
 
-      <div class="detail-modal-top">
-        <h2 id="detail-modal-title" class="headline-md" style="margin:0;">—</h2>
-        <div class="detail-stats-row">
-          <div class="p-stat-box"><span class="label-caps">DISTANCIA</span><span id="detail-stat-dist" class="p-stat-val tabular-num">—</span></div>
-          <div class="p-stat-box"><span class="label-caps">RITMO / VEL</span><span id="detail-stat-pace" class="p-stat-val tabular-num">—</span></div>
-          <div class="p-stat-box"><span class="label-caps">DESNIVEL</span><span id="detail-stat-elev" class="p-stat-val tabular-num" style="color: var(--primary-text);">—</span></div>
-        </div>
-      </div>
+      <div class="strava-detail-grid">
+        <!-- Columna Izquierda: Sidebar (Desktop vertical / Mobile horizontal scrollable) -->
+        <aside class="strava-detail-sidebar" aria-label="Secciones de actividad">
+          <button type="button" class="detail-nav-item active" onclick="scrollDetailSection('detail-sec-overview', this)">Descripción general</button>
+          <button type="button" class="detail-nav-item" onclick="scrollDetailSection('detail-sec-analysis', this)">Análisis</button>
+          <button type="button" class="detail-nav-item sub" onclick="scrollDetailSection('detail-sec-analysis', this)">Análisis del ritmo</button>
+          <button type="button" class="detail-nav-item sub" onclick="scrollDetailSection('detail-zones-card', this)">Frecuencia cardíaca</button>
+          <button type="button" class="detail-nav-item" onclick="scrollDetailSection('detail-sec-segments', this)">Segmentos</button>
+          <button type="button" class="detail-nav-item" onclick="scrollDetailSection('detail-sec-splits', this)">Parciales</button>
+          <button type="button" class="detail-nav-item" onclick="scrollDetailSection('detail-sec-prs', this)">Mejores tiempos</button>
+        </aside>
 
-      <!-- Dual Desktop Grid (1.2fr 1fr): Map + Chart Left | Splits + HR Zones Right -->
-      <div class="detail-modal-body">
-        <div class="detail-col-left">
-          <div id="detail-map-container" class="detail-map-box"></div>
+        <!-- Columna Derecha: Contenido Principal -->
+        <div class="strava-detail-main">
 
-          <div id="detail-create-segment-wrap" style="display:none; justify-content:flex-end;">
-            <button type="button" id="btn-create-segment-from-act" class="strava-chip-btn" style="padding:6px 12px; font-size:0.78rem;">+ Guardar ruta como Segmento</button>
-          </div>
-
-          <div class="glass-card" id="detail-chart-card" style="display:none;">
-            <h3 class="headline-sm" style="margin:0;">Elevación, Ritmo y FC</h3>
-            <div id="detail-chart-svg" style="width:100%; height:150px;"></div>
-          </div>
-        </div>
-
-        <div class="detail-col-right">
-          <!-- Esfuerzo Relativo, RPE (1-10) & VAM -->
-          <div class="glass-card" id="detail-effort-card">
-            <h3 class="headline-sm" style="margin:0;">Carga Fisiológica</h3>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-              <div class="p-stat-box">
-                <span class="label-caps">ESFUERZO RELATIVO</span>
-                <span id="detail-relative-effort" class="p-stat-val tabular-num" style="color: var(--primary-text);">—</span>
+          <!-- Cabecera en 2 mitades -->
+          <section id="detail-sec-overview" class="glass-card strava-detail-header-card">
+            <div class="detail-header-split">
+              <!-- Mitad Izquierda: Fecha, Título, Descripción y Notas privadas -->
+              <div class="detail-header-left">
+                <span id="detail-header-datetime" class="body-xs tabular-num">—</span>
+                <h2 id="detail-modal-title" class="headline-md" style="margin:2px 0 8px 0;">—</h2>
+                <textarea id="detail-input-description" class="strava-input" rows="2" placeholder="Añade una descripción pública de esta sesión..."></textarea>
+                <textarea id="detail-input-notes" class="strava-input" rows="2" placeholder="Notas privadas (sensaciones, molestias, terreno...)"></textarea>
+                <div style="display:flex; justify-content:flex-end;">
+                  <button type="button" class="btn btn-ghost" style="padding:6px 12px; font-size:0.8rem;" onclick="saveActivityNotes()">Guardar notas</button>
+                </div>
               </div>
-              <div class="p-stat-box">
-                <span class="label-caps">VAM</span>
-                <span id="detail-vam-mh" class="p-stat-val tabular-num">—</span>
+
+              <!-- Mitad Derecha: 3 cifras grandes + fila inferior + dispositivo y material -->
+              <div class="detail-header-right">
+                <div class="detail-big-stats">
+                  <div class="detail-big-stat">
+                    <span class="label-caps">DISTANCIA</span>
+                    <strong id="detail-stat-dist" class="tabular-num">—</strong>
+                  </div>
+                  <div class="detail-big-stat">
+                    <span class="label-caps">TIEMPO MOV.</span>
+                    <strong id="detail-stat-moving" class="tabular-num">—</strong>
+                  </div>
+                  <div class="detail-big-stat">
+                    <span class="label-caps">RITMO / VEL</span>
+                    <strong id="detail-stat-pace" class="tabular-num">—</strong>
+                  </div>
+                </div>
+
+                <div class="detail-sub-stats">
+                  <div>
+                    <span class="body-xs">Desnivel</span>
+                    <strong id="detail-stat-elev" class="tabular-num" style="display:block;">—</strong>
+                  </div>
+                  <div>
+                    <span class="body-xs">Transcurrido</span>
+                    <strong id="detail-stat-elapsed" class="tabular-num" style="display:block;">—</strong>
+                  </div>
+                  <div>
+                    <span class="body-xs">Calorías</span>
+                    <strong id="detail-stat-calories" class="tabular-num" style="display:block;">—</strong>
+                  </div>
+                </div>
+
+                <div class="detail-device-gear-row">
+                  <span class="body-xs">Dispositivo: <strong id="detail-device-name">Garmin</strong></span>
+                  <div style="display:flex; align-items:center; gap:6px;">
+                    <label class="body-xs" for="detail-gear-select">Material:</label>
+                    <select id="detail-gear-select" class="strava-input" style="padding:4px 8px; font-size:0.8rem; width:auto;" onchange="saveActivityGear(this.value)">
+                      <option value="0">Sin asignar</option>
+                    </select>
+                  </div>
+                </div>
               </div>
             </div>
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              <span class="label-caps">ESFUERZO PERCIBIDO (RPE 1–10)</span>
-              <div id="detail-rpe-buttons" class="rpe-selector-row"></div>
+          </section>
+
+          <!-- Bloque Central (Grid 260px 1fr): Parciales a la izquierda + Mapa Leaflet & GPX a la derecha -->
+          <section id="detail-sec-splits" class="detail-center-block">
+            <div class="glass-card" id="detail-splits-card">
+              <h3 class="headline-sm" style="margin:0;">Parciales</h3>
+              <div class="splits-table-head">
+                <span>KM</span>
+                <span>RITMO</span>
+                <span style="text-align:right;">DESN.</span>
+              </div>
+              <div id="detail-splits-list" style="display:flex; flex-direction:column; gap:6px;">
+                <p class="body-xs">Sin parciales disponibles.</p>
+              </div>
+            </div>
+
+            <div class="glass-card" style="padding:12px; gap:10px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                <h3 class="headline-sm" style="margin:0;">Mapa de ruta</h3>
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <button type="button" id="btn-create-segment-from-act" class="strava-chip-btn" style="display:none; padding:5px 10px; font-size:0.75rem;">+ Segmento</button>
+                  <a id="btn-download-gpx" class="strava-chip-btn" style="display:none; padding:5px 11px; font-size:0.75rem; text-decoration:none;" download>↓ GPX</a>
+                </div>
+              </div>
+              <div id="detail-map-container" class="detail-map-box" style="height:300px;"></div>
+            </div>
+          </section>
+
+          <!-- Bloque Inferior: Gráfica Sincronizada + Toggles (Sí/No) -->
+          <section id="detail-sec-analysis" class="glass-card">
+            <h3 class="headline-sm" style="margin:0;">Análisis de Elevación y Streams</h3>
+            <div id="detail-chart-card" style="display:flex; flex-direction:column; gap:10px;">
+              <div id="detail-chart-svg" style="width:100%; height:180px;"></div>
+              <div id="detail-stream-toggles" class="detail-toggles-table">
+                <!-- Populated dynamically with Sí/No toggles & averages -->
+              </div>
+            </div>
+          </section>
+
+          <!-- Carga Fisiológica (Esfuerzo Relativo, RPE 1-10, VAM) + Ciclismo -->
+          <div class="detail-phys-row">
+            <div class="glass-card" id="detail-effort-card">
+              <h3 class="headline-sm" style="margin:0;">Carga Fisiológica</h3>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <div class="p-stat-box">
+                  <span class="label-caps">ESFUERZO RELATIVO</span>
+                  <span id="detail-relative-effort" class="p-stat-val tabular-num" style="color: var(--primary-text);">—</span>
+                </div>
+                <div class="p-stat-box">
+                  <span class="label-caps">VAM</span>
+                  <span id="detail-vam-mh" class="p-stat-val tabular-num">—</span>
+                </div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <span class="label-caps">ESFUERZO PERCIBIDO (RPE 1–10)</span>
+                <div id="detail-rpe-buttons" class="rpe-selector-row"></div>
+              </div>
+            </div>
+
+            <div class="glass-card" id="detail-cycling-card" style="display:none;">
+              <h3 class="headline-sm" style="margin:0;">Rendimiento en Ciclismo</h3>
+              <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;">
+                <div class="p-stat-box">
+                  <span class="label-caps">POTENCIA</span>
+                  <span id="detail-power-w" class="p-stat-val tabular-num">—</span>
+                </div>
+                <div class="p-stat-box">
+                  <span class="label-caps">GASTO</span>
+                  <span id="detail-energy-kj" class="p-stat-val tabular-num">—</span>
+                </div>
+                <div class="p-stat-box">
+                  <span class="label-caps">INTENSIDAD</span>
+                  <span id="detail-intensity-pct" class="p-stat-val tabular-num">—</span>
+                </div>
+              </div>
+              <div id="detail-intensity-band" class="intensity-band-pill">—</div>
             </div>
           </div>
 
-          <!-- Potencia, Energía y Banda de Intensidad (Ciclismo) -->
-          <div class="glass-card" id="detail-cycling-card" style="display:none;">
-            <h3 class="headline-sm" style="margin:0;">Rendimiento en Ciclismo</h3>
-            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;">
-              <div class="p-stat-box">
-                <span class="label-caps">POTENCIA</span>
-                <span id="detail-power-w" class="p-stat-val tabular-num">—</span>
-              </div>
-              <div class="p-stat-box">
-                <span class="label-caps">GASTO</span>
-                <span id="detail-energy-kj" class="p-stat-val tabular-num">—</span>
-              </div>
-              <div class="p-stat-box">
-                <span class="label-caps">INTENSIDAD</span>
-                <span id="detail-intensity-pct" class="p-stat-val tabular-num">—</span>
-              </div>
-            </div>
-            <div id="detail-intensity-band" class="intensity-band-pill">—</div>
-          </div>
-
-          <div class="glass-card" id="detail-splits-card" style="display:none;">
-            <h3 class="headline-sm" style="margin:0;">Splits por kilómetro</h3>
-            <div id="detail-splits-list" style="display:flex; flex-direction:column; gap:8px;"></div>
-          </div>
-
+          <!-- Zonas FC + Segmentos + Mejores Tiempos -->
           <div class="glass-card" id="detail-zones-card" style="display:none;">
             <h3 class="headline-sm" style="margin:0;">Zonas de Frecuencia Cardíaca (Z1–Z5)</h3>
             <div id="detail-zones-list" style="display:flex; flex-direction:column; gap:8px;"></div>
           </div>
+
+          <section id="detail-sec-segments" class="glass-card">
+            <h3 class="headline-sm" style="margin:0;">Segmentos detectados en esta ruta</h3>
+            <div id="detail-segments-list" style="display:flex; flex-direction:column; gap:8px;">
+              <p class="body-xs">Sin segmentos detectados en esta actividad.</p>
+            </div>
+          </section>
+
+          <section id="detail-sec-prs" class="glass-card">
+            <h3 class="headline-sm" style="margin:0;">Mejores tiempos</h3>
+            <div id="detail-prs-list" style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;">
+              <p class="body-xs" style="grid-column:1/-1;">Calculados en Entrenamiento / Summit.</p>
+            </div>
+          </section>
+
         </div>
       </div>
     </div>
@@ -1141,6 +1241,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=77"></script>
+  <script src="/app.js?v=78"></script>
 </body>
 </html>

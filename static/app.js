@@ -3513,6 +3513,144 @@ async function loadActivitiesFeed() {
   }
 }
 
+let _currentDetailActivity = null;
+let _detailStreamState = { pace: true, hr: true, cadence: false, temp: false };
+
+function _fmtDurationHMS(mins) {
+  const totalSec = Math.max(0, Math.round(Number(mins || 0) * 60));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function scrollDetailSection(secId, btnEl) {
+  document.querySelectorAll(".strava-detail-sidebar .detail-nav-item").forEach(b => b.classList.remove("active"));
+  if (btnEl) btnEl.classList.add("active");
+  const target = document.getElementById(secId);
+  if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function saveActivityNotes() {
+  if (!_currentDetailActivity) return;
+  const description = document.getElementById("detail-input-description")?.value ?? "";
+  const private_notes = document.getElementById("detail-input-notes")?.value ?? "";
+  try {
+    const res = await fetch(`/api/activities/${_currentDetailActivity.external_id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ description, private_notes })
+    });
+    if (res.ok) showSuccessBanner("Descripción y notas privadas guardadas.");
+  } catch (e) {}
+}
+
+async function saveActivityGear(gearIdVal) {
+  if (!_currentDetailActivity) return;
+  const gear_id = parseInt(gearIdVal || "0", 10);
+  try {
+    const res = await fetch(`/api/activities/${_currentDetailActivity.external_id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ gear_id })
+    });
+    if (res.ok) showSuccessBanner("Material asignado a la actividad.");
+  } catch (e) {}
+}
+
+function toggleDetailStream(key) {
+  _detailStreamState[key] = !_detailStreamState[key];
+  if (_currentDetailActivity) renderDetailStreamChart(_currentDetailActivity);
+}
+
+function renderDetailStreamChart(act) {
+  const chartCard = document.getElementById("detail-chart-card");
+  const chartSvg = document.getElementById("detail-chart-svg");
+  const togglesEl = document.getElementById("detail-stream-toggles");
+  if (!chartSvg || !togglesEl) return;
+
+  const cs = act.chart_series || {};
+  const elevs = (cs.elevation_m || []).filter(v => v !== null && v !== undefined);
+  const paces = (cs.pace_sec || []).filter(v => v !== null && v !== undefined && v > 120 && v < 1200);
+  const hrs = (cs.hr || []).filter(v => v !== null && v !== undefined);
+  const cads = (cs.cadence || []).filter(v => v !== null && v !== undefined);
+  const temps = (cs.temp_c || []).filter(v => v !== null && v !== undefined);
+
+  const avg = (arr) => arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+  const avgPaceSec = avg(paces);
+  const avgPaceStr = avgPaceSec ? `${Math.floor(avgPaceSec / 60)}:${String(Math.round(avgPaceSec % 60)).padStart(2, "0")} /km` : (act.avg_pace_str || "—");
+  const avgHrVal = avg(hrs) ? `${Math.round(avg(hrs))} ppm` : (act.avg_hr ? `${Math.round(act.avg_hr)} ppm` : "—");
+  const avgCadVal = avg(cads) ? `${Math.round(avg(cads))} ppm` : (act.avg_cadence ? `${act.avg_cadence} ppm` : "—");
+  const avgTempVal = avg(temps) !== null ? `${avg(temps).toFixed(1)} °C` : (act.avg_temp_c !== null && act.avg_temp_c !== undefined ? `${Number(act.avg_temp_c).toFixed(1)} °C` : "—");
+
+  const streamsMeta = [
+    { key: "pace", label: "Ritmo", avg: avgPaceStr, color: "#FC5200", data: cs.pace_sec || [], invert: true },
+    { key: "hr", label: "Frecuencia cardíaca", avg: avgHrVal, color: "#DC2626", data: cs.hr || [], invert: false },
+    { key: "cadence", label: "Cadencia", avg: avgCadVal, color: "#0077CC", data: cs.cadence || [], invert: false },
+    { key: "temp", label: "Temperatura", avg: avgTempVal, color: "#16A34A", data: cs.temp_c || [], invert: false }
+  ];
+
+  togglesEl.innerHTML = streamsMeta.map(s => {
+    const isOn = !!_detailStreamState[s.key];
+    return `
+      <div class="detail-toggle-row">
+        <div>
+          <span class="body-xs" style="display:flex; align-items:center; gap:5px; font-weight:700; color:var(--text-secondary);">
+            <span style="width:8px; height:8px; border-radius:50%; background:${s.color}; display:inline-block;"></span>
+            ${s.label}
+          </span>
+          <strong class="tabular-num" style="font-size:0.86rem; color:var(--on-surface);">${s.avg}</strong>
+        </div>
+        <button type="button" class="detail-toggle-btn ${isOn ? "on" : ""}" onclick="toggleDetailStream('${s.key}')">${isOn ? "Sí" : "No"}</button>
+      </div>
+    `;
+  }).join("");
+
+  if (!cs.dist_km || cs.dist_km.length < 4) {
+    if (chartCard) chartCard.style.display = "flex";
+    chartSvg.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center;" class="body-xs">Sin series temporales detalladas para esta actividad.</div>`;
+    return;
+  }
+
+  const W = 640, H = 170, pad = 10;
+  const buildPath = (rawArr, invert = false) => {
+    const pts = [];
+    const valid = rawArr.filter(v => v !== null && v !== undefined);
+    if (valid.length < 3) return "";
+    const mn = Math.min(...valid), mx = Math.max(...valid), rng = (mx - mn) || 1;
+    rawArr.forEach((v, i) => {
+      if (v === null || v === undefined) return;
+      const x = pad + (i / Math.max(1, rawArr.length - 1)) * (W - pad * 2);
+      const norm = (v - mn) / rng;
+      const y = invert ? (pad + norm * (H - pad * 2)) : (H - pad - norm * (H - pad * 2));
+      pts.push(`${pts.length === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`);
+    });
+    return pts.join(" ");
+  };
+
+  let elevArea = "";
+  const elevLine = buildPath(cs.elevation_m || [], false);
+  if (elevLine) {
+    elevArea = `${elevLine} L${(W - pad).toFixed(1)},${(H - pad).toFixed(1)} L${pad.toFixed(1)},${(H - pad).toFixed(1)} Z`;
+  }
+
+  const overlays = streamsMeta
+    .filter(s => _detailStreamState[s.key])
+    .map(s => {
+      const p = buildPath(s.data, s.invert);
+      return p ? `<path d="${p}" fill="none" stroke="${s.color}" stroke-width="2.2" stroke-linecap="round"/>` : "";
+    })
+    .join("");
+
+  chartSvg.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%; height:100%; background:#FAFAFC; border:1px solid #E5E5EA; border-radius:6px;">
+      ${elevArea ? `<path d="${elevArea}" fill="#E5E5EA" opacity="0.7"/>` : ""}
+      ${elevLine ? `<path d="${elevLine}" fill="none" stroke="#9CA3AF" stroke-width="1.5"/>` : ""}
+      ${overlays}
+    </svg>
+  `;
+}
+
 async function openActivityDetail(externalId) {
   const modal = document.getElementById("activity-detail-modal");
   if (!modal) return;
@@ -3523,27 +3661,64 @@ async function openActivityDetail(externalId) {
     const res = await fetch(`/api/activities/${externalId}`);
     if (!res.ok) return;
     const act = await res.json();
+    _currentDetailActivity = act;
 
     document.getElementById("detail-modal-sport").textContent = (act.sport_type || "GARMIN").toUpperCase();
     document.getElementById("detail-modal-date").textContent = act.start_date || "";
+    const dtHeader = document.getElementById("detail-header-datetime");
+    if (dtHeader) dtHeader.textContent = `${act.start_date || ""} • ${act.sport_type || ""}`;
     document.getElementById("detail-modal-title").textContent = act.name || "Actividad";
+
+    const descEl = document.getElementById("detail-input-description");
+    const notesEl = document.getElementById("detail-input-notes");
+    if (descEl) descEl.value = act.description || "";
+    if (notesEl) notesEl.value = act.private_notes || "";
+
     document.getElementById("detail-stat-dist").textContent = act.distance_km ? `${act.distance_km} km` : `${Math.round(act.duration_min || 0)} min`;
+    const movingEl = document.getElementById("detail-stat-moving");
+    if (movingEl) movingEl.textContent = _fmtDurationHMS(act.moving_duration_min || act.duration_min || 0);
     const isBici = act.sport_type === "Ciclismo";
     document.getElementById("detail-stat-pace").textContent = isBici && act.duration_min > 0
       ? `${((act.distance_km || 0) / (act.duration_min / 60)).toFixed(1)} km/h`
       : (act.avg_pace_str || "—");
     document.getElementById("detail-stat-elev").textContent = `+${Math.round(act.elevation_gain || 0)} m`;
+    const elapsedEl = document.getElementById("detail-stat-elapsed");
+    if (elapsedEl) elapsedEl.textContent = _fmtDurationHMS(act.elapsed_duration_min || act.duration_min || 0);
+    const calEl = document.getElementById("detail-stat-calories");
+    if (calEl) calEl.textContent = act.calories ? `${Math.round(act.calories)} kcal` : "—";
+    const devEl = document.getElementById("detail-device-name");
+    if (devEl) devEl.textContent = act.device_name || "Garmin Connect";
 
-    // Render full Leaflet map
+    // Populate gear dropdown
+    const gearSel = document.getElementById("detail-gear-select");
+    if (gearSel) {
+      try {
+        const gRes = await fetch("/api/gear");
+        if (gRes.ok) {
+          const gData = await gRes.json();
+          const opts = [`<option value="0">Sin asignar</option>`].concat(
+            (gData.gear || []).map(g => `<option value="${g.id}">${g.name}</option>`)
+          );
+          gearSel.innerHTML = opts.join("");
+          gearSel.value = String(act.gear_id || 0);
+        }
+      } catch (e) {}
+    }
+
+    // Render full Leaflet map + GPX button + Create Segment
     const mapCont = document.getElementById("detail-map-container");
-    const segBtnWrap = document.getElementById("detail-create-segment-wrap");
     const segBtn = document.getElementById("btn-create-segment-from-act");
+    const gpxBtn = document.getElementById("btn-download-gpx");
     if (_detailMapInstance) { _detailMapInstance.remove(); _detailMapInstance = null; }
     if (window.L && act.polyline && act.polyline.length > 2) {
       mapCont.style.display = "block";
-      if (segBtnWrap && segBtn) {
-        segBtnWrap.style.display = "flex";
+      if (segBtn) {
+        segBtn.style.display = "inline-flex";
         segBtn.onclick = () => createSegmentFromActivity(act.external_id, act.name);
+      }
+      if (gpxBtn) {
+        gpxBtn.style.display = "inline-flex";
+        gpxBtn.href = `/api/activities/${act.external_id}/gpx`;
       }
       setTimeout(() => {
         _detailMapInstance = L.map(mapCont);
@@ -3551,7 +3726,8 @@ async function openActivityDetail(externalId) {
       }, 60);
     } else {
       mapCont.style.display = "none";
-      if (segBtnWrap) segBtnWrap.style.display = "none";
+      if (segBtn) segBtn.style.display = "none";
+      if (gpxBtn) gpxBtn.style.display = "none";
     }
 
     // Render Relative Effort, VAM & Interactive RPE (1-10)
@@ -3583,54 +3759,31 @@ async function openActivityDetail(externalId) {
       }
     }
 
-    // Render Strava-style Splits Table
-    const splitsCard = document.getElementById("detail-splits-card");
+    // Render Strava-style Parciales Table (KM, Ritmo, Desn.) including fractional last split
     const splitsList = document.getElementById("detail-splits-list");
     if (act.splits && act.splits.length > 0) {
-      splitsCard.style.display = "flex";
       const minPace = Math.min(...act.splits.map(s => s.pace_sec));
       const maxPace = Math.max(...act.splits.map(s => s.pace_sec));
       splitsList.innerHTML = act.splits.map(s => {
         const ratio = maxPace > minPace ? 100 - ((s.pace_sec - minPace) / (maxPace - minPace)) * 45 : 85;
+        const elevTxt = s.elev_diff !== undefined && s.elev_diff !== null ? `${s.elev_diff >= 0 ? "+" : ""}${Math.round(s.elev_diff)} m` : "—";
         return `
-          <div class="split-row">
-            <span class="tabular-num" style="color:var(--text-muted); font-weight:700;">KM ${s.km}</span>
-            <span class="tabular-num" style="font-weight:800; color:var(--on-surface);">${s.pace_str}</span>
-            <div class="split-bar-track"><div class="split-bar-fill" style="width:${Math.round(ratio)}%;"></div></div>
-            <span class="tabular-num" style="color:#FC5200; font-size:0.74rem; text-align:right;">${s.avg_hr ? s.avg_hr + ' ppm' : ''}</span>
+          <div class="detail-split-row">
+            <span style="color:var(--text-secondary); font-weight:700;">${s.km} km</span>
+            <div class="detail-split-pace-wrap">
+              <span style="font-weight:800; color:var(--on-surface); min-width:58px;">${s.pace_str}</span>
+              <div class="split-bar-track" style="flex:1;"><div class="split-bar-fill" style="width:${Math.round(ratio)}%;"></div></div>
+            </div>
+            <span style="color:var(--text-secondary); text-align:right;">${elevTxt}</span>
           </div>
         `;
       }).join("");
     } else {
-      splitsCard.style.display = "none";
+      splitsList.innerHTML = `<p class="body-xs">Sin parciales disponibles para esta actividad.</p>`;
     }
 
-    // Render Synchronized Chart (Elevation + HR + Pace)
-    const chartCard = document.getElementById("detail-chart-card");
-    const chartSvg = document.getElementById("detail-chart-svg");
-    const cs = act.chart_series || {};
-    if (cs.dist_km && cs.dist_km.length > 5) {
-      chartCard.style.display = "flex";
-      const W = 360, H = 120, pad = 8;
-      const elevs = (cs.elevation_m || []).filter(v => v !== null);
-      const hrs = (cs.hr || []).filter(v => v !== null);
-      const buildPath = (arr) => {
-        const mn = Math.min(...arr), mx = Math.max(...arr), rng = (mx - mn) || 1;
-        return arr.map((v, i) => {
-          const x = pad + (i / (arr.length - 1)) * (W - pad * 2);
-          const y = H - pad - ((v - mn) / rng) * (H - pad * 2);
-          return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-        }).join(" ");
-      };
-      chartSvg.innerHTML = `
-        <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:100%;">
-          ${elevs.length > 2 ? `<path d="${buildPath(elevs)}" fill="none" stroke="#64748B" stroke-width="2"/>` : ""}
-          ${hrs.length > 2 ? `<path d="${buildPath(hrs)}" fill="none" stroke="#FC5200" stroke-width="2"/>` : ""}
-        </svg>
-      `;
-    } else {
-      chartCard.style.display = "none";
-    }
+    // Render Synchronized Chart + Toggles
+    renderDetailStreamChart(act);
 
     // Render HR Zones Z1-Z5
     const zonesCard = document.getElementById("detail-zones-card");
@@ -3648,6 +3801,37 @@ async function openActivityDetail(externalId) {
       `).join("");
     } else {
       zonesCard.style.display = "none";
+    }
+
+    // Render Detected Segments in this Activity
+    const segListEl = document.getElementById("detail-segments-list");
+    if (segListEl) {
+      const effs = act.segment_efforts || [];
+      segListEl.innerHTML = effs.length > 0
+        ? effs.map(se => `
+            <div class="segment-card-row" style="flex-direction:row; justify-content:space-between; align-items:center;">
+              <div>
+                <strong style="font-size:0.88rem;">${se.segment_name}</strong>
+                <span class="body-xs" style="display:block;">${((se.distance_m || 0) / 1000).toFixed(2)} km${se.vam_mh ? ` • ${se.vam_mh} m/h` : ""}</span>
+              </div>
+              <strong class="tabular-num" style="color:var(--primary-text);">${se.elapsed_str}</strong>
+            </div>
+          `).join("")
+        : `<p class="body-xs">Sin segmentos detectados en esta actividad.</p>`;
+    }
+
+    // Render PRs achieved in this activity (from _summitData)
+    const prsListEl = document.getElementById("detail-prs-list");
+    if (prsListEl && _summitData && Array.isArray(_summitData.personal_records)) {
+      const actPrs = _summitData.personal_records.filter(p => String(p.activity_id) === String(act.external_id));
+      prsListEl.innerHTML = actPrs.length > 0
+        ? actPrs.map(p => `
+            <div class="p-stat-box" style="text-align:left;">
+              <span class="label-caps" style="color:var(--primary-text);">${p.label}</span>
+              <span class="p-stat-val tabular-num">${p.best_value}</span>
+            </div>
+          `).join("")
+        : `<p class="body-xs" style="grid-column:1/-1;">Sin récords GPS asignados a esta sesión.</p>`;
     }
   } catch (e) {
     console.warn("Detail modal error:", e);

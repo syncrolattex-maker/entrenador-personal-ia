@@ -2445,6 +2445,62 @@ async def api_activity_detail(external_id: str):
     return detail
 
 
+class ActivityPatchPayload(BaseModel):
+    description: Optional[str] = None
+    private_notes: Optional[str] = None
+    gear_id: Optional[int] = None
+
+
+@app.patch("/api/activities/{external_id}")
+async def api_patch_activity(external_id: str, payload: ActivityPatchPayload):
+    updated = database.update_activity_metadata(
+        external_id,
+        description=payload.description,
+        private_notes=payload.private_notes,
+        gear_id=payload.gear_id,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Actividad no encontrada")
+    return {"status": "ok", "activity": updated}
+
+
+@app.get("/api/activities/{external_id}/gpx")
+async def api_export_activity_gpx(external_id: str):
+    from xml.sax.saxutils import escape
+    detail = database.get_activity_detail(external_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Actividad no encontrada")
+    poly = detail.get("polyline") or []
+    if not poly:
+        raise HTTPException(status_code=400, detail="La actividad no tiene polilínea GPS")
+
+    act_name = escape(str(detail.get("name") or "Actividad AaronFit"))
+    sport = escape(str(detail.get("sport_type") or "running"))
+    pts_xml = "\n".join(
+        f'      <trkpt lat="{float(pt[0]):.6f}" lon="{float(pt[1]):.6f}"></trkpt>'
+        for pt in poly if isinstance(pt, (list, tuple)) and len(pt) >= 2
+    )
+    gpx_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="AaronFit" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>{act_name}</name>
+  </metadata>
+  <trk>
+    <name>{act_name}</name>
+    <type>{sport}</type>
+    <trkseg>
+{pts_xml}
+    </trkseg>
+  </trk>
+</gpx>
+"""
+    return Response(
+        content=gpx_xml.encode("utf-8"),
+        media_type="application/gpx+xml",
+        headers={"Content-Disposition": f'attachment; filename="aaronfit_{external_id}.gpx"'},
+    )
+
+
 @app.get("/api/analytics/summit")
 async def api_summit_analytics():
     from datetime import date, datetime, timedelta

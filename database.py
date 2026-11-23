@@ -74,7 +74,15 @@ def init_db() -> None:
             avg_power_w REAL,
             energy_kj REAL,
             intensity_pct REAL,
-            vam_mh REAL
+            vam_mh REAL,
+            moving_duration_min REAL,
+            elapsed_duration_min REAL,
+            avg_cadence INTEGER,
+            avg_temp_c REAL,
+            device_name TEXT,
+            gear_id INTEGER,
+            description TEXT,
+            private_notes TEXT
         )
     """)
 
@@ -86,6 +94,14 @@ def init_db() -> None:
         ("energy_kj", "REAL"),
         ("intensity_pct", "REAL"),
         ("vam_mh", "REAL"),
+        ("moving_duration_min", "REAL"),
+        ("elapsed_duration_min", "REAL"),
+        ("avg_cadence", "INTEGER"),
+        ("avg_temp_c", "REAL"),
+        ("device_name", "TEXT"),
+        ("gear_id", "INTEGER"),
+        ("description", "TEXT"),
+        ("private_notes", "TEXT"),
     ]
     try:
         if is_pg:
@@ -449,8 +465,9 @@ def upsert_activities(activities: List[Dict[str, Any]]) -> int:
             INSERT INTO activities
             (external_id, source, sport_type, name, start_date, distance_km, duration_min,
              elevation_gain, avg_hr, max_hr, calories, avg_pace_str, aerobic_te, polyline_json,
-             relative_effort, rpe, avg_power_w, energy_kj, intensity_pct, vam_mh)
-            VALUES ({','.join([p]*20)})
+             relative_effort, rpe, avg_power_w, energy_kj, intensity_pct, vam_mh,
+             moving_duration_min, elapsed_duration_min, avg_cadence, avg_temp_c, device_name, gear_id, description, private_notes)
+            VALUES ({','.join([p]*28)})
             """,
             (
                 ext_id,
@@ -473,6 +490,14 @@ def upsert_activities(activities: List[Dict[str, Any]]) -> int:
                 phys["energy_kj"],
                 phys["intensity_pct"],
                 phys["vam_mh"],
+                a.get("moving_duration_min") or dur_min,
+                a.get("elapsed_duration_min") or dur_min,
+                a.get("cadencia_media") or a.get("avg_cadence"),
+                a.get("avg_temp_c"),
+                a.get("device_name") or "Garmin Connect",
+                a.get("gear_id"),
+                a.get("description") or "",
+                a.get("private_notes") or "",
             ),
         )
         if poly:
@@ -585,6 +610,23 @@ def get_activity_detail(external_id: str) -> Optional[Dict[str, Any]]:
 
     cur.execute(f"SELECT * FROM activity_streams WHERE activity_id = {p}", (str(external_id),))
     st_rows = _rows_to_dicts(cur, cur.fetchall())
+
+    cur.execute(
+        f"""
+        SELECT se.*, s.name AS segment_name, s.distance_m
+        FROM segment_efforts se
+        JOIN segments s ON s.id = se.segment_id
+        WHERE se.activity_id = {p}
+        ORDER BY se.elapsed_sec ASC
+        """,
+        (str(external_id),),
+    )
+    seg_efforts = _rows_to_dicts(cur, cur.fetchall())
+    for se in seg_efforts:
+        sec = int(round(float(se.get("elapsed_sec") or 0)))
+        se["elapsed_str"] = f"{sec // 60}:{sec % 60:02d}"
+    act["segment_efforts"] = seg_efforts
+
     conn.close()
 
     if st_rows:
@@ -749,6 +791,38 @@ def recalculate_gear_and_prs() -> None:
 
     conn.commit()
     conn.close()
+
+
+def update_activity_metadata(
+    external_id: str,
+    description: Optional[str] = None,
+    private_notes: Optional[str] = None,
+    gear_id: Optional[int] = None,
+) -> Optional[Dict[str, Any]]:
+    """Updates editable Strava-style activity metadata (description, private_notes, gear_id)."""
+    init_db()
+    conn = _get_conn()
+    cur = conn.cursor()
+    p = _ph(conn)
+
+    sets = []
+    vals: List[Any] = []
+    if description is not None:
+        sets.append(f"description = {p}")
+        vals.append(description)
+    if private_notes is not None:
+        sets.append(f"private_notes = {p}")
+        vals.append(private_notes)
+    if gear_id is not None:
+        sets.append(f"gear_id = {p}")
+        vals.append(int(gear_id) if gear_id > 0 else None)
+
+    if sets:
+        vals.append(str(external_id))
+        cur.execute(f"UPDATE activities SET {', '.join(sets)} WHERE external_id = {p}", tuple(vals))
+        conn.commit()
+    conn.close()
+    return get_activity_detail(external_id)
 
 
 def update_activity_rpe(external_id: str, rpe: int) -> Optional[Dict[str, Any]]:

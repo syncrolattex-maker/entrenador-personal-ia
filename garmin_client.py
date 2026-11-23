@@ -260,7 +260,12 @@ def get_garmin_history(limit: int = 30) -> List[dict]:
             "ritmo_medio": ritmo_str,
             "efecto_aerobico": act.get("aerobicTrainingEffect"),
             "efecto_anaerobico": act.get("anaerobicTrainingEffect"),
-            "cadencia_media": act.get("averageRunningCadenceInStepsPerMinute"),
+            "cadencia_media": round(act.get("averageRunningCadenceInStepsPerMinute")) if act.get("averageRunningCadenceInStepsPerMinute") else None,
+            "avg_cadence": round(act.get("averageRunningCadenceInStepsPerMinute")) if act.get("averageRunningCadenceInStepsPerMinute") else None,
+            "moving_duration_min": round((act.get("movingDuration") or duration_sec or 0) / 60.0, 2),
+            "elapsed_duration_min": round((act.get("elapsedDuration") or duration_sec or 0) / 60.0, 2),
+            "avg_temp_c": act.get("averageTemperature"),
+            "device_name": act.get("deviceName") or "Garmin Connect",
             "avg_power_w": act.get("avgPower") or act.get("averagePower"),
             "fuente": "Garmin Connect",
         })
@@ -604,9 +609,11 @@ def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
     idx_hr = desc.get("directHeartRate")
     idx_elev = desc.get("directElevation")
     idx_spd = desc.get("directSpeed")
+    idx_cad = desc.get("directRunCadence")
+    idx_temp = desc.get("directAirTemperature")
 
     rows = data.get("activityDetailMetrics") or []
-    chart_dist, chart_elev, chart_hr, chart_pace, chart_time = [], [], [], [], []
+    chart_dist, chart_elev, chart_hr, chart_pace, chart_time, chart_cad, chart_temp = [], [], [], [], [], [], []
     hr_counts = [0, 0, 0, 0, 0]  # Z1..Z5
 
     # Splits accumulator per 1000m
@@ -617,6 +624,9 @@ def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
     split_elev_start = None
     prev_elev = None
     total_elev_gain = 0.0
+    last_d_m = 0.0
+    last_t_s = 0.0
+    last_el = None
 
     for row in rows:
         m = row.get("metrics") or []
@@ -625,6 +635,15 @@ def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
         hr = m[idx_hr] if idx_hr is not None and idx_hr < len(m) else None
         el = m[idx_elev] if idx_elev is not None and idx_elev < len(m) else None
         spd = m[idx_spd] if idx_spd is not None and idx_spd < len(m) else None
+        cad = m[idx_cad] if idx_cad is not None and idx_cad < len(m) else None
+        temp = m[idx_temp] if idx_temp is not None and idx_temp < len(m) else None
+
+        if d_m is not None:
+            last_d_m = float(d_m)
+        if t_s is not None:
+            last_t_s = float(t_s)
+        if el is not None:
+            last_el = el
 
         if el is not None:
             if prev_elev is not None and el > prev_elev:
@@ -648,6 +667,8 @@ def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
             pace_s = round(1000.0 / spd) if (spd and spd > 0.4) else None
             chart_pace.append(pace_s)
             chart_time.append(round(t_s, 1) if t_s is not None else None)
+            chart_cad.append(round(cad) if cad is not None else None)
+            chart_temp.append(round(temp, 1) if temp is not None else None)
 
             if t_s is not None and d_m >= current_km * 1000.0:
                 seg_t = max(1.0, t_s - split_start_t)
@@ -666,6 +687,24 @@ def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
                 split_start_t = t_s
                 split_hrs = []
                 split_elev_start = el
+
+    # Last fractional split if > 50 m remains after last full km
+    rem_m = last_d_m - (current_km - 1) * 1000.0
+    if rem_m > 50.0 and last_t_s > split_start_t:
+        seg_t = max(1.0, last_t_s - split_start_t)
+        pace_per_km = seg_t / (rem_m / 1000.0)
+        pace_min = int(pace_per_km // 60)
+        pace_sec = int(pace_per_km % 60)
+        avg_hr = round(sum(split_hrs) / len(split_hrs)) if split_hrs else None
+        elev_diff = round((last_el - split_elev_start), 1) if (last_el is not None and split_elev_start is not None) else 0
+        splits.append({
+            "km": round(rem_m / 1000.0, 2),
+            "pace_sec": round(pace_per_km),
+            "pace_str": f"{pace_min}:{pace_sec:02d} /km",
+            "avg_hr": avg_hr,
+            "elev_diff": elev_diff,
+            "is_partial": True,
+        })
 
     total_hr_samples = sum(hr_counts) or 1
     zone_names = [
@@ -696,5 +735,7 @@ def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
             "hr": chart_hr,
             "pace_sec": chart_pace,
             "time_sec": chart_time,
+            "cadence": chart_cad,
+            "temp_c": chart_temp,
         },
     }
