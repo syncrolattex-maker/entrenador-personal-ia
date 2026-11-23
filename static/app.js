@@ -3246,6 +3246,8 @@ function renderPersonalRecords(prs) {
 
 const VOYAGER_TILE_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
 const OSM_FALLBACK_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+const ARCGIS_FALLBACK_TILE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}";
+let _feedMapInstances = [];
 
 function renderStravaLeafletRoute(map, polyline) {
   const voyagerLayer = L.tileLayer(VOYAGER_TILE_URL, {
@@ -3254,20 +3256,35 @@ function renderStravaLeafletRoute(map, polyline) {
     maxZoom: 19
   });
 
-  let fallbackAdded = false;
+  let fallbackStage = 0;
   voyagerLayer.on("tileerror", () => {
-    if (fallbackAdded) return;
-    fallbackAdded = true;
+    if (fallbackStage >= 1) return;
+    fallbackStage = 1;
     map.removeLayer(voyagerLayer);
-    L.tileLayer(OSM_FALLBACK_TILE_URL, {
+    const osmLayer = L.tileLayer(OSM_FALLBACK_TILE_URL, {
       attribution: "&copy; OpenStreetMap",
       maxZoom: 19
-    }).addTo(map);
+    });
+    osmLayer.on("tileerror", () => {
+      if (fallbackStage >= 2) return;
+      fallbackStage = 2;
+      map.removeLayer(osmLayer);
+      L.tileLayer(ARCGIS_FALLBACK_TILE_URL, {
+        attribution: "&copy; Esri",
+        maxZoom: 19
+      }).addTo(map);
+    });
+    osmLayer.addTo(map);
   });
 
   voyagerLayer.addTo(map);
   const route = L.polyline(polyline, { color: "#FC5200", weight: 3.5, opacity: 0.95 }).addTo(map);
-  map.fitBounds(route.getBounds(), { padding: [16, 16] });
+  const bounds = route.getBounds();
+  map.fitBounds(bounds, { padding: [16, 16] });
+  requestAnimationFrame(() => {
+    map.invalidateSize();
+    map.fitBounds(bounds, { padding: [16, 16] });
+  });
   return route;
 }
 
@@ -3389,6 +3406,8 @@ async function loadActivitiesFeed() {
     if (listEl) listEl.innerHTML = listHtml;
 
     // Render interactive Leaflet Voyager maps for activities with GPS polylines
+    _feedMapInstances.forEach(m => { try { m.remove(); } catch (e) {} });
+    _feedMapInstances = [];
     if (window.L && feedEl) {
       acts.forEach((a, idx) => {
         if (Array.isArray(a.polyline) && a.polyline.length > 2) {
@@ -3396,6 +3415,7 @@ async function loadActivitiesFeed() {
           if (!mapEl) return;
           const m = L.map(mapEl, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false });
           renderStravaLeafletRoute(m, a.polyline);
+          _feedMapInstances.push(m);
         }
       });
     }

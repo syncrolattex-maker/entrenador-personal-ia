@@ -1,4 +1,4 @@
-const CACHE_NAME = "aaronfit-cache-v74";
+const CACHE_NAME = "aaronfit-cache-v75";
 const ASSETS = [
   "/",
   "/index.html",
@@ -9,46 +9,34 @@ const ASSETS = [
 
 // Install Event
 self.addEventListener("install", (e) => {
-  self.skipWaiting(); // activate immediately
+  self.skipWaiting();
   e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log("[Service Worker] Caching all static assets v48 for Verofit");
-      return cache.addAll(ASSETS);
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
   );
 });
 
 // Activate Event
 self.addEventListener("activate", (e) => {
   e.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            console.log("[Service Worker] Removing old cache", key);
-            return caches.delete(key);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    caches.keys().then((keys) =>
+      Promise.all(keys.map((key) => (key !== CACHE_NAME ? caches.delete(key) : null)))
+    ).then(() => self.clients.claim())
   );
 });
 
-// Fetch Event
+// Fetch Event: Network-First for app shell so UI/map updates apply immediately
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
-  // Only intercept static assets listed in ASSETS or the root path
   const isAsset = ASSETS.some(asset => url.pathname === asset || url.pathname === "/");
-  
-  if (!isAsset) {
-    // Let all API calls and external requests pass directly to the network
-    return;
-  }
+  if (!isAsset) return;
 
   e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
-      return cachedResponse || fetch(e.request);
-    })
+    fetch(e.request)
+      .then((networkResp) => {
+        const clone = networkResp.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+        return networkResp;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
-
