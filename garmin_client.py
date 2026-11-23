@@ -241,6 +241,7 @@ def get_garmin_history(limit: int = 30) -> List[dict]:
             "nombre": act.get("activityName") or mapped_type,
             "duracion_min": duracion_min,
             "distancia_km": distancia_km if distancia_km > 0 else None,
+            "desnivel_m": round(act.get("elevationGain") or 0),
             "frecuencia_cardiaca_media": round(avg_hr) if avg_hr else None,
             "frecuencia_cardiaca_max": round(max_hr) if max_hr else None,
             "calorias": round(calories) if calories else None,
@@ -549,4 +550,136 @@ def send_workout_to_garmin_watch(workout: Dict[str, Any]) -> Dict[str, Any]:
         "status": "needs_garmin_login",
         "method": "garmin_oauth_required",
         "message": "Para enviar sesiones automáticamente al reloj Garmin, vincula tu email y contraseña en Perfil → Garmin Connect (la clave GCDC_ es de solo lectura).",
+    }
+
+
+def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
+    """
+    Fetches GPS polyline and time-series metrics from Garmin Personal API for an activity,
+    and derives 1km splits, HR Zones (Z1-Z5), and chart series (Elevation, Pace, HR).
+    """
+    bearer = _get_personal_api_token()
+    if not bearer:
+        return {"polyline": [], "splits": [], "hr_zones": [], "chart_series": {}}
+
+    try:
+        r = requests.get(
+            f"{PERSONAL_API_BASE}/activity-service/activity/{activity_id}/details",
+            params={"maxChartSize": 180, "maxPolylineSize": 400},
+            headers={"Authorization": f"Bearer {bearer}"},
+            timeout=12,
+        )
+        if r.status_code != 200:
+            return {"polyline": [], "splits": [], "hr_zones": [], "chart_series": {}}
+        data = r.json()
+    except Exception as e:
+        print(f"[Garmin Details] Error fetching {activity_id}: {e}")
+        return {"polyline": [], "splits": [], "hr_zones": [], "chart_series": {}}
+
+    # 1. Polyline [lat, lon]
+    raw_poly = (data.get("geoPolylineDTO") or {}).get("polyline") or []
+    polyline = [
+        [pt["lat"], pt["lon"]]
+        for pt in raw_poly
+        if pt.get("lat") is not None and pt.get("lon") is not None
+    ]
+
+    # 2. Metric descriptors map
+    desc = {d["key"]: d["metricsIndex"] for d in data.get("metricDescriptors", []) if "key" in d}
+    idx_dist = desc.get("sumDistance")
+    idx_time = desc.get("sumElapsedDuration")
+    idx_hr = desc.get("directHeartRate")
+    idx_elev = desc.get("directElevation")
+    idx_spd = desc.get("directSpeed")
+
+    rows = data.get("activityDetailMetrics") or []
+    chart_dist, chart_elev, chart_hr, chart_pace = [], [], [], []
+    hr_counts = [0, 0, 0, 0, 0]  # Z1..Z5
+
+    # Splits accumulator per 1000m
+    splits = []
+    current_km = 1
+    split_start_t = 0.0
+    split_hrs = []
+    split_elev_start = None
+    prev_elev = None
+    total_elev_gain = 0.0
+
+    for row in rows:
+        m = row.get("metrics") or []
+        d_m = m[idx_dist] if idx_dist is not None and idx_dist < len(m) else None
+        t_s = m[idx_time] if idx_time is not None and idx_time < len(m) else None
+        hr = m[idx_hr] if idx_hr is not None and idx_hr < len(m) else None
+        el = m[idx_elev] if idx_elev is not None and idx_elev < len(m) else None
+        spd = m[idx_spd] if idx_spd is not None and idx_spd < len(m) else None
+
+        if el is not None:
+            if prev_elev is not None and el > prev_elev:
+                total_elev_gain += (el - prev_elev)
+            prev_elev = el
+            if split_elev_start is None:
+                split_elev_start = el
+
+        if hr is not None and hr > 40:
+            if hr < 125: hr_counts[0] += 1
+            elif hr < 145: hr_counts[1] += 1
+            elif hr < 160: hr_counts[2] += 1
+            elif hr < 175: hr_counts[3] += 1
+            else: hr_counts[4] += 1
+            split_hrs.append(hr)
+
+        if d_m is not None:
+            chart_dist.append(round(d_m / 1000.0, 2))
+            chart_elev.append(round(el, 1) if el is not None else None)
+            chart_hr.append(round(hr) if hr is not None else None)
+            pace_s = round(1000.0 / spd) if (spd and spd > 0.4) else None
+            chart_pace.append(pace_s)
+
+            if t_s is not None and d_m >= current_km * 1000.0:
+                seg_t = max(1.0, t_s - split_start_t)
+                pace_min = int(seg_t // 60)
+                pace_sec = int(seg_t % 60)
+                avg_hr = round(sum(split_hrs) / len(split_hrs)) if split_hrs else None
+                elev_diff = round((el - split_elev_start), 1) if (el is not None and split_elev_start is not None) else 0
+                splits.append({
+                    "km": current_km,
+                    "pace_sec": round(seg_t),
+                    "pace_str": f"{pace_min}:{pace_sec:02d} /km",
+                    "avg_hr": avg_hr,
+                    "elev_diff": elev_diff,
+                })
+                current_km += 1
+                split_start_t = t_s
+                split_hrs = []
+                split_elev_start = el
+
+    total_hr_samples = sum(hr_counts) or 1
+    zone_names = [
+        ("Z1 Recuperación", "<125 ppm", "#64748B"),
+        ("Z2 Aeróbica", "125–145 ppm", "#00AEEF"),
+        ("Z3 Tempo", "145–160 ppm", "#00E676"),
+        ("Z4 Umbral", "160–175 ppm", "#FF9800"),
+        ("Z5 Máxima", ">175 ppm", "#FF1744"),
+    ]
+    hr_zones = [
+        {
+            "zone": zone_names[i][0],
+            "range": zone_names[i][1],
+            "color": zone_names[i][2],
+            "pct": round((hr_counts[i] / total_hr_samples) * 100),
+        }
+        for i in range(5)
+    ]
+
+    return {
+        "polyline": polyline,
+        "splits": splits,
+        "hr_zones": hr_zones,
+        "elevation_gain": round(total_elev_gain),
+        "chart_series": {
+            "dist_km": chart_dist,
+            "elevation_m": chart_elev,
+            "hr": chart_hr,
+            "pace_sec": chart_pace,
+        },
     }

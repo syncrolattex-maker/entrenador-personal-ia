@@ -8,6 +8,8 @@ coverage/
 !.env.example
 .garmin_tokens/
 *.garth
+*.db
+data/
 
 # Python
 .venv/

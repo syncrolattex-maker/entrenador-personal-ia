@@ -176,6 +176,9 @@ document.addEventListener("DOMContentLoaded", () => {
   initApp();
   checkGarminStatus();
   loadWeeklyPlanAndRaceGoal();
+  loadSummitAnalytics();
+  loadActivitiesFeed();
+  loadGearList();
 
   // Selection events
   elBtnSelectFuerza.addEventListener("click", () => iniciarGeneracionEntrenamiento("Fuerza"));
@@ -3034,6 +3037,344 @@ async function clearRaceGoal() {
     if (data.plan) renderWeeklyPlan(data.plan);
     toggleRaceGoalForm();
     showSuccessBanner("📈 Plan en modo Tendencia Ascendente Continua.");
+  } catch (e) {}
+}
+
+// ============================================================
+// FASE 2 & 3: STRAVA ACTIVITY FEED, LEAFLET MAPS & SUMMIT ANALYTICS
+// ============================================================
+let _summitData = null;
+let _detailMapInstance = null;
+
+async function loadSummitAnalytics() {
+  try {
+    const res = await fetch("/api/analytics/summit");
+    if (!res.ok) return;
+    _summitData = await res.json();
+    renderTrainingLogBubbles("Todo");
+    renderFitnessFreshnessChart(_summitData.fitness_curve || []);
+    renderPersonalRecords(_summitData.personal_records || []);
+  } catch (e) {
+    console.warn("Summit analytics load failed:", e);
+  }
+}
+
+function filterTrainingLog(sport, btnEl) {
+  document.querySelectorAll("#training-log-filters .strava-chip-btn").forEach(b => {
+    b.classList.remove("active");
+    b.style.background = "";
+    b.style.color = "";
+  });
+  if (btnEl) {
+    btnEl.classList.add("active");
+    btnEl.style.background = "#FC5200";
+    btnEl.style.color = "#FFF";
+  }
+  renderTrainingLogBubbles(sport);
+}
+
+function renderTrainingLogBubbles(sportFilter) {
+  const grid = document.getElementById("summit-bubble-grid");
+  if (!grid || !_summitData || !_summitData.training_log) return;
+
+  const days = _summitData.training_log;
+  // Group into 12 columns (weeks) of 7 days
+  let html = "";
+  for (let w = 0; w < 12; w++) {
+    html += `<div class="summit-week-col">`;
+    for (let d = 0; d < 7; d++) {
+      const item = days[w * 7 + d];
+      if (!item) { html += `<div class="summit-bubble-cell"></div>`; continue; }
+      const filtered = sportFilter === "Todo"
+        ? item.entries
+        : item.entries.filter(e => e.sport_type === sportFilter);
+      const totalMin = filtered.reduce((s, e) => s + (e.min || 0), 0);
+      const mainSport = filtered[0]?.sport_type || "";
+      const color = mainSport === "Carrera" ? "#00E676" : mainSport === "Ciclismo" ? "#00AEEF" : mainSport === "Fuerza" ? "#FC5200" : "transparent";
+      const size = totalMin > 0 ? Math.min(20, Math.max(7, Math.round(totalMin / 5))) : 0;
+
+      html += `<div class="summit-bubble-cell" title="${item.date}: ${totalMin} min">
+        ${size > 0 ? `<div class="summit-bubble-dot" style="width:${size}px; height:${size}px; background:${color}; box-shadow:0 0 8px ${color}55;"></div>` : ""}
+      </div>`;
+    }
+    html += `</div>`;
+  }
+  grid.innerHTML = html;
+}
+
+function renderFitnessFreshnessChart(curve) {
+  const wrap = document.getElementById("summit-fitness-svg-wrap");
+  if (!wrap || curve.length === 0) return;
+
+  const W = 360, H = 120, pad = 10;
+  const allVals = curve.flatMap(p => [p.ctl, p.atl, p.tsb]);
+  const minV = Math.min(...allVals, -15);
+  const maxV = Math.max(...allVals, 35);
+  const range = (maxV - minV) || 1;
+
+  const toPath = (key) => curve.map((pt, i) => {
+    const x = pad + (i / (curve.length - 1)) * (W - pad * 2);
+    const y = H - pad - ((pt[key] - minV) / range) * (H - pad * 2);
+    return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+
+  const zeroY = H - pad - ((0 - minV) / range) * (H - pad * 2);
+  const last = curve[curve.length - 1];
+
+  wrap.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:100%;">
+      <line x1="${pad}" y1="${zeroY.toFixed(1)}" x2="${W - pad}" y2="${zeroY.toFixed(1)}" stroke="rgba(255,255,255,0.12)" stroke-dasharray="3 3"/>
+      <path d="${toPath('atl')}" fill="none" stroke="#FC5200" stroke-width="1.8" opacity="0.85"/>
+      <path d="${toPath('ctl')}" fill="none" stroke="#00AEEF" stroke-width="2.2"/>
+      <path d="${toPath('tsb')}" fill="none" stroke="#00E676" stroke-width="1.6" stroke-dasharray="2 2"/>
+    </svg>
+  `;
+  const legend = document.getElementById("fitness-legend");
+  if (legend && last) {
+    legend.innerHTML = `<span style="color:#00AEEF;">CTL ${last.ctl}</span> • <span style="color:#FC5200;">ATL ${last.atl}</span> • <span style="color:#00E676;">TSB ${last.tsb}</span>`;
+  }
+}
+
+function renderPersonalRecords(prs) {
+  const grid = document.getElementById("summit-prs-grid");
+  if (!grid) return;
+  if (!prs || prs.length === 0) {
+    grid.innerHTML = `<p class="body-sm-muted" style="grid-column:1/-1;">Sincroniza tus carreras y salidas en bici para calcular tus récords.</p>`;
+    return;
+  }
+  grid.innerHTML = prs.map(pr => `
+    <div class="p-stat-box" style="text-align:left; cursor:pointer;" onclick="openActivityDetail('${pr.activity_id}')">
+      <span class="label-caps" style="color:#00AEEF; font-size:0.65rem;">🏆 ${pr.label}</span>
+      <span class="p-stat-val" style="color:#FFF; font-size:1.05rem;">${pr.best_value}</span>
+      <span class="body-xs" style="color:var(--text-muted);">${pr.achieved_date || ""}</span>
+    </div>
+  `).join("");
+}
+
+async function loadActivitiesFeed() {
+  const listEl = document.getElementById("metrics-history-list");
+  if (!listEl) return;
+  // Clean skeleton loader
+  listEl.innerHTML = `<div class="skeleton-shimmer" style="height:90px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:90px;"></div>`;
+
+  try {
+    const res = await fetch("/api/activities?limit=25");
+    if (!res.ok) return;
+    const data = await res.json();
+    const acts = data.activities || [];
+    if (acts.length === 0) return;
+
+    let html = "";
+    acts.forEach((a, idx) => {
+      const isFuerza = a.sport_type === "Fuerza";
+      const isBici = a.sport_type === "Ciclismo";
+      const badgeColor = isFuerza ? "#FC5200" : isBici ? "#00AEEF" : "#00E676";
+      const paceOrSpeed = isBici && a.duration_min > 0
+        ? `${((a.distance_km || 0) / (a.duration_min / 60)).toFixed(1)} km/h`
+        : (a.avg_pace_str || `${Math.round(a.duration_min || 0)} min`);
+      const hasPoly = Array.isArray(a.polyline) && a.polyline.length > 2;
+
+      html += `
+        <div class="history-card-item" onclick="openActivityDetail('${a.external_id}')" style="cursor:pointer; border-left: 3px solid ${badgeColor};">
+          <div class="history-card-header">
+            <span class="label-caps">${a.start_date}</span>
+            <span class="pill-tag" style="background:${badgeColor}22; color:${badgeColor};">${a.sport_type}</span>
+          </div>
+          <div class="history-title-row">
+            <span class="headline-sm">${a.name}</span>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:6px;">
+            <div><span class="body-xs" style="color:var(--text-muted); display:block;">DISTANCIA</span><strong>${a.distance_km ? a.distance_km + ' km' : Math.round(a.duration_min) + ' min'}</strong></div>
+            <div><span class="body-xs" style="color:var(--text-muted); display:block;">${isBici ? 'VELOCIDAD' : 'RITMO'}</span><strong>${paceOrSpeed}</strong></div>
+            <div><span class="body-xs" style="color:var(--text-muted); display:block;">DESNIVEL</span><strong>+${Math.round(a.elevation_gain || 0)} m</strong></div>
+          </div>
+          ${hasPoly ? `<div id="minimap-${idx}" class="activity-minimap"></div>` : ""}
+        </div>
+      `;
+    });
+    listEl.innerHTML = html;
+
+    // Render interactive Leaflet minimaps for activities with GPS polylines
+    if (window.L) {
+      acts.forEach((a, idx) => {
+        if (Array.isArray(a.polyline) && a.polyline.length > 2) {
+          const mapEl = document.getElementById(`minimap-${idx}`);
+          if (!mapEl) return;
+          const m = L.map(mapEl, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false });
+          L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { maxZoom: 18 }).addTo(m);
+          const color = a.sport_type === "Ciclismo" ? "#00AEEF" : "#FC5200";
+          const line = L.polyline(a.polyline, { color, weight: 3 }).addTo(m);
+          m.fitBounds(line.getBounds(), { padding: [8, 8] });
+        }
+      });
+    }
+  } catch (e) {
+    console.warn("Activities feed load error:", e);
+  }
+}
+
+async function openActivityDetail(externalId) {
+  const modal = document.getElementById("activity-detail-modal");
+  if (!modal) return;
+  modal.style.display = "flex";
+  if (window.lucide) lucide.createIcons();
+
+  try {
+    const res = await fetch(`/api/activities/${externalId}`);
+    if (!res.ok) return;
+    const act = await res.json();
+
+    document.getElementById("detail-modal-sport").textContent = (act.sport_type || "GARMIN").toUpperCase();
+    document.getElementById("detail-modal-date").textContent = act.start_date || "";
+    document.getElementById("detail-modal-title").textContent = act.name || "Actividad";
+    document.getElementById("detail-stat-dist").textContent = act.distance_km ? `${act.distance_km} km` : `${Math.round(act.duration_min || 0)} min`;
+    const isBici = act.sport_type === "Ciclismo";
+    document.getElementById("detail-stat-pace").textContent = isBici && act.duration_min > 0
+      ? `${((act.distance_km || 0) / (act.duration_min / 60)).toFixed(1)} km/h`
+      : (act.avg_pace_str || "—");
+    document.getElementById("detail-stat-elev").textContent = `+${Math.round(act.elevation_gain || 0)} m`;
+
+    // Render full Leaflet map
+    const mapCont = document.getElementById("detail-map-container");
+    if (_detailMapInstance) { _detailMapInstance.remove(); _detailMapInstance = null; }
+    if (window.L && act.polyline && act.polyline.length > 2) {
+      mapCont.style.display = "block";
+      setTimeout(() => {
+        _detailMapInstance = L.map(mapCont);
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { maxZoom: 18 }).addTo(_detailMapInstance);
+        const line = L.polyline(act.polyline, { color: "#FC5200", weight: 4 }).addTo(_detailMapInstance);
+        _detailMapInstance.fitBounds(line.getBounds(), { padding: [16, 16] });
+      }, 60);
+    } else {
+      mapCont.style.display = "none";
+    }
+
+    // Render Strava-style Splits Table
+    const splitsCard = document.getElementById("detail-splits-card");
+    const splitsList = document.getElementById("detail-splits-list");
+    if (act.splits && act.splits.length > 0) {
+      splitsCard.style.display = "flex";
+      const minPace = Math.min(...act.splits.map(s => s.pace_sec));
+      const maxPace = Math.max(...act.splits.map(s => s.pace_sec));
+      splitsList.innerHTML = act.splits.map(s => {
+        const ratio = maxPace > minPace ? 100 - ((s.pace_sec - minPace) / (maxPace - minPace)) * 45 : 85;
+        return `
+          <div class="split-row">
+            <span style="color:var(--text-muted); font-weight:700;">KM ${s.km}</span>
+            <span style="font-weight:800; color:#FFF;">${s.pace_str}</span>
+            <div class="split-bar-track"><div class="split-bar-fill" style="width:${Math.round(ratio)}%;"></div></div>
+            <span style="color:#FC5200; font-size:0.74rem; text-align:right;">${s.avg_hr ? s.avg_hr + ' ppm' : ''}</span>
+          </div>
+        `;
+      }).join("");
+    } else {
+      splitsCard.style.display = "none";
+    }
+
+    // Render Synchronized Chart (Elevation + HR + Pace)
+    const chartCard = document.getElementById("detail-chart-card");
+    const chartSvg = document.getElementById("detail-chart-svg");
+    const cs = act.chart_series || {};
+    if (cs.dist_km && cs.dist_km.length > 5) {
+      chartCard.style.display = "flex";
+      const W = 360, H = 120, pad = 8;
+      const elevs = (cs.elevation_m || []).filter(v => v !== null);
+      const hrs = (cs.hr || []).filter(v => v !== null);
+      const buildPath = (arr) => {
+        const mn = Math.min(...arr), mx = Math.max(...arr), rng = (mx - mn) || 1;
+        return arr.map((v, i) => {
+          const x = pad + (i / (arr.length - 1)) * (W - pad * 2);
+          const y = H - pad - ((v - mn) / rng) * (H - pad * 2);
+          return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+        }).join(" ");
+      };
+      chartSvg.innerHTML = `
+        <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:100%;">
+          ${elevs.length > 2 ? `<path d="${buildPath(elevs)}" fill="none" stroke="#64748B" stroke-width="2"/>` : ""}
+          ${hrs.length > 2 ? `<path d="${buildPath(hrs)}" fill="none" stroke="#FC5200" stroke-width="2"/>` : ""}
+        </svg>
+      `;
+    } else {
+      chartCard.style.display = "none";
+    }
+
+    // Render HR Zones Z1-Z5
+    const zonesCard = document.getElementById("detail-zones-card");
+    const zonesList = document.getElementById("detail-zones-list");
+    if (act.hr_zones && act.hr_zones.length > 0) {
+      zonesCard.style.display = "flex";
+      zonesList.innerHTML = act.hr_zones.map(z => `
+        <div style="display:flex; flex-direction:column; gap:3px;">
+          <div style="display:flex; justify-content:space-between; font-size:0.75rem;">
+            <span style="color:#FFF; font-weight:700;">${z.zone} <small style="color:var(--text-muted);">(${z.range})</small></span>
+            <span style="color:${z.color}; font-weight:800;">${z.pct}%</span>
+          </div>
+          <div class="split-bar-track"><div style="height:100%; width:${z.pct}%; background:${z.color}; border-radius:999px;"></div></div>
+        </div>
+      `).join("");
+    } else {
+      zonesCard.style.display = "none";
+    }
+  } catch (e) {
+    console.warn("Detail modal error:", e);
+  }
+}
+
+function closeActivityDetailModal() {
+  const modal = document.getElementById("activity-detail-modal");
+  if (modal) modal.style.display = "none";
+  if (_detailMapInstance) { _detailMapInstance.remove(); _detailMapInstance = null; }
+}
+
+// ============================================================
+// FASE 4: GEAR TRACKER (ZAPATILLAS & BICI)
+// ============================================================
+async function loadGearList() {
+  const cont = document.getElementById("gear-list-container");
+  if (!cont) return;
+  try {
+    const res = await fetch("/api/gear");
+    if (!res.ok) return;
+    const data = await res.json();
+    const list = data.gear || [];
+    cont.innerHTML = list.map(g => {
+      const pct = Math.min(100, Math.round((g.total_km / (g.alert_km || 650)) * 100));
+      const warn = g.total_km >= (g.alert_km || 650) * 0.9;
+      return `
+        <div style="background:var(--surface-dim); border:1px solid ${warn ? '#FC5200' : 'var(--border-glass)'}; border-radius:10px; padding:10px 12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <strong style="font-size:0.88rem; color:#FFF;">${g.gear_type === 'shoes' ? '👟' : '🚴'} ${g.name}</strong>
+            <span class="label-caps" style="color:${warn ? '#FC5200' : '#00E676'}; font-size:0.75rem;">${g.total_km} / ${g.alert_km} km</span>
+          </div>
+          <div class="progress-bar-wrap" style="margin-top:6px;">
+            <div class="progress-fill ${warn ? 'lime' : 'cyan'}" style="width:${pct}%; background:${warn ? '#FC5200' : '#00AEEF'};"></div>
+          </div>
+          ${warn ? `<span class="body-xs" style="color:#FC5200; margin-top:4px; display:block;">⚠️ Cerca del límite de desgaste recomendado</span>` : ""}
+        </div>
+      `;
+    }).join("");
+  } catch (e) {}
+}
+
+function toggleGearForm() {
+  const f = document.getElementById("gear-add-form");
+  if (f) f.style.display = f.style.display === "none" ? "flex" : "none";
+}
+
+async function saveNewGear() {
+  const name = document.getElementById("gear-input-name")?.value.trim();
+  const type = document.getElementById("gear-input-type")?.value || "shoes";
+  const alertKm = parseFloat(document.getElementById("gear-input-alert")?.value || "650");
+  if (!name) return;
+  try {
+    await fetch("/api/gear", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, gear_type: type, brand: "", initial_km: 0, alert_km: alertKm })
+    });
+    toggleGearForm();
+    await loadGearList();
+    showSuccessBanner("✅ Material añadido al Gear Tracker.");
   } catch (e) {}
 }
 

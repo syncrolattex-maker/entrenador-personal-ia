@@ -7,15 +7,17 @@
   
   <!-- PWA Metadata -->
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#F8FAFC">
+  <meta name="theme-color" content="#090C10">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="AaronFit">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
   
-  <!-- Stylesheet -->
-  <link rel="stylesheet" href="/style.css?v=59">
+  <!-- Stylesheet & Leaflet Maps -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="/style.css?v=70">
 
   <!-- Icons & Kinetic Fonts (Hanken Grotesk & JetBrains Mono) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -216,6 +218,17 @@
               <i data-lucide="chevron-right" class="arrow-icon"></i>
             </button>
 
+            <button id="btn-select-bici" class="selection-btn" onclick="enviarTextoChat('Hoy quiero salir en bici en ruta, adapta mi plan semanal y la fatiga')">
+              <div class="btn-icon-wrap" style="background:rgba(0,230,118,0.14); color:#00E676; border:1px solid rgba(0,230,118,0.3);">
+                <i data-lucide="bike" style="width: 22px; height: 22px;"></i>
+              </div>
+              <div class="btn-text-wrap">
+                <span class="btn-main-title">Salir en Bici</span>
+                <span class="btn-sub-info">Ciclismo en Ruta • Carga Multideporte</span>
+              </div>
+              <i data-lucide="chevron-right" class="arrow-icon"></i>
+            </button>
+
             <button id="btn-select-descanso" class="selection-btn">
               <div class="btn-icon-wrap rest-glow">
                 <i data-lucide="coffee" style="width: 22px; height: 22px;"></i>
@@ -325,6 +338,36 @@
             <div id="metric-fuerza-bar" class="progress-fill lime" style="width: 0%;"></div>
           </div>
           <span id="metric-fuerza-sub" class="label-caps" style="color: var(--text-muted); margin-top: 4px;">OPCIONAL: 1–2 SESIONES CORTAS/SEM</span>
+        </div>
+
+        <!-- FASE 3: ANALÍTICA "SUMMIT" GRATIS -->
+        <!-- 1. Training Log (Calendario de burbujas 12 semanas) -->
+        <div class="glass-card" id="summit-training-log-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <span class="label-caps" style="color:#FC5200;">TRAINING LOG (12 SEMANAS)</span>
+            <div style="display:flex; gap:4px;" id="training-log-filters">
+              <button type="button" class="strava-chip-btn active" onclick="filterTrainingLog('Todo', this)" style="padding:3px 9px; font-size:0.68rem;">Todo</button>
+              <button type="button" class="strava-chip-btn" onclick="filterTrainingLog('Carrera', this)" style="padding:3px 9px; font-size:0.68rem;">Carrera</button>
+              <button type="button" class="strava-chip-btn" onclick="filterTrainingLog('Ciclismo', this)" style="padding:3px 9px; font-size:0.68rem;">Bici</button>
+              <button type="button" class="strava-chip-btn" onclick="filterTrainingLog('Fuerza', this)" style="padding:3px 9px; font-size:0.68rem;">Fuerza</button>
+            </div>
+          </div>
+          <div id="summit-bubble-grid" class="summit-bubble-grid"></div>
+        </div>
+
+        <!-- 2. Fitness & Freshness (Curva 90 días CTL / ATL / TSB) -->
+        <div class="glass-card" id="summit-fitness-card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span class="label-caps" style="color:#00E676;">FITNESS & FRESHNESS (90 DÍAS)</span>
+            <span id="fitness-legend" class="body-xs" style="color:var(--text-secondary);">CTL • ATL • TSB</span>
+          </div>
+          <div id="summit-fitness-svg-wrap" style="width:100%; height:130px;"></div>
+        </div>
+
+        <!-- 3. Mejores Esfuerzos (PRs) -->
+        <div class="glass-card" id="summit-prs-card">
+          <span class="label-caps" style="color:#00AEEF;">MEJORES ESFUERZOS (PRs)</span>
+          <div id="summit-prs-grid" style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;"></div>
         </div>
 
         <!-- Real Activity Timeline List from Garmin Connect -->
@@ -450,6 +493,30 @@
             <button type="button" id="btn-garmin-login" class="btn btn-primary" style="background:#00AEEF; color:#000; border:none;" onclick="connectGarminAccount()">
               Activar Envío al Reloj Garmin
             </button>
+          </div>
+        </div>
+
+        <!-- Gestor de Material (Gear Tracker) -->
+        <div class="glass-card" id="gear-tracker-card" style="margin-bottom: 16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <span class="label-caps" style="color:#FC5200;">MATERIAL & DESGASTE (GEAR)</span>
+              <h3 class="headline-sm" style="margin-top:2px;">Zapatillas y Bici</h3>
+            </div>
+            <button type="button" class="strava-chip-btn" style="font-size:0.7rem; padding:4px 10px;" onclick="toggleGearForm()">+ Añadir</button>
+          </div>
+          <div id="gear-list-container" style="display:flex; flex-direction:column; gap:10px;"></div>
+
+          <div id="gear-add-form" style="display:none; flex-direction:column; gap:8px; padding-top:8px; border-top:1px solid var(--border-glass);">
+            <input type="text" id="gear-input-name" placeholder="Nombre (ej. Pegasus 41 o Cadena Bici)" style="width:100%; padding:8px 10px; border-radius:8px; background:var(--surface-container-high); border:1px solid var(--border-glass); color:#FFF;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+              <select id="gear-input-type" style="width:100%; padding:8px 10px; border-radius:8px; background:var(--surface-container-high); border:1px solid var(--border-glass); color:#FFF;">
+                <option value="shoes">Zapatillas</option>
+                <option value="bike">Bici / Componente</option>
+              </select>
+              <input type="number" id="gear-input-alert" value="650" placeholder="Alerta km" style="width:100%; padding:8px 10px; border-radius:8px; background:var(--surface-container-high); border:1px solid var(--border-glass); color:#FFF;">
+            </div>
+            <button type="button" class="btn btn-primary" style="padding:9px; font-size:0.85rem;" onclick="saveNewGear()">Guardar Material</button>
           </div>
         </div>
 
@@ -776,6 +843,48 @@
           <i data-lucide="save" style="width:20px;height:20px;"></i>
           Guardar Sesión
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== ACTIVITY DETAIL MODAL (FASE 2 STRAVA STYLE) ===================== -->
+  <div id="activity-detail-modal" class="guided-overlay" style="display: none; z-index: 35000;">
+    <div class="guided-header">
+      <button onclick="closeActivityDetailModal()" class="guided-close-btn" aria-label="Cerrar detalle">
+        <i data-lucide="x" style="width:22px;height:22px;"></i>
+      </button>
+      <span id="detail-modal-sport" class="label-caps" style="color:#FC5200;">ACTIVIDAD GARMIN</span>
+      <span id="detail-modal-date" class="label-caps" style="color:var(--text-muted);">—</span>
+    </div>
+
+    <div style="width:100%; max-width:440px; margin:12px auto; display:flex; flex-direction:column; gap:14px; padding-bottom:32px;">
+      <h2 id="detail-modal-title" class="headline-md" style="margin:0;">—</h2>
+
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;">
+        <div class="p-stat-box"><span class="label-caps">DISTANCIA</span><span id="detail-stat-dist" class="p-stat-val cyan">—</span></div>
+        <div class="p-stat-box"><span class="label-caps">RITMO / VEL</span><span id="detail-stat-pace" class="p-stat-val lime">—</span></div>
+        <div class="p-stat-box"><span class="label-caps">DESNIVEL</span><span id="detail-stat-elev" class="p-stat-val" style="color:#FC5200;">—</span></div>
+      </div>
+
+      <!-- Leaflet Interactive Route Map -->
+      <div id="detail-map-container" style="width:100%; height:220px; border-radius:14px; overflow:hidden; border:1px solid var(--border-glass); background:#0D1117;"></div>
+
+      <!-- Splits Table (Strava Horizontal Bars) -->
+      <div class="glass-card" id="detail-splits-card" style="display:none;">
+        <span class="label-caps" style="color:#00E676;">SPLITS POR KILÓMETRO</span>
+        <div id="detail-splits-list" style="display:flex; flex-direction:column; gap:6px;"></div>
+      </div>
+
+      <!-- Synchronized Elevation + Pace + HR SVG Chart -->
+      <div class="glass-card" id="detail-chart-card" style="display:none;">
+        <span class="label-caps" style="color:#00AEEF;">ELEVACIÓN + RITMO + FC</span>
+        <div id="detail-chart-svg" style="width:100%; height:130px;"></div>
+      </div>
+
+      <!-- Heart Rate Zones Z1-Z5 -->
+      <div class="glass-card" id="detail-zones-card" style="display:none;">
+        <span class="label-caps" style="color:#FC5200;">ZONAS DE FRECUENCIA CARDÍACA (Z1–Z5)</span>
+        <div id="detail-zones-list" style="display:flex; flex-direction:column; gap:8px;"></div>
       </div>
     </div>
   </div>

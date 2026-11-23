@@ -13,6 +13,7 @@ from google import genai
 from google.genai import types
 import garmin_client
 import fit_encoder
+import database
 
 load_dotenv()
 
@@ -2084,6 +2085,24 @@ async def garmin_sync():
     if not garmin_client.is_garmin_connected():
         raise HTTPException(status_code=401, detail="Garmin Connect no está vinculado todavía.")
     activities = garmin_client.get_garmin_history(limit=30)
+    if activities:
+        database.upsert_activities(activities)
+        # Pre-cache GPS polylines & splits for latest 5 activities
+        for act in activities[:5]:
+            eid = str(act.get("id") or "")
+            if eid:
+                existing = database.get_activity_detail(eid)
+                if not existing or not existing.get("polyline"):
+                    det = garmin_client.get_garmin_activity_details(eid)
+                    if det.get("polyline") or det.get("splits"):
+                        database.save_activity_stream(
+                            eid,
+                            det.get("polyline"),
+                            det.get("splits", []),
+                            det.get("hr_zones", []),
+                            det.get("chart_series", {}),
+                            det.get("elevation_gain", 0),
+                        )
     wellness = garmin_client.get_garmin_wellness()
     profile = garmin_client.get_garmin_athlete_profile()
     return {
@@ -2412,6 +2431,141 @@ async def get_plan_semanal():
     history = await get_intervals_history()
     plan = _construir_plan_semanal(history, state_data.get("carrera_objetivo"))
     return plan
+
+
+# ============================================================
+# FASE 1-4: ACTIVITIES FEED, DETAIL STREAMS, SUMMIT ANALYTICS & GEAR
+# ============================================================
+@app.get("/api/activities")
+async def api_list_activities(limit: int = 30):
+    acts = database.get_all_activities(limit=limit)
+    if not acts and garmin_client.is_garmin_connected():
+        fresh = garmin_client.get_garmin_history(limit=limit)
+        if fresh:
+            database.upsert_activities(fresh)
+            # Fetch polylines for top 5 so minimaps render immediately
+            for a in fresh[:5]:
+                eid = str(a.get("id") or "")
+                if eid:
+                    det = garmin_client.get_garmin_activity_details(eid)
+                    if det.get("polyline") or det.get("splits"):
+                        database.save_activity_stream(
+                            eid,
+                            det.get("polyline"),
+                            det.get("splits", []),
+                            det.get("hr_zones", []),
+                            det.get("chart_series", {}),
+                            det.get("elevation_gain", 0),
+                        )
+            acts = database.get_all_activities(limit=limit)
+    return {"status": "ok", "activities": acts}
+
+
+@app.get("/api/activities/{external_id}")
+async def api_activity_detail(external_id: str):
+    detail = database.get_activity_detail(external_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Actividad no encontrada")
+    if (not detail.get("splits") and not detail.get("polyline")) and garmin_client.is_garmin_connected():
+        det = garmin_client.get_garmin_activity_details(external_id)
+        if det.get("polyline") or det.get("splits"):
+            database.save_activity_stream(
+                external_id,
+                det.get("polyline"),
+                det.get("splits", []),
+                det.get("hr_zones", []),
+                det.get("chart_series", {}),
+                det.get("elevation_gain", 0),
+            )
+            detail = database.get_activity_detail(external_id)
+    return detail
+
+
+@app.get("/api/analytics/summit")
+async def api_summit_analytics():
+    from datetime import date, datetime, timedelta
+    acts = database.get_all_activities(limit=100)
+    if not acts and garmin_client.is_garmin_connected():
+        fresh = garmin_client.get_garmin_history(limit=30)
+        if fresh:
+            database.upsert_activities(fresh)
+            acts = database.get_all_activities(limit=100)
+
+    today = date.today()
+    # 1. Training Log (last 84 days = 12 weeks)
+    start_84 = today - timedelta(days=83)
+    daily_load: dict = {}
+    for a in acts:
+        d_str = (a.get("start_date") or "")[:10]
+        if not d_str:
+            continue
+        daily_load.setdefault(d_str, []).append({
+            "sport_type": a.get("sport_type", "Carrera"),
+            "km": float(a.get("distance_km") or 0),
+            "min": float(a.get("duration_min") or 0),
+            "name": a.get("name", ""),
+        })
+
+    training_log = []
+    for i in range(84):
+        d = start_84 + timedelta(days=i)
+        ds = d.isoformat()
+        entries = daily_load.get(ds, [])
+        training_log.append({
+            "date": ds,
+            "weekday": d.weekday(),
+            "entries": entries,
+            "total_km": round(sum(e["km"] for e in entries), 1),
+            "total_min": round(sum(e["min"] for e in entries)),
+        })
+
+    # 2. Fitness & Freshness 90-day curve (Banister EWMA CTL/ATL/TSB)
+    ctl, atl = 18.0, 18.0
+    fitness_curve = []
+    start_90 = today - timedelta(days=89)
+    for i in range(90):
+        d = start_90 + timedelta(days=i)
+        ds = d.isoformat()
+        entries = daily_load.get(ds, [])
+        # Approximate TSS from duration & intensity
+        day_tss = sum(e["min"] * (1.25 if e["sport_type"] == "Carrera" else 0.9 if e["sport_type"] == "Ciclismo" else 0.7) for e in entries)
+        ctl = ctl + (day_tss - ctl) / 42.0
+        atl = atl + (day_tss - atl) / 7.0
+        tsb = ctl - atl
+        fitness_curve.append({
+            "date": ds,
+            "ctl": round(ctl, 1),
+            "atl": round(atl, 1),
+            "tsb": round(tsb, 1),
+        })
+
+    prs = database.get_personal_records()
+    return {
+        "training_log": training_log,
+        "fitness_curve": fitness_curve,
+        "personal_records": prs,
+    }
+
+
+class GearCreatePayload(BaseModel):
+    name: str
+    gear_type: str = "shoes"
+    brand: str = ""
+    initial_km: float = 0.0
+    alert_km: float = 650.0
+
+
+@app.get("/api/gear")
+async def api_get_gear():
+    return {"gear": database.get_gear_list()}
+
+
+@app.post("/api/gear")
+async def api_add_gear(payload: GearCreatePayload):
+    gear = database.add_or_update_gear(
+        payload.name, payload.gear_type, payload.brand, payload.initial_km, payload.alert_km
+    )
+    return {"status": "ok", "gear": gear}
 
 
 # Create static folder if it doesn't exist
