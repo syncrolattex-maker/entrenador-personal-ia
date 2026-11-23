@@ -1215,7 +1215,7 @@ body {
   background: #FC5200;
   color: #FFFFFF;
   border: none;
-  box-shadow: 0 4px 12px rgba(252, 82, 0, 0.28);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1896,3 +1896,76 @@ body {
   color: var(--primary-text);
   background: #FFF7F3;
 }
+
+
+/* ==========================================================================
+   FIGMA SPORT-UI-DESIGN (COMMUNITY) TOKENS & COMPONENTS
+   ========================================================================== */
+.figma-hero-dark {
+  background: #191919;
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.figma-hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.figma-hero-sync {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.figma-coral-strip {
+  width: 100%;
+  background: #C23B00;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.figma-coral-strip:active {
+  transform: scale(0.985);
+}
+
+.figma-strip-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* 4 Pastel Category Tiles from sport-ui-design */
+.figma-tile-green    { background: #D5EDAD; color: #191919; border-radius: 12px; }
+.figma-tile-amber    { background: #FCD076; color: #191919; border-radius: 12px; }
+.figma-tile-lavender { background: #BC99FA; color: #191919; border-radius: 12px; }
+.figma-tile-coral    { background: #FFB4AC; color: #191919; border-radius: 12px; }
+
+/* Profile 3 Pastel Stat Tiles */
+.figma-stat-green    { background: #EEF8DF; border-color: #D5EDAD; }
+.figma-stat-amber    { background: #FFF6DD; border-color: #FCD076; }
+.figma-stat-lavender { background: #F2ECFF; border-color: #BC99FA; }

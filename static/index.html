@@ -17,7 +17,7 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=73">
+  <link rel="stylesheet" href="/style.css?v=74">
 
   <!-- Icons & Fonts (Hanken Grotesk & JetBrains Mono) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -68,9 +68,28 @@
       <!-- ================================================================= -->
       <section id="tab-dashboard" class="tab-view active">
 
-        <div class="greeting-header mobile-only-header">
-          <h1 class="greeting-title">Hola, Aarón</h1>
-          <p class="body-sm-muted">43 años • 1,83 m • 93 kg • Pesas 5 kg & Cintas</p>
+        <div class="greeting-header mobile-only-header figma-hero-dark">
+          <div class="figma-hero-top">
+            <div>
+              <h1 class="greeting-title" style="color:#FFFFFF;">Hola, Aarón</h1>
+              <p class="body-sm-muted" style="color:#D1D5DB;">43 años • 1,83 m • 93 kg • Pesas 5 kg & Cintas</p>
+            </div>
+            <button type="button" class="figma-hero-sync" onclick="syncGarminNow()" aria-label="Sincronizar Garmin">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            </button>
+          </div>
+          <button type="button" class="figma-coral-strip" onclick="switchTab('tab-metrics')">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span class="figma-strip-badge">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              </span>
+              <div style="text-align:left;">
+                <strong style="display:block; font-size:0.9rem; color:#FFFFFF;">Historial y Summit</strong>
+                <span style="display:block; font-size:0.75rem; color:#FFF2EB;">Ver progreso semanal, curva CTL/ATL y segmentos</span>
+              </div>
+            </div>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
         </div>
 
         <!-- Offline Banner -->
@@ -143,7 +162,7 @@
 
               <div class="selection-grid">
                 <button id="btn-select-fuerza" class="selection-btn">
-                  <div class="btn-icon-wrap orange-tint">
+                  <div class="btn-icon-wrap figma-tile-green">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/></svg>
                   </div>
                   <div class="btn-text-wrap">
@@ -154,7 +173,7 @@
                 </button>
 
                 <button id="btn-select-carrera" class="selection-btn">
-                  <div class="btn-icon-wrap blue-tint">
+                  <div class="btn-icon-wrap figma-tile-amber">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 4v6l3.5 3.5"/><circle cx="12" cy="12" r="9"/></svg>
                   </div>
                   <div class="btn-text-wrap">
@@ -165,7 +184,7 @@
                 </button>
 
                 <button id="btn-select-bici" class="selection-btn" onclick="enviarTextoChat('Hoy quiero salir en bici en ruta, adapta mi plan semanal y la fatiga')">
-                  <div class="btn-icon-wrap green-tint">
+                  <div class="btn-icon-wrap figma-tile-lavender">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>
                   </div>
                   <div class="btn-text-wrap">
@@ -176,7 +195,7 @@
                 </button>
 
                 <button id="btn-select-descanso" class="selection-btn">
-                  <div class="btn-icon-wrap rest-tint">
+                  <div class="btn-icon-wrap figma-tile-coral">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>
                   </div>
                   <div class="btn-text-wrap">
@@ -563,15 +582,15 @@
             <p class="label-caps" style="color: var(--text-muted); margin-top: 2px;">43 AÑOS • 1,83 M • 93 KG • PESAS 5 KG & CINTAS</p>
 
             <div class="profile-stats-grid">
-              <div class="p-stat-box">
+              <div class="p-stat-box figma-stat-green">
                 <span class="label-caps">ESTATURA</span>
                 <span class="p-stat-val tabular-num">1,83 M</span>
               </div>
-              <div class="p-stat-box">
+              <div class="p-stat-box figma-stat-amber">
                 <span class="label-caps">PESO</span>
                 <span class="p-stat-val tabular-num">93 KG</span>
               </div>
-              <div class="p-stat-box">
+              <div class="p-stat-box figma-stat-lavender">
                 <span class="label-caps">EDAD</span>
                 <span class="p-stat-val tabular-num">43 AÑOS</span>
               </div>
@@ -1068,6 +1087,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=73"></script>
+  <script src="/app.js?v=74"></script>
 </body>
 </html>
