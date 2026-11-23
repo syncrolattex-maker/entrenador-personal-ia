@@ -1661,7 +1661,7 @@ function showDone() {
     ${guided.tipo === "Fuerza" && workedMusclesList ? `
       <div style="background: rgba(252,82,0,0.1); border: 1px solid rgba(252,82,0,0.3); border-radius: var(--rounded-md); padding: 10px 14px; margin-top: 14px; max-width: 340px; text-align: center;">
         <span class="label-caps" style="color: #FC5200; font-size: 0.72rem;">MÚSCULOS ENTRENADOS:</span>
-        <div class="body-sm" style="color: #FFF; font-weight: 700; margin-top: 4px;">${workedMusclesList}</div>
+        <div class="body-sm" style="color: var(--on-surface); font-weight: 700; margin-top: 4px;">${workedMusclesList}</div>
       </div>
     ` : ""}
   `;
@@ -2168,8 +2168,8 @@ function switchTab(tabId) {
   const targetTab = document.getElementById(tabId);
   if (targetTab) targetTab.classList.add("active");
   
-  const activeBtn = document.querySelector(`.nav-tab-btn[data-target="${tabId}"]`);
-  if (activeBtn) activeBtn.classList.add("active");
+  const activeBtns = document.querySelectorAll(`.nav-tab-btn[data-target="${tabId}"]`);
+  activeBtns.forEach(b => b.classList.add("active"));
   
   if (window.lucide) lucide.createIcons();
 
@@ -2631,7 +2631,7 @@ function openExerciseVideoModal(arg1, arg2, arg3) {
     imgEl.style.transition = "opacity 0.25s ease-in-out";
     if (videoEl) videoEl.style.display = "none";
     if (canvasEl) canvasEl.style.display = "none";
-    imgEl.style.background = "#0D1117";
+    imgEl.style.background = "#F7F7FA";
     imgEl.style.padding = "0";
     imgEl.style.objectFit = "contain";
 
@@ -2975,20 +2975,20 @@ function renderWeeklyPlan(plan) {
     plan.dias.forEach(d => {
       const isFuerza = d.tipo === "Fuerza";
       const isCarrera = d.tipo === "Carrera" || d.tipo === "Carrera Objetivo";
-      const accent = isCarrera ? "#00E676" : isFuerza ? "#FC5200" : "var(--text-muted)";
-      const todayBorder = d.es_hoy ? `border: 1.5px solid ${accent}; background: rgba(255,255,255,0.04);` : "border: 1px solid var(--border-glass); background: var(--surface-dim);";
-      const clickable = (isFuerza || isCarrera) ? `onclick="iniciarGeneracionEntrenamiento('${isFuerza ? 'Fuerza' : 'Carrera'}')" style="cursor:pointer; ${todayBorder} border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; gap:4px;"` : `style="${todayBorder} border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; gap:4px;"`;
+      const accent = isCarrera ? "#16A34A" : isFuerza ? "#FC5200" : "var(--text-muted)";
+      const todayBorder = d.es_hoy ? `border: 1.5px solid ${accent}; background: #FFF7F3;` : "border: 1px solid var(--border-glass); background: var(--surface-dim);";
+      const clickable = (isFuerza || isCarrera) ? `onclick="iniciarGeneracionEntrenamiento('${isFuerza ? 'Fuerza' : 'Carrera'}')" style="cursor:pointer; ${todayBorder} border-radius:8px; padding:10px 12px; display:flex; flex-direction:column; gap:4px;"` : `style="${todayBorder} border-radius:8px; padding:10px 12px; display:flex; flex-direction:column; gap:4px;"`;
 
       html += `
         <div ${clickable}>
           <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
             <div style="display:flex; align-items:center; gap:6px;">
               <span class="label-caps" style="color:${accent}; font-size:0.72rem;">${d.dia}${d.es_hoy ? " • HOY" : ""}</span>
-              ${d.opcional ? `<span class="label-caps" style="background:rgba(252,82,0,0.16); color:#FF8A50; padding:2px 6px; border-radius:4px; font-size:0.62rem;">OPCIONAL</span>` : ""}
+              ${d.opcional ? `<span class="label-caps" style="background:rgba(252,82,0,0.12); color:#FC5200; padding:2px 6px; border-radius:4px; font-size:0.62rem;">OPCIONAL</span>` : ""}
             </div>
-            ${d.completado ? `<span class="label-caps" style="color:#00AEEF; font-size:0.68rem;">✓ Garmin</span>` : (d.duracion_min > 0 ? `<span class="body-xs" style="color:var(--text-muted);">${d.duracion_min} min</span>` : "")}
+            ${d.completado ? `<span class="label-caps" style="color:#0077CC; font-size:0.68rem;">✓ Garmin</span>` : (d.duracion_min > 0 ? `<span class="body-xs tabular-num" style="color:var(--text-muted);">${d.duracion_min} min</span>` : "")}
           </div>
-          <div style="font-weight:700; font-size:0.9rem; color:#F8FAFC;">${d.titulo}</div>
+          <div style="font-weight:700; font-size:0.9rem; color: var(--on-surface);">${d.titulo}</div>
           <div style="font-size:0.76rem; color:var(--text-secondary);">${d.detalle}</div>
         </div>
       `;
@@ -3090,11 +3090,11 @@ function renderTrainingLogBubbles(sportFilter) {
         : item.entries.filter(e => e.sport_type === sportFilter);
       const totalMin = filtered.reduce((s, e) => s + (e.min || 0), 0);
       const mainSport = filtered[0]?.sport_type || "";
-      const color = mainSport === "Carrera" ? "#00E676" : mainSport === "Ciclismo" ? "#00AEEF" : mainSport === "Fuerza" ? "#FC5200" : "transparent";
+      const color = mainSport === "Carrera" ? "#16A34A" : mainSport === "Ciclismo" ? "#0077CC" : mainSport === "Fuerza" ? "#FC5200" : "transparent";
       const size = totalMin > 0 ? Math.min(20, Math.max(7, Math.round(totalMin / 5))) : 0;
 
       html += `<div class="summit-bubble-cell" title="${item.date}: ${totalMin} min">
-        ${size > 0 ? `<div class="summit-bubble-dot" style="width:${size}px; height:${size}px; background:${color}; box-shadow:0 0 8px ${color}55;"></div>` : ""}
+        ${size > 0 ? `<div class="summit-bubble-dot" style="width:${size}px; height:${size}px; background:${color};"></div>` : ""}
       </div>`;
     }
     html += `</div>`;
@@ -3123,15 +3123,15 @@ function renderFitnessFreshnessChart(curve) {
 
   wrap.innerHTML = `
     <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:100%;">
-      <line x1="${pad}" y1="${zeroY.toFixed(1)}" x2="${W - pad}" y2="${zeroY.toFixed(1)}" stroke="rgba(255,255,255,0.12)" stroke-dasharray="3 3"/>
-      <path d="${toPath('atl')}" fill="none" stroke="#FC5200" stroke-width="1.8" opacity="0.85"/>
-      <path d="${toPath('ctl')}" fill="none" stroke="#00AEEF" stroke-width="2.2"/>
-      <path d="${toPath('tsb')}" fill="none" stroke="#00E676" stroke-width="1.6" stroke-dasharray="2 2"/>
+      <line x1="${pad}" y1="${zeroY.toFixed(1)}" x2="${W - pad}" y2="${zeroY.toFixed(1)}" stroke="#E5E5EA" stroke-dasharray="3 3"/>
+      <path d="${toPath('atl')}" fill="none" stroke="#FC5200" stroke-width="1.8" opacity="0.9"/>
+      <path d="${toPath('ctl')}" fill="none" stroke="#0077CC" stroke-width="2.2"/>
+      <path d="${toPath('tsb')}" fill="none" stroke="#16A34A" stroke-width="1.6" stroke-dasharray="2 2"/>
     </svg>
   `;
   const legend = document.getElementById("fitness-legend");
   if (legend && last) {
-    legend.innerHTML = `<span style="color:#00AEEF;">CTL ${last.ctl}</span> • <span style="color:#FC5200;">ATL ${last.atl}</span> • <span style="color:#00E676;">TSB ${last.tsb}</span>`;
+    legend.innerHTML = `<span style="color:#0077CC;">CTL ${last.ctl}</span> • <span style="color:#FC5200;">ATL ${last.atl}</span> • <span style="color:#16A34A;">TSB ${last.tsb}</span>`;
   }
 }
 
@@ -3144,67 +3144,133 @@ function renderPersonalRecords(prs) {
   }
   grid.innerHTML = prs.map(pr => `
     <div class="p-stat-box" style="text-align:left; cursor:pointer;" onclick="openActivityDetail('${pr.activity_id}')">
-      <span class="label-caps" style="color:#00AEEF; font-size:0.65rem;">🏆 ${pr.label}</span>
-      <span class="p-stat-val" style="color:#FFF; font-size:1.05rem;">${pr.best_value}</span>
-      <span class="body-xs" style="color:var(--text-muted);">${pr.achieved_date || ""}</span>
+      <span class="label-caps" style="color: var(--primary); font-size:0.65rem;">🏆 ${pr.label}</span>
+      <span class="p-stat-val tabular-num" style="color: var(--on-surface); font-size:1.05rem;">${pr.best_value}</span>
+      <span class="body-xs tabular-num" style="color:var(--text-muted);">${pr.achieved_date || ""}</span>
     </div>
   `).join("");
 }
 
+const VOYAGER_TILE_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+
 async function loadActivitiesFeed() {
+  const feedEl = document.getElementById("dashboard-activities-feed");
   const listEl = document.getElementById("metrics-history-list");
-  if (!listEl) return;
-  // Clean skeleton loader
-  listEl.innerHTML = `<div class="skeleton-shimmer" style="height:90px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:90px;"></div>`;
+  if (!feedEl && !listEl) return;
+
+  const skel = `<div class="skeleton-shimmer" style="height:120px; margin-bottom:12px;"></div><div class="skeleton-shimmer" style="height:120px;"></div>`;
+  if (feedEl) feedEl.innerHTML = skel;
+  if (listEl) listEl.innerHTML = skel;
 
   try {
     const res = await fetch("/api/activities?limit=25");
     if (!res.ok) return;
     const data = await res.json();
     const acts = data.activities || [];
-    if (acts.length === 0) return;
 
-    let html = "";
+    // Update Desktop Weekly Summary (Left Column Profile Card)
+    const monday = getMondayOfCurrentWeek();
+    let weekRunKm = 0, weekBikeKm = 0, weekStrengthCount = 0;
+    acts.forEach(a => {
+      if (!a.start_date) return;
+      const dt = new Date(a.start_date);
+      if (dt >= monday) {
+        if (a.sport_type === "Carrera") weekRunKm += Number(a.distance_km || 0);
+        else if (a.sport_type === "Ciclismo") weekBikeKm += Number(a.distance_km || 0);
+        else if (a.sport_type === "Fuerza") weekStrengthCount++;
+      }
+    });
+    const elWeekRun = document.getElementById("desktop-week-run-km");
+    const elWeekBike = document.getElementById("desktop-week-bike-km");
+    const elWeekStr = document.getElementById("desktop-week-strength-count");
+    if (elWeekRun) elWeekRun.textContent = `${weekRunKm.toFixed(1)} km`;
+    if (elWeekBike) elWeekBike.textContent = `${weekBikeKm.toFixed(1)} km`;
+    if (elWeekStr) elWeekStr.textContent = `${weekStrengthCount} ses`;
+
+    if (acts.length === 0) {
+      const emptyMsg = `<div class="glass-card"><p class="body-sm-muted" style="text-align:center; padding: 12px 0;">No hay actividades sincronizadas todavía.</p></div>`;
+      if (feedEl) feedEl.innerHTML = emptyMsg;
+      if (listEl) listEl.innerHTML = emptyMsg;
+      return;
+    }
+
+    let feedHtml = "";
+    let listHtml = "";
+
     acts.forEach((a, idx) => {
       const isFuerza = a.sport_type === "Fuerza";
       const isBici = a.sport_type === "Ciclismo";
-      const badgeColor = isFuerza ? "#FC5200" : isBici ? "#00AEEF" : "#00E676";
+      const sportIcon = isFuerza ? "🏋️" : isBici ? "🚴" : "🏃";
+      const badgeBg = isFuerza ? "rgba(252,82,0,0.10)" : isBici ? "rgba(0,119,204,0.10)" : "rgba(22,163,74,0.10)";
+      const badgeColor = isFuerza ? "#FC5200" : isBici ? "#0077CC" : "#16A34A";
       const paceOrSpeed = isBici && a.duration_min > 0
         ? `${((a.distance_km || 0) / (a.duration_min / 60)).toFixed(1)} km/h`
         : (a.avg_pace_str || `${Math.round(a.duration_min || 0)} min`);
+      const distVal = a.distance_km ? `${a.distance_km} km` : `${Math.round(a.duration_min || 0)} min`;
+      const elevVal = `+${Math.round(a.elevation_gain || 0)} m`;
       const hasPoly = Array.isArray(a.polyline) && a.polyline.length > 2;
 
-      html += `
+      feedHtml += `
+        <article class="glass-card strava-feed-card" onclick="openActivityDetail('${a.external_id}')">
+          <div class="strava-feed-header">
+            <div class="strava-feed-meta">
+              <span class="strava-feed-avatar">${sportIcon}</span>
+              <div>
+                <h3 class="strava-feed-title">${a.name}</h3>
+                <span class="strava-feed-date tabular-num">${a.start_date} • ${a.sport_type}</span>
+              </div>
+            </div>
+            <span class="pill-tag" style="background:${badgeBg}; color:${badgeColor};">${a.sport_type}</span>
+          </div>
+          <div class="strava-feed-metrics">
+            <div class="strava-feed-metric">
+              <span class="label-caps">DISTANCIA</span>
+              <strong class="tabular-num">${distVal}</strong>
+            </div>
+            <div class="strava-feed-metric">
+              <span class="label-caps">${isBici ? "VELOCIDAD" : "RITMO"}</span>
+              <strong class="tabular-num">${paceOrSpeed}</strong>
+            </div>
+            <div class="strava-feed-metric">
+              <span class="label-caps">DESNIVEL</span>
+              <strong class="tabular-num">${elevVal}</strong>
+            </div>
+          </div>
+          ${hasPoly ? `<div id="feed-minimap-${idx}" class="activity-feed-map"></div>` : ""}
+        </article>
+      `;
+
+      listHtml += `
         <div class="history-card-item" onclick="openActivityDetail('${a.external_id}')" style="cursor:pointer; border-left: 3px solid ${badgeColor};">
           <div class="history-card-header">
-            <span class="label-caps">${a.start_date}</span>
-            <span class="pill-tag" style="background:${badgeColor}22; color:${badgeColor};">${a.sport_type}</span>
+            <span class="label-caps tabular-num">${a.start_date}</span>
+            <span class="pill-tag" style="background:${badgeBg}; color:${badgeColor};">${a.sport_type}</span>
           </div>
           <div class="history-title-row">
             <span class="headline-sm">${a.name}</span>
           </div>
           <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:6px;">
-            <div><span class="body-xs" style="color:var(--text-muted); display:block;">DISTANCIA</span><strong>${a.distance_km ? a.distance_km + ' km' : Math.round(a.duration_min) + ' min'}</strong></div>
-            <div><span class="body-xs" style="color:var(--text-muted); display:block;">${isBici ? 'VELOCIDAD' : 'RITMO'}</span><strong>${paceOrSpeed}</strong></div>
-            <div><span class="body-xs" style="color:var(--text-muted); display:block;">DESNIVEL</span><strong>+${Math.round(a.elevation_gain || 0)} m</strong></div>
+            <div><span class="body-xs" style="color:var(--text-muted); display:block;">DISTANCIA</span><strong class="tabular-num">${distVal}</strong></div>
+            <div><span class="body-xs" style="color:var(--text-muted); display:block;">${isBici ? 'VELOCIDAD' : 'RITMO'}</span><strong class="tabular-num">${paceOrSpeed}</strong></div>
+            <div><span class="body-xs" style="color:var(--text-muted); display:block;">DESNIVEL</span><strong class="tabular-num">${elevVal}</strong></div>
           </div>
-          ${hasPoly ? `<div id="minimap-${idx}" class="activity-minimap"></div>` : ""}
         </div>
       `;
     });
-    listEl.innerHTML = html;
 
-    // Render interactive Leaflet minimaps for activities with GPS polylines
-    if (window.L) {
+    if (feedEl) feedEl.innerHTML = feedHtml;
+    if (listEl) listEl.innerHTML = listHtml;
+
+    // Render interactive Leaflet Voyager maps for activities with GPS polylines
+    if (window.L && feedEl) {
       acts.forEach((a, idx) => {
         if (Array.isArray(a.polyline) && a.polyline.length > 2) {
-          const mapEl = document.getElementById(`minimap-${idx}`);
+          const mapEl = document.getElementById(`feed-minimap-${idx}`);
           if (!mapEl) return;
           const m = L.map(mapEl, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false });
-          L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { maxZoom: 18 }).addTo(m);
-          const color = a.sport_type === "Ciclismo" ? "#00AEEF" : "#FC5200";
-          const line = L.polyline(a.polyline, { color, weight: 3 }).addTo(m);
-          m.fitBounds(line.getBounds(), { padding: [8, 8] });
+          L.tileLayer(VOYAGER_TILE_URL, { maxZoom: 18 }).addTo(m);
+          const line = L.polyline(a.polyline, { color: "#FC5200", weight: 3.5 }).addTo(m);
+          m.fitBounds(line.getBounds(), { padding: [12, 12] });
         }
       });
     }
@@ -3241,8 +3307,8 @@ async function openActivityDetail(externalId) {
       mapCont.style.display = "block";
       setTimeout(() => {
         _detailMapInstance = L.map(mapCont);
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { maxZoom: 18 }).addTo(_detailMapInstance);
-        const line = L.polyline(act.polyline, { color: "#FC5200", weight: 4 }).addTo(_detailMapInstance);
+        L.tileLayer(VOYAGER_TILE_URL, { maxZoom: 18 }).addTo(_detailMapInstance);
+        const line = L.polyline(act.polyline, { color: "#FC5200", weight: 3.5 }).addTo(_detailMapInstance);
         _detailMapInstance.fitBounds(line.getBounds(), { padding: [16, 16] });
       }, 60);
     } else {
@@ -3260,10 +3326,10 @@ async function openActivityDetail(externalId) {
         const ratio = maxPace > minPace ? 100 - ((s.pace_sec - minPace) / (maxPace - minPace)) * 45 : 85;
         return `
           <div class="split-row">
-            <span style="color:var(--text-muted); font-weight:700;">KM ${s.km}</span>
-            <span style="font-weight:800; color:#FFF;">${s.pace_str}</span>
+            <span class="tabular-num" style="color:var(--text-muted); font-weight:700;">KM ${s.km}</span>
+            <span class="tabular-num" style="font-weight:800; color:var(--on-surface);">${s.pace_str}</span>
             <div class="split-bar-track"><div class="split-bar-fill" style="width:${Math.round(ratio)}%;"></div></div>
-            <span style="color:#FC5200; font-size:0.74rem; text-align:right;">${s.avg_hr ? s.avg_hr + ' ppm' : ''}</span>
+            <span class="tabular-num" style="color:#FC5200; font-size:0.74rem; text-align:right;">${s.avg_hr ? s.avg_hr + ' ppm' : ''}</span>
           </div>
         `;
       }).join("");
@@ -3306,8 +3372,8 @@ async function openActivityDetail(externalId) {
       zonesList.innerHTML = act.hr_zones.map(z => `
         <div style="display:flex; flex-direction:column; gap:3px;">
           <div style="display:flex; justify-content:space-between; font-size:0.75rem;">
-            <span style="color:#FFF; font-weight:700;">${z.zone} <small style="color:var(--text-muted);">(${z.range})</small></span>
-            <span style="color:${z.color}; font-weight:800;">${z.pct}%</span>
+            <span style="color:var(--on-surface); font-weight:700;">${z.zone} <small class="tabular-num" style="color:var(--text-muted);">(${z.range})</small></span>
+            <span class="tabular-num" style="color:${z.color}; font-weight:800;">${z.pct}%</span>
           </div>
           <div class="split-bar-track"><div style="height:100%; width:${z.pct}%; background:${z.color}; border-radius:999px;"></div></div>
         </div>
@@ -3331,28 +3397,31 @@ function closeActivityDetailModal() {
 // ============================================================
 async function loadGearList() {
   const cont = document.getElementById("gear-list-container");
-  if (!cont) return;
+  const dashCont = document.getElementById("dashboard-gear-list");
+  if (!cont && !dashCont) return;
   try {
     const res = await fetch("/api/gear");
     if (!res.ok) return;
     const data = await res.json();
     const list = data.gear || [];
-    cont.innerHTML = list.map(g => {
+    const html = list.map(g => {
       const pct = Math.min(100, Math.round((g.total_km / (g.alert_km || 650)) * 100));
       const warn = g.total_km >= (g.alert_km || 650) * 0.9;
       return `
-        <div style="background:var(--surface-dim); border:1px solid ${warn ? '#FC5200' : 'var(--border-glass)'}; border-radius:10px; padding:10px 12px;">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <strong style="font-size:0.88rem; color:#FFF;">${g.gear_type === 'shoes' ? '👟' : '🚴'} ${g.name}</strong>
-            <span class="label-caps" style="color:${warn ? '#FC5200' : '#00E676'}; font-size:0.75rem;">${g.total_km} / ${g.alert_km} km</span>
+        <div style="background:var(--surface-dim); border:1px solid ${warn ? '#FC5200' : 'var(--border-glass)'}; border-radius:8px; padding:10px 12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+            <strong style="font-size:0.85rem; color:var(--on-surface);">${g.gear_type === 'shoes' ? '👟' : '🚴'} ${g.name}</strong>
+            <span class="label-caps tabular-num" style="color:${warn ? '#FC5200' : 'var(--text-secondary)'}; font-size:0.74rem;">${g.total_km} / ${g.alert_km} km</span>
           </div>
           <div class="progress-bar-wrap" style="margin-top:6px;">
-            <div class="progress-fill ${warn ? 'lime' : 'cyan'}" style="width:${pct}%; background:${warn ? '#FC5200' : '#00AEEF'};"></div>
+            <div class="progress-fill" style="width:${pct}%; background:${warn ? '#FC5200' : '#0077CC'};"></div>
           </div>
           ${warn ? `<span class="body-xs" style="color:#FC5200; margin-top:4px; display:block;">⚠️ Cerca del límite de desgaste recomendado</span>` : ""}
         </div>
       `;
     }).join("");
+    if (cont) cont.innerHTML = html;
+    if (dashCont) dashCont.innerHTML = html || `<p class="body-xs" style="color:var(--text-muted);">Sin material registrado.</p>`;
   } catch (e) {}
 }
 
