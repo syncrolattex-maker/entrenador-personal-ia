@@ -17,7 +17,7 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=71">
+  <link rel="stylesheet" href="/style.css?v=72">
 
   <!-- Icons & Fonts (Hanken Grotesk & JetBrains Mono) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -30,8 +30,8 @@
   <header class="app-topbar">
     <div class="topbar-inner">
       <div class="topbar-left">
-        <div class="user-avatar-small">
-          <span>⚡</span>
+        <div class="user-avatar-small" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FC5200" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
         </div>
         <span class="app-brand-name">AARONFIT</span>
         <span class="version-tag">v27</span>
@@ -47,7 +47,7 @@
 
       <div class="topbar-right">
         <button type="button" class="desktop-sync-btn" onclick="syncGarminNow()">
-          <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
           <span>Sincronizar Garmin</span>
         </button>
         <div class="athlete-pill">
@@ -69,14 +69,13 @@
       <section id="tab-dashboard" class="tab-view active">
 
         <div class="greeting-header mobile-only-header">
-          <span class="label-caps">INICIO • GARMIN CONNECT</span>
           <h1 class="greeting-title">Hola, Aarón</h1>
           <p class="body-sm-muted">43 años • 1,83 m • 93 kg • Pesas 5 kg & Cintas</p>
         </div>
 
         <!-- Offline Banner -->
         <div id="offline-notification" class="offline-banner" style="display: none;">
-          <i data-lucide="wifi-off" style="width: 16px; height: 16px;"></i>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
           <span>Navegando sin conexión.</span>
         </div>
 
@@ -86,7 +85,7 @@
           <aside class="dash-col-left">
             <div class="glass-card desktop-profile-card">
               <div class="desktop-profile-head">
-                <div class="desktop-profile-avatar">🏃‍♂️</div>
+                <div class="desktop-profile-avatar" aria-hidden="true">A</div>
                 <div>
                   <h2 class="headline-sm" style="margin:0;">Aarón</h2>
                   <span class="body-xs" style="color: var(--text-secondary);">43 años • 1,83 m • 93 kg</span>
@@ -94,15 +93,15 @@
               </div>
               <div class="desktop-weekly-stats">
                 <div class="desktop-wstat">
-                  <span class="label-caps">CARRERA SEM</span>
+                  <span class="label-caps">CARRERA</span>
                   <strong id="desktop-week-run-km" class="tabular-num">0.0 km</strong>
                 </div>
                 <div class="desktop-wstat">
-                  <span class="label-caps">BICI SEM</span>
+                  <span class="label-caps">BICI</span>
                   <strong id="desktop-week-bike-km" class="tabular-num">0.0 km</strong>
                 </div>
                 <div class="desktop-wstat">
-                  <span class="label-caps">FUERZA SEM</span>
+                  <span class="label-caps">FUERZA</span>
                   <strong id="desktop-week-strength-count" class="tabular-num">0 ses</strong>
                 </div>
               </div>
@@ -110,8 +109,8 @@
 
             <div class="glass-card desktop-gear-card">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span class="label-caps" style="color: var(--primary);">MATERIAL (GEAR)</span>
-                <button type="button" class="strava-chip-btn" style="font-size:0.7rem; padding:3px 9px;" onclick="switchTab('tab-profile')">Gestionar</button>
+                <h3 class="headline-sm" style="margin:0;">Material (Gear)</h3>
+                <button type="button" class="strava-chip-btn" style="font-size:0.72rem; padding:4px 10px;" onclick="switchTab('tab-profile')">Gestionar</button>
               </div>
               <div id="dashboard-gear-list" style="display:flex; flex-direction:column; gap:8px;">
                 <p class="body-xs" style="color: var(--text-muted);">Cargando material...</p>
@@ -140,57 +139,58 @@
 
             <!-- Main Selection Container -->
             <div id="selection-card" class="glass-card workout-selector-wrap">
-              <span id="selection-card-title" class="label-caps" style="display: block; margin-bottom: 4px;">¿QUÉ VAS A ENTRENAR HOY?</span>
+              <h2 id="selection-card-title" class="headline-sm" style="margin:0;">¿Qué vas a entrenar hoy?</h2>
 
               <div class="selection-grid">
                 <button id="btn-select-fuerza" class="selection-btn">
                   <div class="btn-icon-wrap orange-tint">
-                    <i data-lucide="dumbbell" style="width: 20px; height: 20px;"></i>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/></svg>
                   </div>
                   <div class="btn-text-wrap">
                     <span class="btn-main-title">Fuerza (Opcional • 25–35 min)</span>
                     <span class="btn-sub-info">Strava Strength • Pesas 5kg + Cintas</span>
                   </div>
-                  <i data-lucide="chevron-right" class="arrow-icon"></i>
+                  <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
 
                 <button id="btn-select-carrera" class="selection-btn">
                   <div class="btn-icon-wrap blue-tint">
-                    <i data-lucide="footprints" style="width: 20px; height: 20px;"></i>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 4v6l3.5 3.5"/><circle cx="12" cy="12" r="9"/></svg>
                   </div>
                   <div class="btn-text-wrap">
                     <span class="btn-main-title">Salir a Correr</span>
                     <span class="btn-sub-info">Runna Intervals • Zona 2 / Fartlek</span>
                   </div>
-                  <i data-lucide="chevron-right" class="arrow-icon"></i>
+                  <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
 
                 <button id="btn-select-bici" class="selection-btn" onclick="enviarTextoChat('Hoy quiero salir en bici en ruta, adapta mi plan semanal y la fatiga')">
                   <div class="btn-icon-wrap green-tint">
-                    <i data-lucide="bike" style="width: 20px; height: 20px;"></i>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>
                   </div>
                   <div class="btn-text-wrap">
                     <span class="btn-main-title">Salir en Bici</span>
                     <span class="btn-sub-info">Ciclismo en Ruta • Carga Multideporte</span>
                   </div>
-                  <i data-lucide="chevron-right" class="arrow-icon"></i>
+                  <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
 
                 <button id="btn-select-descanso" class="selection-btn">
                   <div class="btn-icon-wrap rest-tint">
-                    <i data-lucide="coffee" style="width: 20px; height: 20px;"></i>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>
                   </div>
                   <div class="btn-text-wrap">
                     <span class="btn-main-title">Día de Descanso</span>
                     <span class="btn-sub-info">Asimilación muscular y regeneración</span>
                   </div>
-                  <i data-lucide="chevron-right" class="arrow-icon"></i>
+                  <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
               </div>
 
               <!-- Botón de Rescate (Día Gris) -->
               <button id="btnDiaGris" class="btn-rescate" aria-label="Generar rutina suave de 10 minutos">
-                <span class="emoji">🔋</span> Cero energía hoy (Rutina 10 min)
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/><path d="M6 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h1"/><path d="m11 7-3 5h4l-3 5"/><line x1="22" y1="11" x2="22" y2="13"/></svg>
+                <span>Cero energía hoy (Rutina 10 min)</span>
               </button>
             </div>
 
@@ -225,8 +225,8 @@
             <!-- Last Completed Workout Card (Real Sync from Garmin Connect) -->
             <div id="last-workout-box" class="glass-card last-workout-card" style="display: none;">
               <div class="last-workout-header">
-                <span class="label-caps">⌚ ÚLTIMO REGISTRO EN GARMIN</span>
-                <span id="last-workout-date" class="label-caps"></span>
+                <span class="label-caps">ÚLTIMO REGISTRO EN GARMIN</span>
+                <span id="last-workout-date" class="label-caps tabular-num"></span>
               </div>
 
               <div class="last-workout-body">
@@ -244,8 +244,11 @@
             <!-- Strava-style Garmin Activities Feed -->
             <div id="dashboard-feed-wrap" class="dashboard-feed-wrap">
               <div class="feed-section-header">
-                <span class="label-caps">FEED DE ACTIVIDADES GARMIN</span>
-                <button type="button" class="strava-chip-btn" style="font-size:0.72rem; padding:4px 10px;" onclick="syncGarminNow()">↻ Sincronizar</button>
+                <h2 class="headline-sm" style="margin:0;">Actividades recientes</h2>
+                <button type="button" class="strava-chip-btn" style="font-size:0.74rem; padding:5px 11px; display:inline-flex; align-items:center; gap:5px;" onclick="syncGarminNow()">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                  <span>Sincronizar</span>
+                </button>
               </div>
               <div id="dashboard-activities-feed" class="activities-feed-list"></div>
             </div>
@@ -270,7 +273,7 @@
 
               <div class="daily-goal-content">
                 <div class="rec-badge-row">
-                  <span class="label-caps" style="color: var(--primary);">🧠 RECOMENDACIÓN DE HOY</span>
+                  <h2 class="headline-sm" style="margin:0;">Recomendación de hoy</h2>
                   <span id="rec-tipo-label" class="pill-tag orange">-</span>
                 </div>
 
@@ -281,8 +284,8 @@
                 <p id="rec-razon-text" class="body-md">Analizando tu historial real en Garmin Connect...</p>
                 <p id="rec-semanal-text" class="body-sm-muted"></p>
 
-                <button id="btn-comenzar-hoy" class="btn btn-primary" style="display: none; margin-top: 10px; width: 100%; font-size: 0.98rem; padding: 12px 16px;">
-                  <i data-lucide="play" style="width: 18px; height: 18px;"></i>
+                <button id="btn-comenzar-hoy" class="btn btn-primary" style="display: none; margin-top: 8px; width: 100%; font-size: 0.96rem; padding: 12px 16px;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                   <span id="btn-comenzar-hoy-texto">Comenzar Entrenamiento de Hoy</span>
                 </button>
               </div>
@@ -291,11 +294,11 @@
             <!-- Tendencia & Próxima Carrera Objetivo Card -->
             <div id="race-goal-card" class="glass-card">
               <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-                <div>
-                  <span class="label-caps" style="color: var(--primary);">PROGRESIÓN Y OBJETIVO</span>
-                  <h3 id="race-goal-title" class="headline-sm" style="margin-top:2px;">Tendencia Ascendente</h3>
-                </div>
-                <button type="button" class="strava-chip-btn" style="font-size:0.72rem; padding:5px 10px;" onclick="toggleRaceGoalForm()">🏁 Carrera</button>
+                <h3 id="race-goal-title" class="headline-sm" style="margin:0;">Tendencia Ascendente</h3>
+                <button type="button" class="strava-chip-btn" style="font-size:0.72rem; padding:5px 10px; display:inline-flex; align-items:center; gap:5px;" onclick="toggleRaceGoalForm()">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+                  <span>Carrera</span>
+                </button>
               </div>
 
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
@@ -311,7 +314,7 @@
 
               <div id="race-goal-banner" class="race-banner-box" style="display:none;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                  <strong id="race-banner-name" style="color: var(--on-surface); font-size:0.9rem;">🏁 —</strong>
+                  <strong id="race-banner-name" style="color: var(--on-surface); font-size:0.9rem;">—</strong>
                   <span id="race-banner-days" class="label-caps tabular-num" style="color: var(--primary);">—</span>
                 </div>
                 <span id="race-banner-phase" class="body-sm-muted" style="font-size:0.78rem; display:block; margin-top:2px;">—</span>
@@ -333,10 +336,7 @@
             <!-- Plan Semanal Inteligente Card -->
             <div id="weekly-plan-card" class="glass-card">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div>
-                  <span class="label-caps" style="color: var(--secondary);">PLAN SEMANAL GARMIN</span>
-                  <h3 class="headline-sm" style="margin-top:2px;">Lunes – Domingo</h3>
-                </div>
+                <h3 class="headline-sm" style="margin:0;">Plan Semanal (L–D)</h3>
                 <span id="weekly-plan-km-badge" class="pill-tag orange tabular-num">0 km obj.</span>
               </div>
               <p class="body-sm-muted" style="font-size:0.8rem;">Basado en tu historial de Garmin. Las 1–2 sesiones de fuerza son <strong>opcionales</strong> si vas justo de tiempo.</p>
@@ -355,26 +355,25 @@
       <!-- ================================================================= -->
       <section id="tab-metrics" class="tab-view">
         <div class="greeting-header">
-          <span class="label-caps">RENDIMIENTO REAL • GARMIN CONNECT</span>
           <h1 class="greeting-title">Entrenamiento y Summit</h1>
           <p class="body-sm-muted">Curva Fitness & Freshness (90 días), Training Log, PRs e historial real de Garmin</p>
         </div>
 
         <!-- Summit Wide Desktop Grid -->
         <div class="summit-desktop-grid">
-          <!-- 2. Fitness & Freshness (Curva 90 días CTL / ATL / TSB) — 100% arriba -->
+          <!-- Fitness & Freshness (Curva 90 días CTL / ATL / TSB) — 100% arriba -->
           <div class="glass-card summit-fitness-full" id="summit-fitness-card">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-              <span class="label-caps" style="color: var(--primary);">FITNESS & FRESHNESS (90 DÍAS)</span>
+              <h2 class="headline-sm" style="margin:0;">Fitness & Freshness (90 días)</h2>
               <span id="fitness-legend" class="body-xs tabular-num" style="color:var(--text-secondary);">CTL • ATL • TSB</span>
             </div>
             <div id="summit-fitness-svg-wrap" style="width:100%; height:160px;"></div>
           </div>
 
-          <!-- 1. Training Log (Calendario de burbujas 12 semanas) -->
+          <!-- Training Log (Calendario de burbujas 12 semanas) -->
           <div class="glass-card" id="summit-training-log-card">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-              <span class="label-caps" style="color: var(--primary);">TRAINING LOG (12 SEMANAS)</span>
+              <h2 class="headline-sm" style="margin:0;">Training Log (12 semanas)</h2>
               <div style="display:flex; gap:4px;" id="training-log-filters">
                 <button type="button" class="strava-chip-btn active" onclick="filterTrainingLog('Todo', this)" style="padding:3px 9px; font-size:0.68rem;">Todo</button>
                 <button type="button" class="strava-chip-btn" onclick="filterTrainingLog('Carrera', this)" style="padding:3px 9px; font-size:0.68rem;">Carrera</button>
@@ -385,9 +384,9 @@
             <div id="summit-bubble-grid" class="summit-bubble-grid"></div>
           </div>
 
-          <!-- 3. Mejores Esfuerzos (PRs) -->
+          <!-- Mejores Esfuerzos (PRs) -->
           <div class="glass-card" id="summit-prs-card">
-            <span class="label-caps" style="color: var(--primary);">MEJORES ESFUERZOS (PRs)</span>
+            <h2 class="headline-sm" style="margin:0;">Mejores Esfuerzos (PRs)</h2>
             <div id="summit-prs-grid" style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;"></div>
           </div>
         </div>
@@ -395,8 +394,11 @@
         <!-- Garmin Live Wellness & Summary Card -->
         <div id="garmin-wellness-card" class="glass-card">
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span class="label-caps" style="color: var(--secondary);">TELEMETRÍA GARMIN (14 DÍAS)</span>
-            <button type="button" class="strava-chip-btn" style="font-size:0.72rem; padding:4px 10px;" onclick="syncGarminNow()">↻ Sincronizar</button>
+            <h2 class="headline-sm" style="margin:0;">Telemetría Garmin (14 días)</h2>
+            <button type="button" class="strava-chip-btn" style="font-size:0.72rem; padding:4px 10px; display:inline-flex; align-items:center; gap:5px;" onclick="syncGarminNow()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              <span>Sincronizar</span>
+            </button>
           </div>
           <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; text-align:center;">
             <div class="p-stat-box">
@@ -418,7 +420,6 @@
           <!-- Real Balance Progress: Carrera (Base Semanal Garmin) -->
           <div class="glass-card metric-card">
             <div class="metric-header">
-              <i data-lucide="zap" class="metric-icon" style="color: var(--primary);"></i>
               <span class="label-caps">CARRERA & CARDIO (SEMANAL)</span>
             </div>
             <div class="metric-value-row">
@@ -433,7 +434,6 @@
           <!-- Real Balance Progress: Fuerza (Opcional) -->
           <div class="glass-card metric-card">
             <div class="metric-header">
-              <i data-lucide="dumbbell" class="metric-icon" style="color: var(--secondary);"></i>
               <span class="label-caps">FUERZA STRAVA (OPCIONAL • 5KG & CINTAS)</span>
             </div>
             <div class="metric-value-row">
@@ -448,14 +448,16 @@
 
         <!-- Real Activity Timeline List from Garmin Connect -->
         <div class="metrics-history-wrap">
-          <span class="label-caps" style="display: block; margin-bottom: 10px;">HISTORIAL REAL DE GARMIN CONNECT</span>
+          <h2 class="headline-sm" style="margin-bottom: 10px;">Historial real de Garmin Connect</h2>
           <div id="metrics-history-list" class="metrics-history-list"></div>
         </div>
 
         <!-- Dynamic Coach Diagnosis Box -->
         <div class="glass-card coach-insights-card">
           <div class="insights-header">
-            <div class="icon-circle">🧠</div>
+            <div class="icon-circle">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FC5200" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            </div>
             <h3 class="headline-md">Diagnóstico de Asimilación</h3>
           </div>
           <p id="metrics-coach-text" class="body-md">
@@ -471,14 +473,13 @@
       <!-- ================================================================= -->
       <section id="tab-chat" class="tab-view">
         <div class="greeting-header">
-          <span class="label-caps">INTELLIGENT COACHING</span>
           <h1 class="greeting-title">Coach IA de Aarón</h1>
         </div>
 
         <div id="coach-chat-card" class="glass-card coach-chat-card-full">
           <div class="chat-card-header">
             <div class="coach-avatar-wrap">
-              <div class="coach-avatar">🏃‍♂️</div>
+              <div class="coach-avatar">A</div>
               <span class="coach-status-dot"></span>
             </div>
             <div class="coach-info">
@@ -501,7 +502,7 @@
           <div class="chat-input-container">
             <input type="text" id="chat-input" placeholder="Pregunta o pide adaptar tu rutina..." autocomplete="off">
             <button id="btn-send-chat" class="chat-send-btn" aria-label="Enviar">
-              <i data-lucide="send" style="width: 18px; height: 18px;"></i>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
           </div>
         </div>
@@ -514,7 +515,7 @@
         <div class="profile-desktop-grid">
           <div class="glass-card profile-header-card">
             <div class="profile-avatar-large">
-              <div class="avatar-img-circle">🏃‍♂️</div>
+              <div class="avatar-img-circle">A</div>
               <span class="level-badge">ATLETA</span>
             </div>
 
@@ -541,17 +542,14 @@
           <!-- Garmin Connect Direct Integration Card -->
           <div class="glass-card" id="garmin-connect-card">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-              <div>
-                <span class="label-caps" style="color: var(--secondary);">SINCRONIZACIÓN GARMIN CONNECT</span>
-                <h3 class="headline-sm" style="margin-top:2px;">Historial y Telemetría Real</h3>
-              </div>
+              <h3 class="headline-sm" style="margin:0;">Sincronización Garmin Connect</h3>
               <span id="garmin-status-badge" class="label-caps" style="padding:4px 10px; border-radius:999px; background:var(--surface-dim); border:1px solid var(--border-glass); color:var(--text-secondary);">Desconectado</span>
             </div>
 
             <div id="garmin-connected-panel" style="display:none; flex-direction:column; gap:10px; margin-bottom:10px;">
               <p id="garmin-summary-text" class="body-sm-muted">Lectura Garmin Connect activa. Tus sesiones y métricas se analizan automáticamente.</p>
               <button type="button" class="btn btn-ghost" style="border:1px solid var(--secondary); color: var(--secondary);" onclick="syncGarminNow()">
-                ↻ Sincronizar Garmin Ahora
+                Sincronizar Garmin Ahora
               </button>
             </div>
 
@@ -576,10 +574,7 @@
           <!-- Gestor de Material (Gear Tracker) -->
           <div class="glass-card" id="gear-tracker-card">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-              <div>
-                <span class="label-caps" style="color: var(--primary);">MATERIAL & DESGASTE (GEAR)</span>
-                <h3 class="headline-sm" style="margin-top:2px;">Zapatillas y Bici</h3>
-              </div>
+              <h3 class="headline-sm" style="margin:0;">Material y Desgaste (Gear)</h3>
               <button type="button" class="strava-chip-btn" style="font-size:0.72rem; padding:4px 10px;" onclick="toggleGearForm()">+ Añadir</button>
             </div>
             <div id="gear-list-container" style="display:flex; flex-direction:column; gap:10px;"></div>
@@ -599,12 +594,12 @@
 
           <!-- Equipamiento y Lógica Dinámica -->
           <div class="glass-card equipment-card">
-            <span class="label-caps">EQUIPAMIENTO & MOTOR AUTOMÁTICO</span>
+            <h3 class="headline-sm" style="margin:0;">Equipamiento Disponible</h3>
             <p class="body-sm-muted" style="font-size:0.82rem;">El plan semanal se genera automáticamente desde tu historial real de Garmin Connect y tu carrera objetivo, con 1–2 sesiones opcionales de fuerza.</p>
             <div class="equipment-tags">
-              <span class="equip-chip active">🏋️‍♂️ Mancuernas 5 kg</span>
-              <span class="equip-chip active">🎗️ Cintas Elásticas</span>
-              <span class="equip-chip active">⌚ Reloj Garmin</span>
+              <span class="equip-chip active">Mancuernas 5 kg</span>
+              <span class="equip-chip active">Cintas Elásticas</span>
+              <span class="equip-chip active">Reloj Garmin</span>
             </div>
           </div>
         </div>
@@ -614,14 +609,8 @@
 
     <!-- Success Floating Banner -->
     <div id="success-banner" class="success-banner-overlay" style="display: none;">
-      <span class="success-icon">✨</span>
       <span id="success-text" class="success-text">¡Preferencias guardadas con éxito!</span>
     </div>
-
-    <!-- Floating Action Button (Mobile only) -->
-    <button id="fab-action" class="fab-btn" aria-label="Acción rápida" onclick="switchTab('tab-chat')">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    </button>
 
     <!-- Bottom Dock Navigation Bar (Mobile < 1024px) -->
     <nav class="bottom-dock-nav" aria-label="Navegación móvil">
@@ -671,7 +660,7 @@
         <div id="guided-video-card" class="guided-video-card">
           <div class="video-container" style="position:relative; background:#F7F7FA;">
             <button type="button" id="btn-toggle-ex-photo" onclick="toggleGuidedMediaMode()" style="position:absolute; top:8px; right:8px; z-index:12; background:#FFFFFF; border:1px solid #E5E5EA; color:#242428; font-size:0.68rem; font-weight:700; padding:4px 9px; border-radius:999px; cursor:pointer;">
-              📷 Ver Foto
+              Ver Foto
             </button>
 
             <div id="guided-biomechanics-canvas" class="biomechanics-canvas" style="display:flex; width:100%; height:100%;">
@@ -797,7 +786,7 @@
             </svg>
           </div>
           <div class="runna-avatar-stats">
-            <span id="runna-cadence-badge" class="runna-cadence-pill tabular-num">⚡ Cadencia: ~175 ppm</span>
+            <span id="runna-cadence-badge" class="runna-cadence-pill tabular-num">Cadencia: ~175 ppm</span>
             <span id="runna-coach-speech" class="runna-speech-bubble">"Mantén la postura erguida y mirada al frente"</span>
           </div>
         </div>
@@ -886,9 +875,9 @@
       <div id="guided-actions-done" style="display:none; flex-direction:column; gap:14px; width:100%;">
         <p style="text-align:center; font-weight:700; font-size:1rem; color:var(--text-primary);">¿Cómo te has sentido?</p>
         <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
-          <button class="guided-feedback-btn" data-value="facil">😊<br><small>Fácil</small></button>
-          <button class="guided-feedback-btn" data-value="optimo">⚡<br><small>Óptimo</small></button>
-          <button class="guided-feedback-btn" data-value="agotador">🥵<br><small>Agotador</small></button>
+          <button class="guided-feedback-btn" data-value="facil">Fácil</button>
+          <button class="guided-feedback-btn" data-value="optimo">Óptimo</button>
+          <button class="guided-feedback-btn" data-value="agotador">Agotador</button>
         </div>
         <button id="btn-guardar-sesion" class="btn btn-primary guided-action-btn" disabled>
           <i data-lucide="save" style="width:20px;height:20px;"></i>
@@ -903,7 +892,7 @@
     <div class="detail-modal-shell">
       <div class="guided-header detail-modal-header">
         <button onclick="closeActivityDetailModal()" class="guided-close-btn" aria-label="Cerrar detalle">
-          <i data-lucide="x" style="width:22px;height:22px;"></i>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
         <span id="detail-modal-sport" class="label-caps" style="color: var(--primary);">ACTIVIDAD GARMIN</span>
         <span id="detail-modal-date" class="label-caps tabular-num" style="color:var(--text-muted);">—</span>
@@ -924,19 +913,19 @@
           <div id="detail-map-container" class="detail-map-box"></div>
 
           <div class="glass-card" id="detail-chart-card" style="display:none;">
-            <span class="label-caps" style="color: var(--secondary);">ELEVACIÓN + RITMO + FC</span>
+            <h3 class="headline-sm" style="margin:0;">Elevación, Ritmo y FC</h3>
             <div id="detail-chart-svg" style="width:100%; height:150px;"></div>
           </div>
         </div>
 
         <div class="detail-col-right">
           <div class="glass-card" id="detail-splits-card" style="display:none;">
-            <span class="label-caps" style="color: var(--primary);">SPLITS POR KILÓMETRO</span>
+            <h3 class="headline-sm" style="margin:0;">Splits por kilómetro</h3>
             <div id="detail-splits-list" style="display:flex; flex-direction:column; gap:8px;"></div>
           </div>
 
           <div class="glass-card" id="detail-zones-card" style="display:none;">
-            <span class="label-caps" style="color: var(--primary);">ZONAS DE FRECUENCIA CARDÍACA (Z1–Z5)</span>
+            <h3 class="headline-sm" style="margin:0;">Zonas de Frecuencia Cardíaca (Z1–Z5)</h3>
             <div id="detail-zones-list" style="display:flex; flex-direction:column; gap:8px;"></div>
           </div>
         </div>
@@ -948,11 +937,10 @@
   <div id="exercise-video-modal" class="guided-overlay" style="display: none; justify-content: center; align-items: center; padding: 20px; z-index: 9999;">
     <div class="glass-card" style="width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; position: relative; padding: 20px;">
       <button onclick="closeExerciseVideoModal()" class="guided-close-btn" style="position: absolute; top: 14px; right: 14px;" aria-label="Cerrar">
-        <i data-lucide="x" style="width:20px;height:20px;"></i>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
 
-      <span class="label-caps" style="color: var(--primary);">VÍDEO DEMOSTRATIVO DE TÉCNICA</span>
-      <h3 id="modal-video-title" class="headline-sm" style="margin: 6px 0 14px 0;">-</h3>
+      <h3 id="modal-video-title" class="headline-sm" style="margin: 0 32px 14px 0;">-</h3>
 
       <div class="video-container" style="position: relative; border-radius: var(--rounded-md); overflow: hidden; margin-bottom: 14px; height: 210px; background: #F7F7FA; border: 1px solid #E5E5EA; display: flex; align-items: center; justify-content: center;">
         <div id="modal-biomechanics-canvas" class="biomechanics-canvas anim-squat" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
@@ -998,6 +986,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=71"></script>
+  <script src="/app.js?v=72"></script>
 </body>
 </html>

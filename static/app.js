@@ -232,6 +232,7 @@ function updateOnlineStatus() {
 // BOOT — FETCH RECOMMENDATION
 // ============================================================
 async function initApp() {
+  if (window.lucide) lucide.createIcons();
   hideSuccessBanner();
   mostrarPantallaSeleccion();
 
@@ -3188,7 +3189,12 @@ async function loadActivitiesFeed() {
     if (elWeekStr) elWeekStr.textContent = `${weekStrengthCount} ses`;
 
     if (acts.length === 0) {
-      const emptyMsg = `<div class="glass-card"><p class="body-sm-muted" style="text-align:center; padding: 12px 0;">No hay actividades sincronizadas todavía.</p></div>`;
+      const emptyMsg = `
+        <div class="glass-card" style="text-align:center; padding: 24px 16px;">
+          <p class="body-md" style="font-weight:700; margin-bottom:4px;">Sin actividades sincronizadas todavía</p>
+          <p class="body-sm-muted" style="margin-bottom:12px;">Conecta o sincroniza tu Garmin Connect para ver tus rutas, ritmos y mapas aquí.</p>
+          <button type="button" class="btn btn-primary" style="margin:0 auto;" onclick="syncGarminNow()">Sincronizar Garmin Ahora</button>
+        </div>`;
       if (feedEl) feedEl.innerHTML = emptyMsg;
       if (listEl) listEl.innerHTML = emptyMsg;
       return;
@@ -3200,7 +3206,11 @@ async function loadActivitiesFeed() {
     acts.forEach((a, idx) => {
       const isFuerza = a.sport_type === "Fuerza";
       const isBici = a.sport_type === "Ciclismo";
-      const sportIcon = isFuerza ? "🏋️" : isBici ? "🚴" : "🏃";
+      const sportSvg = isFuerza
+        ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FC5200" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/></svg>`
+        : isBici
+        ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0077CC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>`
+        : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 4v6l3.5 3.5"/><circle cx="12" cy="12" r="9"/></svg>`;
       const badgeBg = isFuerza ? "rgba(252,82,0,0.10)" : isBici ? "rgba(0,119,204,0.10)" : "rgba(22,163,74,0.10)";
       const badgeColor = isFuerza ? "#FC5200" : isBici ? "#0077CC" : "#16A34A";
       const paceOrSpeed = isBici && a.duration_min > 0
@@ -3214,7 +3224,7 @@ async function loadActivitiesFeed() {
         <article class="glass-card strava-feed-card" onclick="openActivityDetail('${a.external_id}')">
           <div class="strava-feed-header">
             <div class="strava-feed-meta">
-              <span class="strava-feed-avatar">${sportIcon}</span>
+              <span class="strava-feed-avatar">${sportSvg}</span>
               <div>
                 <h3 class="strava-feed-title">${a.name}</h3>
                 <span class="strava-feed-date tabular-num">${a.start_date} • ${a.sport_type}</span>

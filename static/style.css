@@ -62,6 +62,25 @@
   outline-offset: 2px;
 }
 
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F7F7FA;
+}
+::-webkit-scrollbar-thumb {
+  background: #D1D5DB;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
+}
+
+input, textarea, select {
+  caret-color: var(--primary);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -504,6 +523,12 @@ body {
   cursor: not-allowed;
 }
 
+.btn:active:not(:disabled),
+.selection-btn:active,
+.strava-chip-btn:active {
+  transform: scale(0.985);
+}
+
 .btn-primary {
   background: var(--primary);
   color: #FFFFFF;
@@ -662,6 +687,11 @@ body {
   font-weight: 700;
   font-size: 0.84rem;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
 
 .btn-rescate:hover {
@@ -747,13 +777,14 @@ body {
 
 .strava-feed-card {
   cursor: pointer;
-  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
   padding: 16px;
 }
 
 .strava-feed-card:hover {
+  transform: translateY(-2px);
   border-color: #D1D5DB;
-  box-shadow: var(--card-shadow-hover);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
 .strava-feed-header {
@@ -805,6 +836,11 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.strava-feed-metric:not(:last-child) {
+  border-right: 1px solid #E5E5EA;
+  padding-right: 10px;
 }
 
 .strava-feed-metric strong {
@@ -961,10 +997,12 @@ body {
   border-radius: 50%;
   background: #FFF2EB;
   border: 1px solid #FFD5BF;
+  color: #FC5200;
+  font-weight: 900;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.3rem;
+  font-size: 1.15rem;
 }
 
 .coach-status-dot {
@@ -1086,10 +1124,12 @@ body {
   border-radius: 50%;
   background: #FFF2EB;
   border: 2px solid var(--primary);
+  color: #FC5200;
+  font-weight: 900;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
+  font-size: 1.85rem;
 }
 
 .level-badge {
@@ -1683,15 +1723,17 @@ body {
   }
 
   .desktop-profile-avatar {
-    width: 48px;
-    height: 48px;
+    width: 46px;
+    height: 46px;
     border-radius: 50%;
     background: #FFF2EB;
     border: 2px solid #FC5200;
+    color: #FC5200;
+    font-weight: 900;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.4rem;
+    font-size: 1.25rem;
     flex-shrink: 0;
   }
 
