@@ -2070,7 +2070,12 @@ async def garmin_status():
     connected = garmin_client.is_garmin_connected()
     write_connected = any(garmin_client.TOKEN_DIR.glob("*.json")) if garmin_client.HAS_GARMINCONNECT else False
     profile = garmin_client.get_garmin_athlete_profile() if connected else {}
-    return {"connected": connected, "write_connected": write_connected, "profile": profile}
+    return {
+        "connected": connected,
+        "write_connected": write_connected,
+        "db_backend": "postgresql" if database.is_postgres_active() else "sqlite",
+        "profile": profile,
+    }
 
 @app.post("/api/garmin/login")
 async def garmin_login(payload: GarminLoginPayload):
@@ -2154,6 +2159,12 @@ PLAN_STATE_FILE = (
 
 def _load_plan_state() -> dict:
     try:
+        raw = database.get_setting("aaron_plan_state")
+        if raw:
+            return json.loads(raw)
+    except Exception as e:
+        print(f"[PlanState] DB read error: {e}")
+    try:
         if os.path.exists(PLAN_STATE_FILE):
             with open(PLAN_STATE_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
@@ -2163,6 +2174,10 @@ def _load_plan_state() -> dict:
 
 
 def _save_plan_state(state_data: dict) -> None:
+    try:
+        database.set_setting("aaron_plan_state", json.dumps(state_data, ensure_ascii=False))
+    except Exception as e:
+        print(f"[PlanState] DB write error: {e}")
     try:
         os.makedirs(os.path.dirname(PLAN_STATE_FILE), exist_ok=True)
         with open(PLAN_STATE_FILE, "w", encoding="utf-8") as f:

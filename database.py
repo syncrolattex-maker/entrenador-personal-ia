@@ -17,6 +17,15 @@ def _use_postgres() -> bool:
     return bool(DATABASE_URL and DATABASE_URL.startswith(("postgres://", "postgresql://")))
 
 
+def is_postgres_active() -> bool:
+    if not _use_postgres():
+        return False
+    conn = _get_conn()
+    active = not isinstance(conn, sqlite3.Connection)
+    conn.close()
+    return active
+
+
 def _get_conn():
     if _use_postgres():
         try:
@@ -92,6 +101,13 @@ def init_db() -> None:
             logged_km REAL DEFAULT 0,
             alert_km REAL DEFAULT 650,
             active INTEGER DEFAULT 1
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
         )
     """)
 
@@ -349,3 +365,28 @@ def add_or_update_gear(name: str, gear_type: str, brand: str, initial_km: float,
     conn.close()
     recalculate_gear_and_prs()
     return get_gear_list()
+
+
+def get_setting(key: str) -> Optional[str]:
+    init_db()
+    conn = _get_conn()
+    cur = conn.cursor()
+    p = _ph(conn)
+    cur.execute(f"SELECT value FROM app_settings WHERE key = {p}", (key,))
+    row = cur.fetchone()
+    conn.close()
+    return row[0] if row else None
+
+
+def set_setting(key: str, value: str) -> None:
+    init_db()
+    conn = _get_conn()
+    cur = conn.cursor()
+    p = _ph(conn)
+    cur.execute(f"SELECT key FROM app_settings WHERE key = {p}", (key,))
+    if cur.fetchone():
+        cur.execute(f"UPDATE app_settings SET value = {p} WHERE key = {p}", (value, key))
+    else:
+        cur.execute(f"INSERT INTO app_settings (key, value) VALUES ({p}, {p})", (key, value))
+    conn.commit()
+    conn.close()

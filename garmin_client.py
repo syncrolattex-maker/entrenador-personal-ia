@@ -35,6 +35,13 @@ def get_saved_personal_key() -> str:
     if key:
         return key
     try:
+        import database
+        db_key = database.get_setting("garmin_personal_key")
+        if db_key:
+            return db_key.strip()
+    except Exception:
+        pass
+    try:
         if PERSONAL_KEY_FILE.exists():
             return PERSONAL_KEY_FILE.read_text(encoding="utf-8").strip()
     except Exception:
@@ -48,10 +55,15 @@ def save_personal_key(api_key: str) -> None:
     _personal_token_cache["token"] = None
     _personal_token_cache["expires_at"] = 0.0
     try:
+        import database
+        database.set_setting("garmin_personal_key", clean)
+    except Exception as e:
+        print(f"[Garmin] Could not persist personal key to DB: {e}")
+    try:
         PERSONAL_KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
         PERSONAL_KEY_FILE.write_text(clean, encoding="utf-8")
     except Exception as e:
-        print(f"[Garmin] Could not persist personal key: {e}")
+        print(f"[Garmin] Could not persist personal key to file: {e}")
 
 
 def _get_personal_api_token() -> Optional[str]:
