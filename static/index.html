@@ -428,22 +428,23 @@
             <span id="garmin-status-badge" class="label-caps" style="padding:4px 10px; border-radius:999px; background:rgba(255,255,255,0.08); color:var(--text-secondary);">Desconectado</span>
           </div>
 
-          <div id="garmin-login-form" style="display:flex; flex-direction:column; gap:10px;">
-            <input type="email" id="garmin-email-input" placeholder="Email de Garmin Connect" style="width:100%; padding:10px 12px; border-radius:8px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.12); color:#FFF;">
-            <input type="password" id="garmin-password-input" placeholder="Contraseña de Garmin Connect" style="width:100%; padding:10px 12px; border-radius:8px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.12); color:#FFF;">
+          <div id="garmin-connected-panel" style="display:none; flex-direction:column; gap:10px; margin-bottom:10px;">
+            <p id="garmin-summary-text" class="body-sm-muted">Lectura Garmin Connect activa. Tus sesiones y métricas se analizan automáticamente.</p>
+            <button type="button" class="btn btn-ghost" style="border:1px solid rgba(0,174,239,0.35); color:#00AEEF;" onclick="syncGarminNow()">
+              🔄 Sincronizar Garmin Ahora
+            </button>
+          </div>
+
+          <div id="garmin-login-form" style="display:flex; flex-direction:column; gap:10px; padding-top:8px; border-top:1px solid var(--border-glass);">
+            <span id="garmin-write-status" class="label-caps" style="color: #FC5200; font-size:0.7rem;">ENVÍO AUTOMÁTICO AL RELOJ: VINCULAR CUENTA GARMIN</span>
+            <input type="email" id="garmin-email-input" placeholder="Email de Garmin Connect" style="width:100%; padding:10px 12px; border-radius:8px; background:var(--surface-container-high); border:1px solid var(--border-glass); color:#FFF;">
+            <input type="password" id="garmin-password-input" placeholder="Contraseña de Garmin Connect" style="width:100%; padding:10px 12px; border-radius:8px; background:var(--surface-container-high); border:1px solid var(--border-glass); color:#FFF;">
             <div id="garmin-mfa-box" style="display:none; flex-direction:column; gap:8px;">
               <input type="text" id="garmin-mfa-input" placeholder="Código 2FA / MFA de Garmin" style="width:100%; padding:10px 12px; border-radius:8px; background:rgba(0,174,239,0.12); border:1px solid #00AEEF; color:#FFF;">
               <button type="button" class="btn btn-primary" onclick="submitGarminMfa()">Verificar Código 2FA</button>
             </div>
             <button type="button" id="btn-garmin-login" class="btn btn-primary" style="background:#00AEEF; color:#000; border:none;" onclick="connectGarminAccount()">
-              Conectar Garmin Connect
-            </button>
-          </div>
-
-          <div id="garmin-connected-panel" style="display:none; flex-direction:column; gap:10px;">
-            <p id="garmin-summary-text" class="body-sm-muted">Garmin Connect conectado. Tus sesiones, HRV, Body Battery y sueño se analizan automáticamente.</p>
-            <button type="button" class="btn btn-ghost" style="border:1px solid rgba(0,174,239,0.35); color:#00AEEF;" onclick="syncGarminNow()">
-              🔄 Sincronizar Garmin Ahora
+              Activar Envío al Reloj Garmin
             </button>
           </div>
         </div>
@@ -575,22 +576,40 @@
     <div class="guided-main">
       <!-- ================== SISTEMA DE FUERZA (ESTILO STRAVA) ================== -->
       <div id="guided-strength-container" style="display:none; width:100%; flex-direction:column; align-items:center; gap:10px;">
-        <!-- Video & Kinetic Biomechanics Motion Card -->
+        <!-- Video & Kinetic Biomechanics Motion Card (Strava/Runna Articulated Rig) -->
         <div id="guided-video-card" class="guided-video-card">
-          <div class="video-container">
-            <!-- Biomechanics SVG Engine -->
-            <div id="guided-biomechanics-canvas" class="biomechanics-canvas anim-squat">
-              <svg viewBox="0 0 200 180" class="biomechanics-svg">
-                <ellipse id="guided-muscle-glow" cx="100" cy="110" rx="40" ry="25" fill="rgba(252,82,0,0.3)"/>
-                <g id="guided-body-group">
-                  <circle cx="100" cy="40" r="12" fill="#E5E2E1"/>
-                  <path d="M100 52 L100 100" stroke="#E5E2E1" stroke-width="8" stroke-linecap="round"/>
-                  <path id="guided-arms" d="M80 65 L100 75 L120 65" stroke="#FC5200" stroke-width="5" stroke-linecap="round" fill="none"/>
-                  <circle id="guided-weight-l" cx="75" cy="65" r="7" fill="#FC5200"/>
-                  <circle id="guided-weight-r" cx="125" cy="65" r="7" fill="#FC5200"/>
-                  <path id="guided-legs" d="M100 100 L85 145 M100 100 L115 145" stroke="#FC5200" stroke-width="7" stroke-linecap="round"/>
-                </g>
-                <line x1="40" y1="152" x2="160" y2="152" stroke="#353534" stroke-width="4" stroke-linecap="round"/>
+          <div class="video-container" style="position:relative; background:#0D1117;">
+            <!-- Toggle between Articulated Animated Athlete & Photo -->
+            <button type="button" id="btn-toggle-ex-photo" onclick="toggleGuidedMediaMode()" style="position:absolute; top:8px; right:8px; z-index:12; background:rgba(18,23,31,0.85); border:1px solid rgba(255,255,255,0.16); color:#F8FAFC; font-size:0.68rem; font-weight:700; padding:4px 9px; border-radius:999px; cursor:pointer;">
+              📷 Ver Foto
+            </button>
+
+            <!-- Articulated 60fps Biomechanics SVG Athlete -->
+            <div id="guided-biomechanics-canvas" class="biomechanics-canvas" style="display:flex; width:100%; height:100%;">
+              <svg id="strava-motion-svg" viewBox="0 0 240 180" class="biomechanics-svg" style="width:100%; height:100%;">
+                <!-- Floor & dynamic shadow -->
+                <line x1="30" y1="162" x2="210" y2="162" stroke="#273142" stroke-width="3" stroke-linecap="round"/>
+                <ellipse id="rig-shadow" cx="120" cy="162" rx="34" ry="5" fill="rgba(0,0,0,0.55)"/>
+                <!-- Muscle focus glow -->
+                <circle id="rig-muscle-glow" cx="120" cy="105" r="26" fill="rgba(252,82,0,0.28)"/>
+
+                <!-- Back Limb Layer -->
+                <line id="rig-thigh-b" x1="120" y1="95" x2="108" y2="128" stroke="#64748B" stroke-width="11" stroke-linecap="round"/>
+                <line id="rig-calf-b" x1="108" y1="128" x2="105" y2="158" stroke="#475569" stroke-width="9" stroke-linecap="round"/>
+                <line id="rig-uarm-b" x1="120" y1="56" x2="102" y2="78" stroke="#64748B" stroke-width="8" stroke-linecap="round"/>
+                <line id="rig-farm-b" x1="102" y1="78" x2="96" y2="96" stroke="#475569" stroke-width="7" stroke-linecap="round"/>
+                <circle id="rig-db-b" cx="96" cy="96" r="7" fill="#00AEEF"/>
+
+                <!-- Core & Torso Layer -->
+                <line id="rig-torso" x1="120" y1="95" x2="120" y2="52" stroke="#E2E8F0" stroke-width="15" stroke-linecap="round"/>
+                <circle id="rig-head" cx="120" cy="34" r="11" fill="#F8FAFC"/>
+
+                <!-- Front Limb Layer (Highlighted in Strava Orange / Neon) -->
+                <line id="rig-thigh-f" x1="120" y1="95" x2="132" y2="128" stroke="#FC5200" stroke-width="12" stroke-linecap="round"/>
+                <line id="rig-calf-f" x1="132" y1="128" x2="135" y2="158" stroke="#FF8A50" stroke-width="10" stroke-linecap="round"/>
+                <line id="rig-uarm-f" x1="120" y1="56" x2="138" y2="78" stroke="#FC5200" stroke-width="9" stroke-linecap="round"/>
+                <line id="rig-farm-f" x1="138" y1="78" x2="144" y2="96" stroke="#FF8A50" stroke-width="8" stroke-linecap="round"/>
+                <circle id="rig-db-f" cx="144" cy="96" r="8" fill="#00E676"/>
               </svg>
               <div class="media-tech-badge">
                 <span id="guided-muscle-name" class="label-caps" style="color: #FC5200;">GLÚTEOS • CUÁDRICEPS</span>

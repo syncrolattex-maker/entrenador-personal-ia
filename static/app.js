@@ -1126,6 +1126,9 @@ function startGuidedSession() {
 }
 
 let _stravaFrameInterval = null;
+let _stravaRigRaf = null;
+let _guidedPhotoUrl = "";
+let _guidedShowPhoto = false;
 
 function _stopStravaFrameAnim() {
   if (_stravaFrameInterval) {
@@ -1134,9 +1137,174 @@ function _stopStravaFrameAnim() {
   }
 }
 
+function stopStravaMotionRig() {
+  if (_stravaRigRaf) {
+    cancelAnimationFrame(_stravaRigRaf);
+    _stravaRigRaf = null;
+  }
+}
+
+function startStravaMotionRig(animClass) {
+  stopStravaMotionRig();
+  const svg = document.getElementById("strava-motion-svg");
+  if (!svg) return;
+
+  const setL = (id, x1, y1, x2, y2) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.setAttribute("x1", x1);
+    el.setAttribute("y1", y1);
+    el.setAttribute("x2", x2);
+    el.setAttribute("y2", y2);
+  };
+  const setC = (id, cx, cy, r) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.setAttribute("cx", cx);
+    el.setAttribute("cy", cy);
+    if (r !== undefined) el.setAttribute("r", r);
+  };
+
+  const tempoEl = document.getElementById("guided-tempo-text");
+  const mode = (animClass || "anim-squat").replace("anim-", "");
+
+  function frame(ts) {
+    // 3.2s full rep cycle: smooth eccentric -> pause -> concentric
+    const t = (ts % 3200) / 3200;
+    const p = 0.5 - 0.5 * Math.cos(t * Math.PI * 2); // 0 -> 1 -> 0
+
+    if (tempoEl && !_guidedShowPhoto) {
+      if (t < 0.42) tempoEl.textContent = "⬇️ BAJADA CONTROLADA (3s)";
+      else if (t < 0.58) tempoEl.textContent = "🔥 CONTRACCIÓN MÁXIMA (1s)";
+      else tempoEl.textContent = "⬆️ EMPUJE EXPLOSIVO (1s)";
+    }
+
+    if (mode === "squat") {
+      const hipY = 95 + p * 36;
+      const kneeX = 124 + p * 22;
+      const kneeY = 128 + p * 8;
+      const torsoLean = p * 12;
+      setC("rig-shadow", 120, 162, 30 + p * 10);
+      setC("rig-muscle-glow", 120, hipY + 8, 22 + p * 10);
+      setL("rig-torso", 120 - torsoLean * 0.4, hipY, 120 + torsoLean, hipY - 43);
+      setC("rig-head", 120 + torsoLean + 2, hipY - 58);
+      // Legs
+      setL("rig-thigh-b", 120 - torsoLean * 0.4, hipY, kneeX - 10, kneeY);
+      setL("rig-calf-b", kneeX - 10, kneeY, 108, 158);
+      setL("rig-thigh-f", 120 - torsoLean * 0.4, hipY, kneeX + 6, kneeY);
+      setL("rig-calf-f", kneeX + 6, kneeY, 126, 158);
+      // Arms holding 5kg dumbbells
+      const shX = 120 + torsoLean, shY = hipY - 38;
+      const handX = shX + 18 + p * 18, handY = shY + 26 - p * 18;
+      setL("rig-uarm-b", shX, shY, shX + 8, shY + 18);
+      setL("rig-farm-b", shX + 8, shY + 18, handX - 8, handY);
+      setC("rig-db-b", handX - 8, handY);
+      setL("rig-uarm-f", shX, shY, shX + 10, shY + 20);
+      setL("rig-farm-f", shX + 10, shY + 20, handX, handY);
+      setC("rig-db-f", handX, handY);
+    } else if (mode === "lunge") {
+      const hipY = 95 + p * 28;
+      setC("rig-shadow", 120, 162, 38);
+      setC("rig-muscle-glow", 126, hipY + 12, 22 + p * 10);
+      setL("rig-torso", 120, hipY, 122, hipY - 43);
+      setC("rig-head", 122, hipY - 58);
+      // Split legs
+      setL("rig-thigh-b", 120, hipY, 92, 126 + p * 20);
+      setL("rig-calf-b", 92, 126 + p * 20, 74, 158);
+      setL("rig-thigh-f", 120, hipY, 152, 122 + p * 8);
+      setL("rig-calf-f", 152, 122 + p * 8, 154, 158);
+      // Arms at sides with 5kg dumbbells
+      setL("rig-uarm-b", 122, hipY - 38, 108, hipY - 14);
+      setL("rig-farm-b", 108, hipY - 14, 106, hipY + 6);
+      setC("rig-db-b", 106, hipY + 6);
+      setL("rig-uarm-f", 122, hipY - 38, 134, hipY - 14);
+      setL("rig-farm-f", 134, hipY - 14, 136, hipY + 6);
+      setC("rig-db-f", 136, hipY + 6);
+    } else if (mode === "press") {
+      // Overhead / shoulder press with 5kg dumbbells
+      setC("rig-shadow", 120, 162, 28);
+      setC("rig-muscle-glow", 120, 56, 20 + p * 12);
+      setL("rig-torso", 120, 98, 120, 54);
+      setC("rig-head", 120, 36);
+      setL("rig-thigh-b", 120, 98, 110, 128);
+      setL("rig-calf-b", 110, 128, 108, 158);
+      setL("rig-thigh-f", 120, 98, 130, 128);
+      setL("rig-calf-f", 130, 128, 132, 158);
+      const elbowY = 62 - p * 26;
+      const handY = 42 - p * 28;
+      setL("rig-uarm-b", 120, 58, 94, elbowY);
+      setL("rig-farm-b", 94, elbowY, 98, handY);
+      setC("rig-db-b", 98, handY);
+      setL("rig-uarm-f", 120, 58, 146, elbowY);
+      setL("rig-farm-f", 146, elbowY, 142, handY);
+      setC("rig-db-f", 142, handY);
+    } else if (mode === "row") {
+      // Bent-over row / hinge with 5kg dumbbells
+      setC("rig-shadow", 120, 162, 34);
+      setC("rig-muscle-glow", 126, 72, 20 + p * 10);
+      setL("rig-torso", 104, 100, 144, 68);
+      setC("rig-head", 156, 56);
+      setL("rig-thigh-b", 104, 100, 98, 130);
+      setL("rig-calf-b", 98, 130, 96, 158);
+      setL("rig-thigh-f", 104, 100, 116, 130);
+      setL("rig-calf-f", 116, 130, 114, 158);
+      const pullY = 122 - p * 44;
+      setL("rig-uarm-b", 140, 72, 136 - p * 16, pullY - 12);
+      setL("rig-farm-b", 136 - p * 16, pullY - 12, 138, pullY);
+      setC("rig-db-b", 138, pullY);
+      setL("rig-uarm-f", 144, 72, 140 - p * 16, pullY - 12);
+      setL("rig-farm-f", 140 - p * 16, pullY - 12, 146, pullY);
+      setC("rig-db-f", 146, pullY);
+    } else {
+      // Plank / Core isometric hold with breathing pulse
+      const breath = Math.sin(ts / 450) * 2.5;
+      setC("rig-shadow", 120, 162, 65);
+      setC("rig-muscle-glow", 120, 128 + breath, 22 + Math.abs(breath) * 2);
+      setL("rig-torso", 76, 132 + breath, 154, 122 + breath);
+      setC("rig-head", 172, 116 + breath);
+      setL("rig-thigh-b", 76, 132 + breath, 52, 146);
+      setL("rig-calf-b", 52, 146, 38, 158);
+      setL("rig-thigh-f", 76, 132 + breath, 54, 148);
+      setL("rig-calf-f", 54, 148, 40, 158);
+      setL("rig-uarm-b", 150, 124 + breath, 154, 144);
+      setL("rig-farm-b", 154, 144, 168, 156);
+      setC("rig-db-b", 168, 156, 3);
+      setL("rig-uarm-f", 154, 124 + breath, 158, 144);
+      setL("rig-farm-f", 158, 144, 174, 156);
+      setC("rig-db-f", 174, 156, 3);
+    }
+
+    _stravaRigRaf = requestAnimationFrame(frame);
+  }
+  _stravaRigRaf = requestAnimationFrame(frame);
+}
+
+function toggleGuidedMediaMode() {
+  _guidedShowPhoto = !_guidedShowPhoto;
+  const canvasEl = document.getElementById("guided-biomechanics-canvas");
+  const imgEl = document.getElementById("guided-exercise-img");
+  const btn = document.getElementById("btn-toggle-ex-photo");
+
+  if (_guidedShowPhoto && _guidedPhotoUrl && imgEl) {
+    stopStravaMotionRig();
+    if (canvasEl) canvasEl.style.display = "none";
+    imgEl.src = _guidedPhotoUrl;
+    imgEl.style.display = "block";
+    if (btn) btn.textContent = "🏃 Ver Muñeco";
+  } else {
+    _guidedShowPhoto = false;
+    if (imgEl) imgEl.style.display = "none";
+    if (canvasEl) canvasEl.style.display = "flex";
+    if (btn) btn.textContent = "📷 Ver Foto";
+    const animClass = canvasEl?.dataset?.anim || "anim-squat";
+    startStravaMotionRig(animClass);
+  }
+}
+
 function closeGuided() {
   clearTimer();
   _stopStravaFrameAnim();
+  stopStravaMotionRig();
   if (_runnaNeedleInterval) {
     clearInterval(_runnaNeedleInterval);
     _runnaNeedleInterval = null;
@@ -2491,17 +2659,22 @@ function openExerciseVideoModal(arg1, arg2, arg3) {
     };
   }
 
-  // Reset media elements
+  // Reset media elements & ALWAYS start Articulated Strava/Runna Athlete Rig
   _stopStravaFrameAnim();
+  _guidedPhotoUrl = gifUrl || "";
+  _guidedShowPhoto = false;
+  const animClass = match ? match.animClass : "anim-squat";
+  const toggleBtn = document.getElementById("btn-toggle-ex-photo");
+  if (toggleBtn) toggleBtn.style.display = _guidedPhotoUrl ? "inline-block" : "none";
+  if (toggleBtn) toggleBtn.textContent = "📷 Ver Foto";
+
   if (videoEl) { videoEl.pause(); videoEl.src = ""; videoEl.style.display = "none"; }
   if (imgEl)   imgEl.style.display = "none";
 
-  if (videoUrl) {
-    _showVideo(videoUrl);
-  } else if (gifUrl) {
-    _showImage(gifUrl);
-  } else if (canvasEl) {
+  if (canvasEl) {
+    canvasEl.dataset.anim = animClass;
     canvasEl.style.display = "flex";
+    startStravaMotionRig(animClass);
   }
 
   // ── Instructions and tips ─────────────────────────────────────────────────
@@ -2576,30 +2749,36 @@ async function checkGarminStatus() {
     const res = await fetch("/api/garmin/status");
     if (!res.ok) return;
     const data = await res.json();
-    updateGarminUI(data.connected, data.profile);
+    updateGarminUI(data.connected, data.profile, data.write_connected);
   } catch (e) {
     console.warn("Garmin status check failed:", e);
   }
 }
 
-function updateGarminUI(connected, profile) {
+function updateGarminUI(connected, profile, writeConnected = false) {
   const badge = document.getElementById("garmin-status-badge");
   const loginForm = document.getElementById("garmin-login-form");
   const connectedPanel = document.getElementById("garmin-connected-panel");
   const summaryText = document.getElementById("garmin-summary-text");
+  const writeStatus = document.getElementById("garmin-write-status");
 
   if (!badge || !loginForm || !connectedPanel) return;
 
   if (connected) {
-    badge.textContent = "Conectado";
+    badge.textContent = writeConnected ? "Lectura + Reloj OK" : "Lectura Activa";
     badge.style.background = "rgba(0, 174, 239, 0.18)";
     badge.style.color = "#00AEEF";
-    loginForm.style.display = "none";
     connectedPanel.style.display = "flex";
+    loginForm.style.display = writeConnected ? "none" : "flex";
+    if (writeStatus) {
+      writeStatus.textContent = writeConnected
+        ? "✅ ENVÍO AUTOMÁTICO AL RELOJ ACTIVO"
+        : "ENVÍO AUTOMÁTICO AL RELOJ: INICIA SESIÓN CON TU CUENTA GARMIN";
+    }
     if (profile && profile.nombre && summaryText) {
       const vo2 = profile.vo2max_carrera ? ` • VO2 Máx: ${profile.vo2max_carrera}` : "";
       const peso = profile.peso_kg ? ` • Peso Garmin: ${profile.peso_kg} kg` : "";
-      summaryText.textContent = `Vinculado como ${profile.nombre}${peso}${vo2}. Tus entrenamientos y sueño se analizan automáticamente.`;
+      summaryText.textContent = `Vinculado como ${profile.nombre}${peso}${vo2}. Tus entrenamientos y métricas se analizan automáticamente.`;
     }
   } else {
     badge.textContent = "Desconectado";

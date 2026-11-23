@@ -2051,8 +2051,9 @@ class GarminMfaPayload(BaseModel):
 @app.get("/api/garmin/status")
 async def garmin_status():
     connected = garmin_client.is_garmin_connected()
+    write_connected = any(garmin_client.TOKEN_DIR.glob("*.json")) if garmin_client.HAS_GARMINCONNECT else False
     profile = garmin_client.get_garmin_athlete_profile() if connected else {}
-    return {"connected": connected, "profile": profile}
+    return {"connected": connected, "write_connected": write_connected, "profile": profile}
 
 @app.post("/api/garmin/login")
 async def garmin_login(payload: GarminLoginPayload):
