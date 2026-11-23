@@ -6,14 +6,18 @@ from datetime import datetime, date, timedelta
 from pathlib import Path
 from typing import Optional, Dict, List, Any
 
-from garminconnect import (
-    Garmin,
-    GarminConnectAuthenticationError,
-    GarminConnectConnectionError,
-    GarminConnectTooManyRequestsError,
-)
+try:
+    from garminconnect import Garmin
+    HAS_GARMINCONNECT = True
+except ImportError:
+    Garmin = None  # type: ignore
+    HAS_GARMINCONNECT = False
 
-TOKEN_DIR = Path(__file__).parent / ".garmin_tokens"
+TOKEN_DIR = (
+    Path("/tmp/.garmin_tokens")
+    if os.getenv("VERCEL")
+    else Path(__file__).parent / ".garmin_tokens"
+)
 PERSONAL_API_BASE = "https://personal.connectapi.garmin.com"
 
 # Temporary in-memory store for pending MFA login flows and Personal API token cache
@@ -66,8 +70,10 @@ def _map_garmin_type(type_key: str) -> str:
     return type_key.replace("_", " ").title() if type_key else "Entrenamiento"
 
 
-def get_garmin_client() -> Optional[Garmin]:
+def get_garmin_client() -> Optional[Any]:
     """Returns an authenticated Garmin client using saved tokens or .env credentials."""
+    if not HAS_GARMINCONNECT:
+        return None
     TOKEN_DIR.mkdir(parents=True, exist_ok=True)
     token_files = list(TOKEN_DIR.glob("*.json"))
 
@@ -103,6 +109,8 @@ def get_garmin_client() -> Optional[Garmin]:
 
 def start_garmin_login(email: str, password: str) -> Dict[str, Any]:
     """Starts a Garmin Connect login flow. Supports 2FA/MFA."""
+    if not HAS_GARMINCONNECT:
+        return {"status": "error", "message": "Usa GARMIN_PERSONAL_API_KEY (GCDC_...) en entorno serverless."}
     TOKEN_DIR.mkdir(parents=True, exist_ok=True)
     try:
         client = Garmin(email=email, password=password, return_on_mfa=True)
