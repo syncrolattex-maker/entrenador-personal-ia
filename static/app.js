@@ -3153,6 +3153,31 @@ function renderPersonalRecords(prs) {
 }
 
 const VOYAGER_TILE_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+const OSM_FALLBACK_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+function renderStravaLeafletRoute(map, polyline) {
+  const voyagerLayer = L.tileLayer(VOYAGER_TILE_URL, {
+    attribution: "&copy; OpenStreetMap &copy; CARTO",
+    subdomains: "abcd",
+    maxZoom: 19
+  });
+
+  let fallbackAdded = false;
+  voyagerLayer.on("tileerror", () => {
+    if (fallbackAdded) return;
+    fallbackAdded = true;
+    map.removeLayer(voyagerLayer);
+    L.tileLayer(OSM_FALLBACK_TILE_URL, {
+      attribution: "&copy; OpenStreetMap",
+      maxZoom: 19
+    }).addTo(map);
+  });
+
+  voyagerLayer.addTo(map);
+  const route = L.polyline(polyline, { color: "#FC5200", weight: 3.5, opacity: 0.95 }).addTo(map);
+  map.fitBounds(route.getBounds(), { padding: [16, 16] });
+  return route;
+}
 
 async function loadActivitiesFeed() {
   const feedEl = document.getElementById("dashboard-activities-feed");
@@ -3278,9 +3303,7 @@ async function loadActivitiesFeed() {
           const mapEl = document.getElementById(`feed-minimap-${idx}`);
           if (!mapEl) return;
           const m = L.map(mapEl, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false });
-          L.tileLayer(VOYAGER_TILE_URL, { maxZoom: 18 }).addTo(m);
-          const line = L.polyline(a.polyline, { color: "#FC5200", weight: 3.5 }).addTo(m);
-          m.fitBounds(line.getBounds(), { padding: [12, 12] });
+          renderStravaLeafletRoute(m, a.polyline);
         }
       });
     }
@@ -3317,9 +3340,7 @@ async function openActivityDetail(externalId) {
       mapCont.style.display = "block";
       setTimeout(() => {
         _detailMapInstance = L.map(mapCont);
-        L.tileLayer(VOYAGER_TILE_URL, { maxZoom: 18 }).addTo(_detailMapInstance);
-        const line = L.polyline(act.polyline, { color: "#FC5200", weight: 3.5 }).addTo(_detailMapInstance);
-        _detailMapInstance.fitBounds(line.getBounds(), { padding: [16, 16] });
+        renderStravaLeafletRoute(_detailMapInstance, act.polyline);
       }, 60);
     } else {
       mapCont.style.display = "none";
