@@ -17,7 +17,7 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=72">
+  <link rel="stylesheet" href="/style.css?v=73">
 
   <!-- Icons & Fonts (Hanken Grotesk & JetBrains Mono) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -384,10 +384,49 @@
             <div id="summit-bubble-grid" class="summit-bubble-grid"></div>
           </div>
 
-          <!-- Mejores Esfuerzos (PRs) -->
+          <!-- Mejores Tiempos (GPS) -->
           <div class="glass-card" id="summit-prs-card">
-            <h2 class="headline-sm" style="margin:0;">Mejores Esfuerzos (PRs)</h2>
+            <h2 class="headline-sm" style="margin:0;">Mejores Tiempos (GPS)</h2>
             <div id="summit-prs-grid" style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;"></div>
+          </div>
+
+          <!-- Récords Personales Oficiales (RP Manual) -->
+          <div class="glass-card" id="summit-official-prs-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+              <h2 class="headline-sm" style="margin:0;">Récords Personales Oficiales (RP)</h2>
+              <button type="button" class="strava-chip-btn" style="font-size:0.75rem; padding:4px 10px;" onclick="toggleOfficialPrForm()">+ Añadir RP</button>
+            </div>
+            <div id="summit-official-prs-grid" style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;">
+              <p class="body-sm-muted" style="grid-column:1/-1;">Añade tus marcas oficiales en carrera o competición.</p>
+            </div>
+            <div id="official-pr-form" style="display:none; flex-direction:column; gap:8px; padding-top:8px; border-top:1px solid var(--border-glass);">
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <select id="official-pr-category" class="strava-input">
+                  <option value="5K">5K Oficial</option>
+                  <option value="10K">10K Oficial</option>
+                  <option value="21K">Media Maratón</option>
+                  <option value="42K">Maratón</option>
+                  <option value="CUSTOM">Otro RP</option>
+                </select>
+                <input type="text" id="official-pr-value" class="strava-input" placeholder="Marca (ej. 46:12)">
+              </div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <input type="text" id="official-pr-label" class="strava-input" placeholder="Etiqueta (ej. 10K Valencia)">
+                <input type="date" id="official-pr-date" class="strava-input">
+              </div>
+              <button type="button" class="btn btn-primary" style="padding:9px; font-size:0.85rem;" onclick="saveOfficialPr()">Guardar RP Oficial</button>
+            </div>
+          </div>
+
+          <!-- Mis Segmentos -->
+          <div class="glass-card summit-fitness-full" id="summit-segments-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+              <h2 class="headline-sm" style="margin:0;">Mis Segmentos</h2>
+              <span class="body-xs">Radio de detección GPS: 35 m</span>
+            </div>
+            <div id="summit-segments-list" style="display:flex; flex-direction:column; gap:10px;">
+              <p class="body-sm-muted">Abre cualquier actividad con mapa y pulsa «Guardar como Segmento» para seguir tus tiempos históricos.</p>
+            </div>
           </div>
         </div>
 
@@ -912,6 +951,10 @@
         <div class="detail-col-left">
           <div id="detail-map-container" class="detail-map-box"></div>
 
+          <div id="detail-create-segment-wrap" style="display:none; justify-content:flex-end;">
+            <button type="button" id="btn-create-segment-from-act" class="strava-chip-btn" style="padding:6px 12px; font-size:0.78rem;">+ Guardar ruta como Segmento</button>
+          </div>
+
           <div class="glass-card" id="detail-chart-card" style="display:none;">
             <h3 class="headline-sm" style="margin:0;">Elevación, Ritmo y FC</h3>
             <div id="detail-chart-svg" style="width:100%; height:150px;"></div>
@@ -919,6 +962,45 @@
         </div>
 
         <div class="detail-col-right">
+          <!-- Esfuerzo Relativo, RPE (1-10) & VAM -->
+          <div class="glass-card" id="detail-effort-card">
+            <h3 class="headline-sm" style="margin:0;">Carga Fisiológica</h3>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+              <div class="p-stat-box">
+                <span class="label-caps">ESFUERZO RELATIVO</span>
+                <span id="detail-relative-effort" class="p-stat-val tabular-num" style="color: var(--primary-text);">—</span>
+              </div>
+              <div class="p-stat-box">
+                <span class="label-caps">VAM</span>
+                <span id="detail-vam-mh" class="p-stat-val tabular-num">—</span>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <span class="label-caps">ESFUERZO PERCIBIDO (RPE 1–10)</span>
+              <div id="detail-rpe-buttons" class="rpe-selector-row"></div>
+            </div>
+          </div>
+
+          <!-- Potencia, Energía y Banda de Intensidad (Ciclismo) -->
+          <div class="glass-card" id="detail-cycling-card" style="display:none;">
+            <h3 class="headline-sm" style="margin:0;">Rendimiento en Ciclismo</h3>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;">
+              <div class="p-stat-box">
+                <span class="label-caps">POTENCIA</span>
+                <span id="detail-power-w" class="p-stat-val tabular-num">—</span>
+              </div>
+              <div class="p-stat-box">
+                <span class="label-caps">GASTO</span>
+                <span id="detail-energy-kj" class="p-stat-val tabular-num">—</span>
+              </div>
+              <div class="p-stat-box">
+                <span class="label-caps">INTENSIDAD</span>
+                <span id="detail-intensity-pct" class="p-stat-val tabular-num">—</span>
+              </div>
+            </div>
+            <div id="detail-intensity-band" class="intensity-band-pill">—</div>
+          </div>
+
           <div class="glass-card" id="detail-splits-card" style="display:none;">
             <h3 class="headline-sm" style="margin:0;">Splits por kilómetro</h3>
             <div id="detail-splits-list" style="display:flex; flex-direction:column; gap:8px;"></div>
@@ -986,6 +1068,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=72"></script>
+  <script src="/app.js?v=73"></script>
 </body>
 </html>

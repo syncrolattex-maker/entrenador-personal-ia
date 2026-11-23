@@ -261,6 +261,7 @@ def get_garmin_history(limit: int = 30) -> List[dict]:
             "efecto_aerobico": act.get("aerobicTrainingEffect"),
             "efecto_anaerobico": act.get("anaerobicTrainingEffect"),
             "cadencia_media": act.get("averageRunningCadenceInStepsPerMinute"),
+            "avg_power_w": act.get("avgPower") or act.get("averagePower"),
             "fuente": "Garmin Connect",
         })
 
@@ -605,7 +606,7 @@ def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
     idx_spd = desc.get("directSpeed")
 
     rows = data.get("activityDetailMetrics") or []
-    chart_dist, chart_elev, chart_hr, chart_pace = [], [], [], []
+    chart_dist, chart_elev, chart_hr, chart_pace, chart_time = [], [], [], [], []
     hr_counts = [0, 0, 0, 0, 0]  # Z1..Z5
 
     # Splits accumulator per 1000m
@@ -646,6 +647,7 @@ def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
             chart_hr.append(round(hr) if hr is not None else None)
             pace_s = round(1000.0 / spd) if (spd and spd > 0.4) else None
             chart_pace.append(pace_s)
+            chart_time.append(round(t_s, 1) if t_s is not None else None)
 
             if t_s is not None and d_m >= current_km * 1000.0:
                 seg_t = max(1.0, t_s - split_start_t)
@@ -693,5 +695,6 @@ def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
             "elevation_m": chart_elev,
             "hr": chart_hr,
             "pace_sec": chart_pace,
+            "time_sec": chart_time,
         },
     }

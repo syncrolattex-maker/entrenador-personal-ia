@@ -3055,9 +3055,101 @@ async function loadSummitAnalytics() {
     renderTrainingLogBubbles("Todo");
     renderFitnessFreshnessChart(_summitData.fitness_curve || []);
     renderPersonalRecords(_summitData.personal_records || []);
+    renderOfficialRecords(_summitData.official_records || []);
+    loadSegmentsList();
   } catch (e) {
     console.warn("Summit analytics load failed:", e);
   }
+}
+
+function renderOfficialRecords(records) {
+  const grid = document.getElementById("summit-official-prs-grid");
+  if (!grid) return;
+  if (!records || records.length === 0) {
+    grid.innerHTML = `<p class="body-sm-muted" style="grid-column:1/-1;">Añade tus marcas oficiales en carrera o competición.</p>`;
+    return;
+  }
+  grid.innerHTML = records.map(pr => `
+    <div class="p-stat-box" style="text-align:left; border-color:#FFD5BF; background:#FFF7F3;">
+      <span class="label-caps" style="color: var(--primary-text); font-size:0.72rem;">RP • ${pr.label}</span>
+      <span class="p-stat-val tabular-num" style="color: var(--on-surface); font-size:1.05rem;">${pr.best_value}</span>
+      <span class="body-xs tabular-num" style="color:var(--text-muted);">${pr.achieved_date || ""}</span>
+    </div>
+  `).join("");
+}
+
+function toggleOfficialPrForm() {
+  const f = document.getElementById("official-pr-form");
+  if (f) f.style.display = f.style.display === "none" ? "flex" : "none";
+}
+
+async function saveOfficialPr() {
+  const cat = document.getElementById("official-pr-category")?.value || "10K";
+  const val = document.getElementById("official-pr-value")?.value.trim();
+  const label = document.getElementById("official-pr-label")?.value.trim() || cat;
+  const dt = document.getElementById("official-pr-date")?.value || "";
+  if (!val) return;
+  try {
+    const res = await fetch("/api/personal-records/official", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category: cat, label, best_value: val, achieved_date: dt })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      renderOfficialRecords(data.official_records || []);
+      toggleOfficialPrForm();
+      showSuccessBanner("RP Oficial guardado.");
+    }
+  } catch (e) {}
+}
+
+async function loadSegmentsList() {
+  const listEl = document.getElementById("summit-segments-list");
+  if (!listEl) return;
+  try {
+    const res = await fetch("/api/segments");
+    if (!res.ok) return;
+    const data = await res.json();
+    const segs = data.segments || [];
+    if (segs.length === 0) {
+      listEl.innerHTML = `<p class="body-sm-muted">Abre cualquier actividad con mapa y pulsa «Guardar ruta como Segmento» para seguir tus tiempos históricos.</p>`;
+      return;
+    }
+    listEl.innerHTML = segs.map(seg => {
+      const distKm = ((seg.distance_m || 0) / 1000).toFixed(2);
+      const effortsHtml = (seg.efforts || []).slice(0, 6).map((e, i) => `
+        <button type="button" class="segment-effort-chip ${i === 0 ? 'best' : ''}" onclick="openActivityDetail('${e.activity_id}')">
+          ${i === 0 ? 'PR ' : ''}${e.elapsed_str} (${(e.achieved_date || '').slice(0, 10)})${e.vam_mh ? ` • ${e.vam_mh} m/h` : ''}
+        </button>
+      `).join("");
+      return `
+        <div class="segment-card-row">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <strong style="font-size:0.92rem; color:var(--on-surface);">${seg.name}</strong>
+            <span class="pill-tag orange tabular-num">${seg.sport_type} • ${distKm} km</span>
+          </div>
+          <div class="segment-efforts-list">${effortsHtml || `<span class="body-xs">Sin intentos detectados todavía.</span>`}</div>
+        </div>
+      `;
+    }).join("");
+  } catch (e) {}
+}
+
+async function createSegmentFromActivity(externalId, defaultName) {
+  const segName = window.prompt("Nombre del segmento (ej. Subida al Garbí):", defaultName || "Segmento Personal");
+  if (!segName || !segName.trim()) return;
+  try {
+    const res = await fetch("/api/segments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: segName.trim(), activity_id: externalId })
+    });
+    if (res.ok) {
+      await loadSegmentsList();
+      showSuccessBanner("Segmento guardado e intentos históricos detectados.");
+    }
+  } catch (e) {}
 }
 
 function filterTrainingLog(sport, btnEl) {
@@ -3335,15 +3427,51 @@ async function openActivityDetail(externalId) {
 
     // Render full Leaflet map
     const mapCont = document.getElementById("detail-map-container");
+    const segBtnWrap = document.getElementById("detail-create-segment-wrap");
+    const segBtn = document.getElementById("btn-create-segment-from-act");
     if (_detailMapInstance) { _detailMapInstance.remove(); _detailMapInstance = null; }
     if (window.L && act.polyline && act.polyline.length > 2) {
       mapCont.style.display = "block";
+      if (segBtnWrap && segBtn) {
+        segBtnWrap.style.display = "flex";
+        segBtn.onclick = () => createSegmentFromActivity(act.external_id, act.name);
+      }
       setTimeout(() => {
         _detailMapInstance = L.map(mapCont);
         renderStravaLeafletRoute(_detailMapInstance, act.polyline);
       }, 60);
     } else {
       mapCont.style.display = "none";
+      if (segBtnWrap) segBtnWrap.style.display = "none";
+    }
+
+    // Render Relative Effort, VAM & Interactive RPE (1-10)
+    const relEl = document.getElementById("detail-relative-effort");
+    const vamEl = document.getElementById("detail-vam-mh");
+    const rpeWrap = document.getElementById("detail-rpe-buttons");
+    if (relEl) relEl.textContent = act.relative_effort !== null && act.relative_effort !== undefined ? `${act.relative_effort}` : "—";
+    if (vamEl) vamEl.textContent = act.vam_mh ? `${act.vam_mh} m/h` : "—";
+    if (rpeWrap) {
+      const currentRpe = Number(act.rpe || 0);
+      rpeWrap.innerHTML = Array.from({ length: 10 }, (_, i) => i + 1).map(n => `
+        <button type="button" class="rpe-btn ${currentRpe === n ? 'active' : ''}" onclick="setActivityRpe('${act.external_id}', ${n})">${n}</button>
+      `).join("");
+    }
+
+    // Render Cycling Power, Energy & Intensity Band
+    const cycCard = document.getElementById("detail-cycling-card");
+    if (cycCard) {
+      if (isBici && act.avg_power_w) {
+        cycCard.style.display = "flex";
+        document.getElementById("detail-power-w").textContent = `${Math.round(act.avg_power_w)} W`;
+        document.getElementById("detail-energy-kj").textContent = act.energy_kj ? `${Math.round(act.energy_kj)} kJ` : "—";
+        const pct = Number(act.intensity_pct || 0);
+        document.getElementById("detail-intensity-pct").textContent = pct ? `${pct}%` : "—";
+        const band = pct >= 95 ? "Contrarreloj (Z4–Z5)" : pct >= 80 ? "Con ritmo (Tempo)" : pct >= 65 ? "Moderada (Aeróbica)" : "Resistencia (Z1–Z2)";
+        document.getElementById("detail-intensity-band").textContent = `Zona de Intensidad: ${band}`;
+      } else {
+        cycCard.style.display = "none";
+      }
     }
 
     // Render Strava-style Splits Table
@@ -3421,6 +3549,26 @@ function closeActivityDetailModal() {
   const modal = document.getElementById("activity-detail-modal");
   if (modal) modal.style.display = "none";
   if (_detailMapInstance) { _detailMapInstance.remove(); _detailMapInstance = null; }
+}
+
+async function setActivityRpe(externalId, rpe) {
+  try {
+    const res = await fetch(`/api/activities/${externalId}/rpe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rpe })
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const relEl = document.getElementById("detail-relative-effort");
+    if (relEl && data.relative_effort !== null && data.relative_effort !== undefined) {
+      relEl.textContent = `${data.relative_effort}`;
+    }
+    const rpeBtns = document.querySelectorAll("#detail-rpe-buttons .rpe-btn");
+    rpeBtns.forEach((btn, idx) => btn.classList.toggle("active", idx + 1 === rpe));
+    loadSummitAnalytics();
+    showSuccessBanner(`RPE ${rpe}/10 guardado.`);
+  } catch (e) {}
 }
 
 // ============================================================

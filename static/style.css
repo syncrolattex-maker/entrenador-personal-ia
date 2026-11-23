@@ -1817,3 +1817,82 @@ body {
     height: 340px;
   }
 }
+
+
+/* ==========================================================================
+   PHYSIOLOGICAL METRICS: RPE (1-10), CYCLING INTENSITY & SEGMENTS
+   ========================================================================== */
+.rpe-selector-row {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 4px;
+}
+
+.rpe-btn {
+  padding: 7px 0;
+  border-radius: 6px;
+  border: 1px solid #E5E5EA;
+  background: #F7F7FA;
+  color: var(--text-primary);
+  font-family: var(--font-hanken);
+  font-weight: 700;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.rpe-btn:hover {
+  border-color: var(--primary);
+}
+
+.rpe-btn.active {
+  background: #FC5200;
+  border-color: #FC5200;
+  color: #FFFFFF;
+}
+
+.intensity-band-pill {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #F7F7FA;
+  border: 1px solid #E5E5EA;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.segment-card-row {
+  background: #F7F7FA;
+  border: 1px solid #E5E5EA;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.segment-efforts-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.segment-effort-chip {
+  font-size: 0.76rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #FFFFFF;
+  border: 1px solid #E5E5EA;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.segment-effort-chip.best {
+  border-color: #FC5200;
+  color: var(--primary-text);
+  background: #FFF7F3;
+}

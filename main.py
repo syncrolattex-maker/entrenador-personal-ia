@@ -2491,6 +2491,7 @@ async def api_summit_analytics():
             "km": float(a.get("distance_km") or 0),
             "min": float(a.get("duration_min") or 0),
             "name": a.get("name", ""),
+            "relative_effort": a.get("relative_effort"),
         })
 
     training_log = []
@@ -2506,7 +2507,7 @@ async def api_summit_analytics():
             "total_min": round(sum(e["min"] for e in entries)),
         })
 
-    # 2. Fitness & Freshness 90-day curve (Banister EWMA CTL/ATL/TSB)
+    # 2. Fitness & Freshness 90-day curve (Banister EWMA CTL/ATL/TSB powered by real Relative Effort TRIMP)
     ctl, atl = 18.0, 18.0
     fitness_curve = []
     start_90 = today - timedelta(days=89)
@@ -2514,8 +2515,12 @@ async def api_summit_analytics():
         d = start_90 + timedelta(days=i)
         ds = d.isoformat()
         entries = daily_load.get(ds, [])
-        # Approximate TSS from duration & intensity
-        day_tss = sum(e["min"] * (1.25 if e["sport_type"] == "Carrera" else 0.9 if e["sport_type"] == "Ciclismo" else 0.7) for e in entries)
+        day_tss = sum(
+            float(e["relative_effort"])
+            if e.get("relative_effort") is not None
+            else e["min"] * (1.25 if e["sport_type"] == "Carrera" else 0.9 if e["sport_type"] == "Ciclismo" else 0.7)
+            for e in entries
+        )
         ctl = ctl + (day_tss - ctl) / 42.0
         atl = atl + (day_tss - atl) / 7.0
         tsb = ctl - atl
@@ -2526,11 +2531,14 @@ async def api_summit_analytics():
             "tsb": round(tsb, 1),
         })
 
-    prs = database.get_personal_records()
+    all_prs = database.get_personal_records()
+    gps_prs = [p for p in all_prs if int(p.get("is_official") or 0) == 0]
+    official_prs = [p for p in all_prs if int(p.get("is_official") or 0) == 1]
     return {
         "training_log": training_log,
         "fitness_curve": fitness_curve,
-        "personal_records": prs,
+        "personal_records": gps_prs,
+        "official_records": official_prs,
     }
 
 
@@ -2553,6 +2561,81 @@ async def api_add_gear(payload: GearCreatePayload):
         payload.name, payload.gear_type, payload.brand, payload.initial_km, payload.alert_km
     )
     return {"status": "ok", "gear": gear}
+
+
+class ActivityRpePayload(BaseModel):
+    rpe: int
+
+
+@app.post("/api/activities/{external_id}/rpe")
+async def api_set_activity_rpe(external_id: str, payload: ActivityRpePayload):
+    if payload.rpe < 1 or payload.rpe > 10:
+        raise HTTPException(status_code=400, detail="RPE debe estar entre 1 y 10")
+    res = database.update_activity_rpe(external_id, payload.rpe)
+    if not res:
+        raise HTTPException(status_code=404, detail="Actividad no encontrada")
+    return {"status": "ok", **res}
+
+
+class OfficialPrPayload(BaseModel):
+    category: str
+    label: str
+    best_value: str
+    achieved_date: str = ""
+
+
+@app.post("/api/personal-records/official")
+async def api_upsert_official_pr(payload: OfficialPrPayload):
+    records = database.upsert_official_pr(
+        payload.category, payload.label, payload.best_value, payload.achieved_date
+    )
+    official = [p for p in records if int(p.get("is_official") or 0) == 1]
+    return {"status": "ok", "official_records": official}
+
+
+class SegmentCreatePayload(BaseModel):
+    name: str
+    sport_type: str = "Carrera"
+    activity_id: Optional[str] = None
+    start_lat: Optional[float] = None
+    start_lon: Optional[float] = None
+    end_lat: Optional[float] = None
+    end_lon: Optional[float] = None
+    distance_m: float = 0.0
+    elevation_gain: float = 0.0
+
+
+@app.get("/api/segments")
+async def api_get_segments():
+    return {"segments": database.get_segments_with_efforts()}
+
+
+@app.post("/api/segments")
+async def api_create_segment(payload: SegmentCreatePayload):
+    s_lat, s_lon = payload.start_lat, payload.start_lon
+    e_lat, e_lon = payload.end_lat, payload.end_lon
+    dist_m = payload.distance_m
+    elev = payload.elevation_gain
+    sport = payload.sport_type
+
+    if payload.activity_id and (s_lat is None or e_lat is None):
+        act = database.get_activity_detail(payload.activity_id)
+        if not act or not act.get("polyline") or len(act["polyline"]) < 2:
+            raise HTTPException(status_code=400, detail="La actividad no tiene polilínea GPS")
+        poly = act["polyline"]
+        s_lat, s_lon = float(poly[0][0]), float(poly[0][1])
+        e_lat, e_lon = float(poly[-1][0]), float(poly[-1][1])
+        dist_m = dist_m or float(act.get("distance_km") or 0) * 1000.0
+        elev = elev or float(act.get("elevation_gain") or 0)
+        sport = act.get("sport_type") or sport
+
+    if s_lat is None or s_lon is None or e_lat is None or e_lon is None:
+        raise HTTPException(status_code=400, detail="Coordenadas de inicio y fin requeridas")
+
+    database.create_segment(
+        payload.name, sport, s_lat, s_lon, e_lat, e_lon, dist_m, elev
+    )
+    return {"status": "ok", "segments": database.get_segments_with_efforts()}
 
 
 # Create static folder if it doesn't exist
