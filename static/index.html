@@ -17,7 +17,7 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=79">
+  <link rel="stylesheet" href="/style.css?v=80">
 
   <!-- Icons & Fonts (Hanken Grotesk & JetBrains Mono) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -30,18 +30,20 @@
   <header class="app-topbar">
     <div class="topbar-inner">
       <div class="topbar-left">
-        <div class="user-avatar-small" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FC5200" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        </div>
-        <span class="app-brand-name">AARONFIT</span>
+        <a href="/inicio" class="brand-link" onclick="navigateTo(event, '/inicio', 'tab-dashboard')" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
+          <div class="user-avatar-small" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FC5200" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+          <span class="app-brand-name">AARONFIT</span>
+        </a>
         <span class="version-tag">v27</span>
 
         <!-- Desktop Horizontal Navigation (>= 1024px) -->
         <nav class="desktop-nav" aria-label="Navegación principal">
-          <button type="button" class="nav-tab-btn desktop-nav-btn active" data-target="tab-dashboard" onclick="switchTab('tab-dashboard')">Inicio</button>
-          <button type="button" class="nav-tab-btn desktop-nav-btn" data-target="tab-metrics" onclick="switchTab('tab-metrics')">Entrenamiento</button>
-          <button type="button" class="nav-tab-btn desktop-nav-btn" data-target="tab-training" onclick="switchTab('tab-training')">Entrenamientos</button>
-          <button type="button" class="nav-tab-btn desktop-nav-btn" data-target="tab-profile" onclick="switchTab('tab-profile')">Perfil</button>
+          <a href="/inicio" class="nav-tab-btn desktop-nav-btn active" data-target="tab-dashboard" onclick="navigateTo(event, '/inicio', 'tab-dashboard')">Inicio</a>
+          <a href="/entrenamiento" class="nav-tab-btn desktop-nav-btn" data-target="tab-metrics" onclick="navigateTo(event, '/entrenamiento', 'tab-metrics')">Entrenamiento</a>
+          <a href="/entrenamientos" class="nav-tab-btn desktop-nav-btn" data-target="tab-training" onclick="navigateTo(event, '/entrenamientos', 'tab-training')">Entrenos</a>
+          <a href="/perfil" class="nav-tab-btn desktop-nav-btn" data-target="tab-profile" onclick="navigateTo(event, '/perfil', 'tab-profile')">Perfil</a>
         </nav>
       </div>
 
@@ -78,7 +80,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
             </button>
           </div>
-          <button type="button" class="figma-coral-strip" onclick="switchTab('tab-metrics')">
+          <a href="/entrenamiento" class="figma-coral-strip" onclick="navigateTo(event, '/entrenamiento', 'tab-metrics')">
             <div style="display:flex; align-items:center; gap:10px;">
               <span class="figma-strip-badge">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -89,7 +91,7 @@
               </div>
             </div>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
+          </a>
         </div>
 
         <!-- Offline Banner -->
@@ -129,7 +131,7 @@
             <div class="glass-card desktop-gear-card">
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <h3 class="headline-sm" style="margin:0;">Material (Gear)</h3>
-                <button type="button" class="strava-chip-btn" style="font-size:0.72rem; padding:4px 10px;" onclick="switchTab('tab-profile')">Gestionar</button>
+                <a href="/perfil" class="strava-chip-btn" style="font-size:0.72rem; padding:4px 10px; text-decoration:none;" onclick="navigateTo(event, '/perfil', 'tab-profile')">Gestionar</a>
               </div>
               <div id="dashboard-gear-list" style="display:flex; flex-direction:column; gap:8px;">
                 <p class="body-xs" style="color: var(--text-muted);">Cargando material...</p>
@@ -726,25 +728,25 @@
 
     <!-- Bottom Dock Navigation Bar (Mobile < 1024px) -->
     <nav class="bottom-dock-nav" aria-label="Navegación móvil">
-      <button class="nav-tab-btn active" data-target="tab-dashboard" onclick="switchTab('tab-dashboard')">
+      <a href="/inicio" class="nav-tab-btn active" data-target="tab-dashboard" onclick="navigateTo(event, '/inicio', 'tab-dashboard')">
         <svg class="tab-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
         <span class="label-caps tab-label">Inicio</span>
-      </button>
+      </a>
 
-      <button class="nav-tab-btn" data-target="tab-metrics" onclick="switchTab('tab-metrics')">
+      <a href="/entrenamiento" class="nav-tab-btn" data-target="tab-metrics" onclick="navigateTo(event, '/entrenamiento', 'tab-metrics')">
         <svg class="tab-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-        <span class="label-caps tab-label">Entreno</span>
-      </button>
+        <span class="label-caps tab-label">Summit</span>
+      </a>
 
-      <button class="nav-tab-btn" data-target="tab-training" onclick="switchTab('tab-training')">
+      <a href="/entrenamientos" class="nav-tab-btn" data-target="tab-training" onclick="navigateTo(event, '/entrenamientos', 'tab-training')">
         <svg class="tab-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <span class="label-caps tab-label">Entrenos</span>
-      </button>
+      </a>
 
-      <button class="nav-tab-btn" data-target="tab-profile" onclick="switchTab('tab-profile')">
+      <a href="/perfil" class="nav-tab-btn" data-target="tab-profile" onclick="navigateTo(event, '/perfil', 'tab-profile')">
         <svg class="tab-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <span class="label-caps tab-label">Perfil</span>
-      </button>
+      </a>
     </nav>
 
   </div>
@@ -1241,6 +1243,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=79"></script>
+  <script src="/app.js?v=80"></script>
 </body>
 </html>

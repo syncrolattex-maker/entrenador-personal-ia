@@ -173,6 +173,8 @@ document.addEventListener("DOMContentLoaded", () => {
   loadSummitAnalytics();
   loadActivitiesFeed();
   loadGearList();
+  syncRouteFromLocation();
+  window.addEventListener("popstate", syncRouteFromLocation);
 
   // Selection events
   elBtnSelectFuerza.addEventListener("click", () => iniciarGeneracionEntrenamiento("Fuerza"));
@@ -2259,19 +2261,64 @@ async function sendPlannedDayToGarmin(dayIdx) {
   }
 }
 
-function switchTab(tabId) {
+const ROUTE_TO_TAB = {
+  "/": "tab-dashboard",
+  "/inicio": "tab-dashboard",
+  "/entrenamiento": "tab-metrics",
+  "/entrenamientos": "tab-training",
+  "/perfil": "tab-profile"
+};
+
+const TAB_TO_ROUTE = {
+  "tab-dashboard": "/inicio",
+  "tab-metrics": "/entrenamiento",
+  "tab-training": "/entrenamientos",
+  "tab-profile": "/perfil"
+};
+
+let _lastTabId = "tab-dashboard";
+
+function navigateTo(event, path, tabId) {
+  if (event && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+    event.preventDefault();
+    if (window.location.pathname !== path) {
+      history.pushState({ tabId }, "", path);
+    }
+    switchTab(tabId, false);
+  }
+}
+
+function syncRouteFromLocation() {
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  const actMatch = path.match(/^\/actividad\/([^/]+)$/);
+  if (actMatch) {
+    switchTab(_lastTabId, false);
+    openActivityDetail(actMatch[1], false);
+    return;
+  }
+  closeActivityDetailModal(false);
+  const tabId = ROUTE_TO_TAB[path] || "tab-dashboard";
+  switchTab(tabId, false);
+}
+
+function switchTab(tabId, updateUrl = true) {
+  _lastTabId = tabId;
   const tabs = document.querySelectorAll(".tab-view");
   tabs.forEach(t => t.classList.remove("active"));
-  
+
   const navBtns = document.querySelectorAll(".nav-tab-btn");
   navBtns.forEach(b => b.classList.remove("active"));
-  
+
   const targetTab = document.getElementById(tabId);
   if (targetTab) targetTab.classList.add("active");
-  
+
   const activeBtns = document.querySelectorAll(`.nav-tab-btn[data-target="${tabId}"]`);
   activeBtns.forEach(b => b.classList.add("active"));
-  
+
+  if (updateUrl && TAB_TO_ROUTE[tabId] && window.location.pathname !== TAB_TO_ROUTE[tabId]) {
+    history.pushState({ tabId }, "", TAB_TO_ROUTE[tabId]);
+  }
+
   if (window.lucide) lucide.createIcons();
 
   if (tabId === "tab-metrics") {
@@ -3449,7 +3496,7 @@ async function loadActivitiesFeed() {
             <div class="strava-feed-meta">
               <span class="strava-feed-avatar">${sportSvg}</span>
               <div>
-                <h3 class="strava-feed-title">${a.name}</h3>
+                <a href="/actividad/${a.external_id}" class="strava-feed-title" style="text-decoration:none; display:block;" onclick="event.preventDefault(); event.stopPropagation(); openActivityDetail('${a.external_id}')">${a.name}</a>
                 <span class="strava-feed-date tabular-num">${a.start_date} • ${a.sport_type}</span>
               </div>
             </div>
@@ -3652,10 +3699,16 @@ function renderStravaDetailChart(series) {
   `;
 }
 
-async function openActivityDetail(externalId) {
+async function openActivityDetail(externalId, updateUrl = true) {
   const modal = document.getElementById("activity-detail-modal");
   if (!modal) return;
   modal.style.display = "flex";
+  if (updateUrl) {
+    const targetPath = `/actividad/${externalId}`;
+    if (window.location.pathname !== targetPath) {
+      history.pushState({ externalId }, "", targetPath);
+    }
+  }
   if (window.lucide) lucide.createIcons();
 
   try {
@@ -3839,10 +3892,14 @@ async function openActivityDetail(externalId) {
   }
 }
 
-function closeActivityDetailModal() {
+function closeActivityDetailModal(updateUrl = true) {
   const modal = document.getElementById("activity-detail-modal");
   if (modal) modal.style.display = "none";
   if (_detailMapInstance) { _detailMapInstance.remove(); _detailMapInstance = null; }
+  if (updateUrl && window.location.pathname.startsWith("/actividad/")) {
+    const backPath = TAB_TO_ROUTE[_lastTabId] || "/inicio";
+    history.pushState({ tabId: _lastTabId }, "", backPath);
+  }
 }
 
 async function setActivityRpe(externalId, rpe) {

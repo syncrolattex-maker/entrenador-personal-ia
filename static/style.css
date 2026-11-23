@@ -1187,6 +1187,7 @@ body {
 .nav-tab-btn {
   background: transparent;
   border: none;
+  text-decoration: none;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1935,6 +1936,7 @@ body {
   width: 100%;
   background: #C23B00;
   border: none;
+  text-decoration: none;
   border-radius: 12px;
   padding: 12px 14px;
   display: flex;

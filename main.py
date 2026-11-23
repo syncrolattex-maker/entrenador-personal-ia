@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -2681,6 +2681,16 @@ async def api_create_segment(payload: SegmentCreatePayload):
 
 # Create static folder if it doesn't exist
 os.makedirs("static", exist_ok=True)
+
+
+@app.get("/inicio")
+@app.get("/entrenamiento")
+@app.get("/entrenamientos")
+@app.get("/perfil")
+@app.get("/actividad/{external_id}")
+async def serve_spa_routes(external_id: Optional[str] = None):
+    return FileResponse(os.path.join("static", "index.html"))
+
 
 # Mount static files to serve the PWA frontend
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
