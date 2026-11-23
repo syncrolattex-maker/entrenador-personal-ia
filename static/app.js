@@ -3244,40 +3244,28 @@ function renderPersonalRecords(prs) {
   `).join("");
 }
 
-const VOYAGER_TILE_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
-const OSM_FALLBACK_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+const OSM_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const ARCGIS_FALLBACK_TILE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}";
 let _feedMapInstances = [];
 
 function renderStravaLeafletRoute(map, polyline) {
-  const voyagerLayer = L.tileLayer(VOYAGER_TILE_URL, {
-    attribution: "&copy; OpenStreetMap &copy; CARTO",
-    subdomains: "abcd",
+  const primaryLayer = L.tileLayer(OSM_TILE_URL, {
+    attribution: "&copy; OpenStreetMap contributors",
     maxZoom: 19
   });
 
-  let fallbackStage = 0;
-  voyagerLayer.on("tileerror", () => {
-    if (fallbackStage >= 1) return;
-    fallbackStage = 1;
-    map.removeLayer(voyagerLayer);
-    const osmLayer = L.tileLayer(OSM_FALLBACK_TILE_URL, {
-      attribution: "&copy; OpenStreetMap",
+  let fallbackAdded = false;
+  primaryLayer.on("tileerror", () => {
+    if (fallbackAdded) return;
+    fallbackAdded = true;
+    map.removeLayer(primaryLayer);
+    L.tileLayer(ARCGIS_FALLBACK_TILE_URL, {
+      attribution: "&copy; Esri",
       maxZoom: 19
-    });
-    osmLayer.on("tileerror", () => {
-      if (fallbackStage >= 2) return;
-      fallbackStage = 2;
-      map.removeLayer(osmLayer);
-      L.tileLayer(ARCGIS_FALLBACK_TILE_URL, {
-        attribution: "&copy; Esri",
-        maxZoom: 19
-      }).addTo(map);
-    });
-    osmLayer.addTo(map);
+    }).addTo(map);
   });
 
-  voyagerLayer.addTo(map);
+  primaryLayer.addTo(map);
   const route = L.polyline(polyline, { color: "#FC5200", weight: 3.5, opacity: 0.95 }).addTo(map);
   const bounds = route.getBounds();
   map.fitBounds(bounds, { padding: [16, 16] });
