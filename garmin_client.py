@@ -18,6 +18,11 @@ TOKEN_DIR = (
     if os.getenv("VERCEL")
     else Path(__file__).parent / ".garmin_tokens"
 )
+PERSONAL_KEY_FILE = (
+    Path("/tmp/.garmin_personal_key")
+    if os.getenv("VERCEL")
+    else Path(__file__).parent / "data" / ".garmin_personal_key"
+)
 PERSONAL_API_BASE = "https://personal.connectapi.garmin.com"
 
 # Temporary in-memory store for pending MFA login flows and Personal API token cache
@@ -25,9 +30,33 @@ _pending_mfa: Dict[str, Any] = {}
 _personal_token_cache: Dict[str, Any] = {"token": None, "expires_at": 0.0}
 
 
+def get_saved_personal_key() -> str:
+    key = os.getenv("GARMIN_PERSONAL_API_KEY", "").strip()
+    if key:
+        return key
+    try:
+        if PERSONAL_KEY_FILE.exists():
+            return PERSONAL_KEY_FILE.read_text(encoding="utf-8").strip()
+    except Exception:
+        pass
+    return ""
+
+
+def save_personal_key(api_key: str) -> None:
+    clean = (api_key or "").strip()
+    os.environ["GARMIN_PERSONAL_API_KEY"] = clean
+    _personal_token_cache["token"] = None
+    _personal_token_cache["expires_at"] = 0.0
+    try:
+        PERSONAL_KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
+        PERSONAL_KEY_FILE.write_text(clean, encoding="utf-8")
+    except Exception as e:
+        print(f"[Garmin] Could not persist personal key: {e}")
+
+
 def _get_personal_api_token() -> Optional[str]:
     """Exchanges GARMIN_PERSONAL_API_KEY (GCDC_...) for a short-lived Bearer JWT token."""
-    api_key = os.getenv("GARMIN_PERSONAL_API_KEY", "").strip()
+    api_key = get_saved_personal_key()
     if not api_key:
         return None
 
@@ -142,7 +171,7 @@ def complete_garmin_mfa(mfa_code: str) -> Dict[str, Any]:
 
 
 def is_garmin_connected() -> bool:
-    return bool(os.getenv("GARMIN_PERSONAL_API_KEY", "").strip()) or any(TOKEN_DIR.glob("*.json"))
+    return bool(get_saved_personal_key()) or any(TOKEN_DIR.glob("*.json"))
 
 
 def get_garmin_history(limit: int = 30) -> List[dict]:
@@ -324,7 +353,7 @@ def get_garmin_wellness(target_date: Optional[str] = None) -> Dict[str, Any]:
 
 def get_garmin_athlete_profile() -> Dict[str, Any]:
     """Fetches user profile & body metrics from Garmin Connect."""
-    if os.getenv("GARMIN_PERSONAL_API_KEY", "").strip():
+    if get_saved_personal_key():
         return {
             "nombre": "Aarón",
             "edad": 43,

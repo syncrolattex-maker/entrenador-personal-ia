@@ -2048,6 +2048,22 @@ class GarminLoginPayload(BaseModel):
 class GarminMfaPayload(BaseModel):
     code: str
 
+class GarminKeyPayload(BaseModel):
+    api_key: str
+
+@app.post("/api/garmin/set-key")
+async def garmin_set_key(payload: GarminKeyPayload):
+    key = payload.api_key.strip()
+    if not key.startswith("GCDC_"):
+        return {"status": "error", "message": "La clave debe empezar por GCDC_"}
+    garmin_client.save_personal_key(key)
+    token = garmin_client._get_personal_api_token()
+    if not token:
+        return {"status": "error", "message": "No se pudo validar la clave GCDC_ contra Garmin Connect."}
+    cached_recommendation_data["date"] = None
+    cached_recommendation_data["data"] = None
+    return {"status": "connected", "message": "Clave GCDC_ de Garmin Connect activada correctamente."}
+
 @app.get("/api/garmin/status")
 async def garmin_status():
     connected = garmin_client.is_garmin_connected()

@@ -2229,10 +2229,10 @@ function renderMetricsTab(history, coachText) {
     });
   }
   
-  const targetFuerza = state.prefFuerzaDays || 3;
-  const targetCarrera = state.prefCarreraDays || 2;
+  const targetFuerza = 2;  // 1-2 opcionales por semana
+  const targetCarrera = 3; // Base semanal Garmin
 
-  if (elMetricFuerzaCount) elMetricFuerzaCount.innerHTML = `${fuerzaCount}<small> / ${targetFuerza} ses</small>`;
+  if (elMetricFuerzaCount) elMetricFuerzaCount.innerHTML = `${fuerzaCount}<small> / ${targetFuerza} opc</small>`;
   if (elMetricFuerzaBar) elMetricFuerzaBar.style.width = `${Math.min(100, Math.round((fuerzaCount / targetFuerza) * 100))}%`;
   if (elMetricCarreraCount) elMetricCarreraCount.innerHTML = `${carreraCount}<small> / ${targetCarrera} ses</small>`;
   if (elMetricCarreraBar) elMetricCarreraBar.style.width = `${Math.min(100, Math.round((carreraCount / targetCarrera) * 100))}%`;
@@ -2786,6 +2786,36 @@ function updateGarminUI(connected, profile, writeConnected = false) {
     badge.style.color = "var(--text-secondary)";
     loginForm.style.display = "flex";
     connectedPanel.style.display = "none";
+  }
+}
+
+async function saveGarminPersonalKey() {
+  const keyEl = document.getElementById("garmin-apikey-input");
+  const key = keyEl ? keyEl.value.trim() : "";
+  if (!key || !key.startsWith("GCDC_")) {
+    showSuccessBanner("⚠️ Introduce una clave válida que empiece por GCDC_");
+    return;
+  }
+  showLoading(true, "Validando clave de Garmin Connect...");
+  try {
+    const res = await fetch("/api/garmin/set-key", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ api_key: key })
+    });
+    const data = await res.json();
+    if (data.status === "connected") {
+      showSuccessBanner("✅ ¡Garmin Connect conectado!");
+      await checkGarminStatus();
+      await initApp();
+      await loadWeeklyPlanAndRaceGoal();
+    } else {
+      showSuccessBanner(`⚠️ ${data.message || "Error validando clave."}`);
+    }
+  } catch (e) {
+    showSuccessBanner("⚠️ Error de red conectando Garmin.");
+  } finally {
+    showLoading(false);
   }
 }
 

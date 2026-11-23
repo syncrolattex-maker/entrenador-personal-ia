@@ -297,34 +297,34 @@
           </div>
         </div>
 
-        <!-- Real Balance Progress: Fuerza -->
-        <div class="glass-card metric-card lime-border">
-          <div class="metric-header">
-            <i data-lucide="dumbbell" class="metric-icon lime"></i>
-            <span class="label-caps">FUERZA FULL-BODY (MANCUERNAS 5KG & CINTAS)</span>
-          </div>
-          <div class="metric-value-row">
-            <span id="metric-fuerza-count" class="metric-xl">2<small> / 3 ses</small></span>
-          </div>
-          <div class="progress-bar-wrap">
-            <div id="metric-fuerza-bar" class="progress-fill lime" style="width: 66%;"></div>
-          </div>
-          <span id="metric-fuerza-sub" class="label-caps" style="color: var(--text-muted); margin-top: 4px;">META SEMANAL: 2 A 3 SESIONES</span>
-        </div>
-
-        <!-- Real Balance Progress: Carrera -->
+        <!-- Real Balance Progress: Carrera (Base Semanal Garmin) -->
         <div class="glass-card metric-card cyan-border">
           <div class="metric-header">
             <i data-lucide="zap" class="metric-icon cyan"></i>
-            <span class="label-caps">CARRERA (ZONA 2 & MÁX 1 CALIDAD)</span>
+            <span class="label-caps">CARRERA & CARDIO (PLAN SEMANAL GARMIN)</span>
           </div>
           <div class="metric-value-row">
-            <span id="metric-carrera-count" class="metric-xl">1<small> / 2 ses</small></span>
+            <span id="metric-carrera-count" class="metric-xl">0<small> / 3 ses</small></span>
           </div>
           <div class="progress-bar-wrap">
-            <div id="metric-carrera-bar" class="progress-fill cyan" style="width: 50%;"></div>
+            <div id="metric-carrera-bar" class="progress-fill cyan" style="width: 0%;"></div>
           </div>
-          <span id="metric-carrera-sub" class="label-caps" style="color: var(--text-muted); margin-top: 4px;">META SEMANAL: 1 A 2 SESIONES</span>
+          <span id="metric-carrera-sub" class="label-caps" style="color: var(--text-muted); margin-top: 4px;">META SEMANAL: 3 SESIONES DE CARRERA</span>
+        </div>
+
+        <!-- Real Balance Progress: Fuerza (Opcional) -->
+        <div class="glass-card metric-card lime-border">
+          <div class="metric-header">
+            <i data-lucide="dumbbell" class="metric-icon lime"></i>
+            <span class="label-caps">FUERZA STRAVA (OPCIONAL • 5KG & CINTAS)</span>
+          </div>
+          <div class="metric-value-row">
+            <span id="metric-fuerza-count" class="metric-xl">0<small> / 2 opc</small></span>
+          </div>
+          <div class="progress-bar-wrap">
+            <div id="metric-fuerza-bar" class="progress-fill lime" style="width: 0%;"></div>
+          </div>
+          <span id="metric-fuerza-sub" class="label-caps" style="color: var(--text-muted); margin-top: 4px;">OPCIONAL: 1–2 SESIONES CORTAS/SEM</span>
         </div>
 
         <!-- Real Activity Timeline List from Garmin Connect -->
@@ -436,8 +436,12 @@
           </div>
 
           <div id="garmin-login-form" style="display:flex; flex-direction:column; gap:10px; padding-top:8px; border-top:1px solid var(--border-glass);">
-            <span id="garmin-write-status" class="label-caps" style="color: #FC5200; font-size:0.7rem;">ENVÍO AUTOMÁTICO AL RELOJ: VINCULAR CUENTA GARMIN</span>
-            <input type="email" id="garmin-email-input" placeholder="Email de Garmin Connect" style="width:100%; padding:10px 12px; border-radius:8px; background:var(--surface-container-high); border:1px solid var(--border-glass); color:#FFF;">
+            <span id="garmin-write-status" class="label-caps" style="color: #FC5200; font-size:0.7rem;">CONEXIÓN GARMIN CONNECT (CLAVE PERSONAL O CUENTA)</span>
+            <input type="text" id="garmin-apikey-input" placeholder="Clave Personal Garmin (GCDC_...)" style="width:100%; padding:10px 12px; border-radius:8px; background:var(--surface-container-high); border:1px solid var(--border-glass); color:#FFF;">
+            <button type="button" class="btn btn-ghost" style="border:1px solid rgba(0,174,239,0.4); color:#00AEEF;" onclick="saveGarminPersonalKey()">
+              Guardar Clave GCDC_ (Lectura Garmin)
+            </button>
+            <input type="email" id="garmin-email-input" placeholder="Email de Garmin Connect (para enviar al reloj)" style="width:100%; padding:10px 12px; border-radius:8px; background:var(--surface-container-high); border:1px solid var(--border-glass); color:#FFF;">
             <input type="password" id="garmin-password-input" placeholder="Contraseña de Garmin Connect" style="width:100%; padding:10px 12px; border-radius:8px; background:var(--surface-container-high); border:1px solid var(--border-glass); color:#FFF;">
             <div id="garmin-mfa-box" style="display:none; flex-direction:column; gap:8px;">
               <input type="text" id="garmin-mfa-input" placeholder="Código 2FA / MFA de Garmin" style="width:100%; padding:10px 12px; border-radius:8px; background:rgba(0,174,239,0.12); border:1px solid #00AEEF; color:#FFF;">
@@ -449,72 +453,15 @@
           </div>
         </div>
 
-        <!-- Interactive Configurable Goals & Rules Section -->
-        <div class="goals-section">
-          <span class="label-caps">CONFIGURACIÓN DE REGLAS Y ENTRENAMIENTOS</span>
-
-          <!-- Rule 1: Fuerza Full-Body Frequency -->
-          <div class="glass-card goal-item-card lime-border">
-            <div class="goal-item-top">
-              <span class="headline-sm">FUERZA FULL-BODY (CUERPO COMPLETO)</span>
-              <i data-lucide="dumbbell" class="goal-icon lime"></i>
-            </div>
-            <span class="body-sm-muted">Selecciona el número de sesiones semanales de Fuerza:</span>
-            
-            <div class="pref-selector-grid">
-              <button class="pref-btn pref-fuerza-btn" data-val="2" onclick="setFuerzaPreference(2)">2 Días/Sem</button>
-              <button class="pref-btn pref-fuerza-btn active" data-val="3" onclick="setFuerzaPreference(3)">3 Días/Sem</button>
-              <button class="pref-btn pref-fuerza-btn" data-val="4" onclick="setFuerzaPreference(4)">4 Días/Sem</button>
-            </div>
+        <!-- Equipamiento y Lógica Dinámica -->
+        <div class="glass-card equipment-card">
+          <span class="label-caps">EQUIPAMIENTO & MOTOR AUTOMÁTICO</span>
+          <p class="body-sm-muted" style="font-size:0.82rem;">El plan semanal se genera automáticamente desde tu historial real de Garmin Connect y tu carrera objetivo, con 1–2 sesiones opcionales de fuerza.</p>
+          <div class="equipment-tags">
+            <span class="equip-chip active">🏋️‍♂️ Mancuernas 5 kg</span>
+            <span class="equip-chip active">🎗️ Cintas Elásticas</span>
+            <span class="equip-chip active">⌚ Reloj Garmin</span>
           </div>
-
-          <!-- Rule 2: Carrera Running Frequency & Quality Rule -->
-          <div class="glass-card goal-item-card cyan-border">
-            <div class="goal-item-top">
-              <span class="headline-sm">CARRERA AERÓBICA (GARMIN & RUNNA)</span>
-              <i data-lucide="footprints" class="goal-icon cyan"></i>
-            </div>
-            <span class="body-sm-muted">Selecciona el número de sesiones semanales de Carrera:</span>
-            
-            <div class="pref-selector-grid">
-              <button class="pref-btn pref-carrera-btn" data-val="1" onclick="setCarreraPreference(1)">1 Día/Sem</button>
-              <button class="pref-btn pref-carrera-btn active" data-val="2" onclick="setCarreraPreference(2)">2 Días/Sem</button>
-              <button class="pref-btn pref-carrera-btn" data-val="3" onclick="setCarreraPreference(3)">3 Días/Sem</button>
-            </div>
-
-            <div class="pref-toggle-box" style="margin-top: 10px;">
-              <label class="pref-toggle-label">
-                <input type="checkbox" id="pref-max-calidad" checked>
-                <span class="body-sm-muted">Limitar a <strong>máximo 1 sesión de calidad/semana</strong> (fartleks/series). Demás rodamientos suaves Zona 2.</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- Rule 3: Equipment Selection -->
-          <div class="glass-card equipment-card">
-            <span class="label-caps">MATERIALES DISPONIBLES</span>
-            <div class="equipment-tags">
-              <label class="equip-chip active">
-                <input type="checkbox" id="equip-mancuernas" checked hidden onchange="updateEquipChip(this)">
-                🏋️‍♀️ Mancuernas de 5 kg
-              </label>
-              <label class="equip-chip active">
-                <input type="checkbox" id="equip-cintas" checked hidden onchange="updateEquipChip(this)">
-                🎗️ Bandas de Resistencia (Cintas)
-              </label>
-              <label class="equip-chip active">
-                <input type="checkbox" id="equip-watch" checked hidden onchange="updateEquipChip(this)">
-                ⌚ Reloj Garmin & Garmin Connect
-              </label>
-            </div>
-          </div>
-
-          <!-- Save Rules Button -->
-          <button id="btn-save-preferences" class="btn btn-primary" onclick="guardarPreferenciasEntrenamiento()">
-            <i data-lucide="save" style="width: 18px; height: 18px;"></i>
-            GUARDAR CONFIGURACIÓN DE ENTRENAMIENTO
-          </button>
-
         </div>
       </section>
 
