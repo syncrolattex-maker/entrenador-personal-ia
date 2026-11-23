@@ -3558,18 +3558,19 @@ async function saveActivityGear(gearIdVal) {
   } catch (e) {}
 }
 
-function toggleDetailStream(key) {
-  _detailStreamState[key] = !_detailStreamState[key];
-  if (_currentDetailActivity) renderDetailStreamChart(_currentDetailActivity);
+function toggleChartLayer(layerKey) {
+  _detailStreamState[layerKey] = !_detailStreamState[layerKey];
+  if (_currentDetailActivity) renderStravaDetailChart(_currentDetailActivity.chart_series || {});
 }
 
-function renderDetailStreamChart(act) {
+function renderStravaDetailChart(series) {
+  const act = _currentDetailActivity || { chart_series: series || {} };
   const chartCard = document.getElementById("detail-chart-card");
   const chartSvg = document.getElementById("detail-chart-svg");
   const togglesEl = document.getElementById("detail-stream-toggles");
   if (!chartSvg || !togglesEl) return;
 
-  const cs = act.chart_series || {};
+  const cs = series || act.chart_series || {};
   const elevs = (cs.elevation_m || []).filter(v => v !== null && v !== undefined);
   const paces = (cs.pace_sec || []).filter(v => v !== null && v !== undefined && v > 120 && v < 1200);
   const hrs = (cs.hr || []).filter(v => v !== null && v !== undefined);
@@ -3584,10 +3585,10 @@ function renderDetailStreamChart(act) {
   const avgTempVal = avg(temps) !== null ? `${avg(temps).toFixed(1)} °C` : (act.avg_temp_c !== null && act.avg_temp_c !== undefined ? `${Number(act.avg_temp_c).toFixed(1)} °C` : "—");
 
   const streamsMeta = [
-    { key: "pace", label: "Ritmo", avg: avgPaceStr, color: "#FC5200", data: cs.pace_sec || [], invert: true },
-    { key: "hr", label: "Frecuencia cardíaca", avg: avgHrVal, color: "#DC2626", data: cs.hr || [], invert: false },
-    { key: "cadence", label: "Cadencia", avg: avgCadVal, color: "#0077CC", data: cs.cadence || [], invert: false },
-    { key: "temp", label: "Temperatura", avg: avgTempVal, color: "#16A34A", data: cs.temp_c || [], invert: false }
+    { key: "pace", label: "Ritmo", avg: avgPaceStr, color: "#0077CC", data: cs.pace_sec || [], invert: true },
+    { key: "hr", label: "Frecuencia cardíaca", avg: avgHrVal, color: "#E53935", data: cs.hr || [], invert: false },
+    { key: "cadence", label: "Cadencia", avg: avgCadVal, color: "#8E24AA", data: cs.cadence || [], invert: false },
+    { key: "temp", label: "Temperatura", avg: avgTempVal, color: "#FB8C00", data: cs.temp_c || [], invert: false }
   ];
 
   togglesEl.innerHTML = streamsMeta.map(s => {
@@ -3601,7 +3602,7 @@ function renderDetailStreamChart(act) {
           </span>
           <strong class="tabular-num" style="font-size:0.86rem; color:var(--on-surface);">${s.avg}</strong>
         </div>
-        <button type="button" class="detail-toggle-btn ${isOn ? "on" : ""}" onclick="toggleDetailStream('${s.key}')">${isOn ? "Sí" : "No"}</button>
+        <button type="button" class="detail-toggle-btn ${isOn ? "on" : ""}" onclick="toggleChartLayer('${s.key}')">${isOn ? "Sí" : "No"}</button>
       </div>
     `;
   }).join("");
@@ -3783,7 +3784,7 @@ async function openActivityDetail(externalId) {
     }
 
     // Render Synchronized Chart + Toggles
-    renderDetailStreamChart(act);
+    renderStravaDetailChart(act.chart_series || {});
 
     // Render HR Zones Z1-Z5
     const zonesCard = document.getElementById("detail-zones-card");

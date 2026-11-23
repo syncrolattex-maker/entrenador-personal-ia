@@ -609,8 +609,8 @@ def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
     idx_hr = desc.get("directHeartRate")
     idx_elev = desc.get("directElevation")
     idx_spd = desc.get("directSpeed")
-    idx_cad = desc.get("directRunCadence")
-    idx_temp = desc.get("directAirTemperature")
+    idx_cad = desc.get("directRunCadence") or desc.get("directBikeCadence")
+    idx_temp = desc.get("directAirTemperature") or desc.get("directTemperature")
 
     rows = data.get("activityDetailMetrics") or []
     chart_dist, chart_elev, chart_hr, chart_pace, chart_time, chart_cad, chart_temp = [], [], [], [], [], [], []
@@ -688,9 +688,9 @@ def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
                 split_hrs = []
                 split_elev_start = el
 
-    # Last fractional split if > 50 m remains after last full km
+    # Last fractional split if >= 50 m remains after last full km
     rem_m = last_d_m - (current_km - 1) * 1000.0
-    if rem_m > 50.0 and last_t_s > split_start_t:
+    if rem_m >= 50.0 and last_t_s > split_start_t:
         seg_t = max(1.0, last_t_s - split_start_t)
         pace_per_km = seg_t / (rem_m / 1000.0)
         pace_min = int(pace_per_km // 60)

@@ -2445,14 +2445,14 @@ async def api_activity_detail(external_id: str):
     return detail
 
 
-class ActivityPatchPayload(BaseModel):
+class ActivityUpdatePayload(BaseModel):
     description: Optional[str] = None
     private_notes: Optional[str] = None
     gear_id: Optional[int] = None
 
 
 @app.patch("/api/activities/{external_id}")
-async def api_patch_activity(external_id: str, payload: ActivityPatchPayload):
+async def api_patch_activity(external_id: str, payload: ActivityUpdatePayload):
     updated = database.update_activity_metadata(
         external_id,
         description=payload.description,
@@ -2476,10 +2476,18 @@ async def api_export_activity_gpx(external_id: str):
 
     act_name = escape(str(detail.get("name") or "Actividad AaronFit"))
     sport = escape(str(detail.get("sport_type") or "running"))
-    pts_xml = "\n".join(
-        f'      <trkpt lat="{float(pt[0]):.6f}" lon="{float(pt[1]):.6f}"></trkpt>'
-        for pt in poly if isinstance(pt, (list, tuple)) and len(pt) >= 2
-    )
+    elevs = (detail.get("chart_series") or {}).get("elevation_m") or []
+    valid_pts = [pt for pt in poly if isinstance(pt, (list, tuple)) and len(pt) >= 2]
+    pts_lines = []
+    for idx, pt in enumerate(valid_pts):
+        lat, lon = float(pt[0]), float(pt[1])
+        ele_tag = ""
+        if elevs and len(valid_pts) > 1:
+            e_idx = min(len(elevs) - 1, round(idx * (len(elevs) - 1) / (len(valid_pts) - 1)))
+            if elevs[e_idx] is not None:
+                ele_tag = f"<ele>{float(elevs[e_idx]):.1f}</ele>"
+        pts_lines.append(f'      <trkpt lat="{lat:.6f}" lon="{lon:.6f}">{ele_tag}</trkpt>')
+    pts_xml = "\n".join(pts_lines)
     gpx_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="AaronFit" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata>
