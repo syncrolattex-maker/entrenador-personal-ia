@@ -411,7 +411,7 @@ def workout_to_fit_steps(workout: Dict[str, Any]) -> List[Dict[str, Any]]:
     tipo = workout.get("tipo_sesion", "Carrera")
     steps: List[Dict[str, Any]] = []
 
-    if tipo == "Carrera":
+    if tipo in ("Carrera", "Ciclismo", "Bici", "Carrera Objetivo"):
         for p in workout.get("phases", []):
             dur_s = int(p.get("duration_seconds") or 300)
             steps.append({

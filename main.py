@@ -150,19 +150,6 @@ class GenerarEntrenamientoPayload(BaseModel):
 class SincronizarCarreraPayload(BaseModel):
     phases: List[FaseCarrera]
 
-class ChatMessage(BaseModel):
-    role: str  # "user" or "model"
-    parts: str  # message content
-
-class ChatCoachRequest(BaseModel):
-    mensaje: str
-    historial: List[ChatMessage] = []
-
-class GeminiChatResponse(BaseModel):
-    respuesta: str
-    tiene_cambio_rutina: bool
-    rutina_actualizada: Optional[RutinaResponse] = None
-
 
 
 # --- Helpers ---
@@ -1755,100 +1742,6 @@ async def post_sincronizar_carrera(payload: SincronizarCarreraPayload):
         "msg": "Sincronizado correctamente con Apple Watch (Watchletic)" if success else "No se pudo sincronizar. Verifica las credenciales de Intervals.icu."
     }
 
-@app.post("/chat-coach")
-async def post_chat_coach(payload: ChatCoachRequest):
-    """
-    Handles interactive messaging with the AI Coach (Aarón's personalized trainer).
-    Provides context-aware athletic guidance and dynamically adapts recommendations.
-    """
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        return {"respuesta": "Hola Aarón. En este momento el modo chat de IA está desconectado. ¿En qué puedo ayudarte con tu rutina local?"}
-        
-    try:
-        real_history = await get_intervals_history()
-        wiki_context = get_wiki_context()
-        garmin_wellness = garmin_client.get_garmin_wellness() if garmin_client.is_garmin_connected() else {}
-        client = genai.Client(api_key=api_key)
-        
-        system_instruction = (
-            "Eres el Coach y Entrenador Personal IA de **Aarón**, un atleta de 43 años "
-            "que mide 1.83 m y pesa 93 kg.\n\n"
-            "ACCESO A BASE DE CONOCIMIENTO VIVA (LLM WIKI) Y GARMIN CONNECT:\n"
-            "Tienes acceso completo a la base de conocimiento viva de Aarón (/wiki) y a su historial real de Garmin Connect / Strava. "
-            "DEBES consultar y respetar siempre este contexto al responderle o proponer ajustes a su plan.\n\n"
-            "DIRECTRICES DE PERSONALIDAD Y COACHING:\n"
-            "1. Tono: Cercano, directo, motivador y profesional. Dirígete a él siempre como 'Aarón'.\n"
-            "2. Contexto físico y Materiales: Tiene 43 años, mide 1.83m y pesa 93kg. Para entrenar dispone de **bandas de resistencia (cintas elásticas)** y **mancuernas de 5 kg (pesas de 5 kg)**. Sus entrenamientos de Fuerza siguen el sistema Strava Strength.\n"
-            "3. REGLA DE RECONFIGURACIÓN DE ENTRENAMIENTO EN TIEMPO REAL (COHERENCIA TOTAL EN LA APP):\n"
-            "   - Si Aarón en su mensaje te pide cambiar, adaptar, acortar, personalizar o reconfigurar su entrenamiento de hoy (por ejemplo: pedir ejercicios distintos, cambiar de fuerza a carrera o viceversa, pedir una rutina de 20 minutos, enfocarse en tren superior/core, o reportar fatiga/molestias musculares), DEBES RECONFIGURAR SU ENTRENAMIENTO.\n"
-            "   - En ese caso, establece 'tiene_cambio_rutina': true y rellena el objeto 'rutina_actualizada' con la sesión completa ajustada (tipo_sesion: 'Fuerza' o 'Carrera', explicacion_tipo, ejercicios para Fuerza o phases para Carrera, mensaje_adaptacion).\n"
-            "   - Si el mensaje es una simple duda o conversación sin intención de cambiar la sesión del día, establece 'tiene_cambio_rutina': false y 'rutina_actualizada': null.\n"
-            "4. Concisión: Mantén tu 'respuesta' escrita de forma clara (máximo 2-3 párrafos) explicando las razones del ajuste."
-        )
-
-        
-        historial_str = ""
-        if real_history:
-            historial_str = "Historial de entrenamientos de Aarón (Garmin / Strava):\n"
-            for log in real_history[:15]:
-                dist_str = f", Distancia: {log['distancia_km']} km" if log.get('distancia_km') else ""
-                fc_str = f", FC Media: {log['frecuencia_cardiaca_media']} ppm" if log.get('frecuencia_cardiaca_media') else ""
-                ritmo_str = f", Ritmo: {log['ritmo_medio']}" if log.get('ritmo_medio') else ""
-                historial_str += f"- {log['fecha']}: {log['tipo']} ({log['nombre']}). {log['duracion_minutos']} min{dist_str}{fc_str}{ritmo_str}\n"
-        else:
-            historial_str = "No hay historial disponible todavía en Garmin Connect."
-
-        contents = []
-        
-        intro_prompt = f"""
-        Perfil del atleta:
-        - Nombre: Aarón
-        - Edad: 43 años
-        - Estatura: 1.83 m | Peso: 93 kg
-        - Equipamiento: Mancuernas de 5 kg y cintas elásticas
-        - Garmin Wellness hoy: {json.dumps(garmin_wellness, ensure_ascii=False)}
-        - Historial físico real:
-        {historial_str}
-
-        {wiki_context}
-        """
-        
-        for msg in payload.historial[-6:]:
-            contents.append(
-                types.Content(
-                    role=msg.role,
-                    parts=[types.Part.from_text(text=msg.parts)]
-                )
-            )
-            
-        contents.append(
-            types.Content(
-                role="user",
-                parts=[types.Part.from_text(text=payload.mensaje)]
-            )
-        )
-        
-        chat_data = await generate_gemini_content_with_retry(
-            client=client,
-            contents=contents,
-            system_instruction=system_instruction + "\n\n" + intro_prompt,
-            response_schema=GeminiChatResponse,
-            temperature=0.7
-        )
-        if isinstance(chat_data, dict) and chat_data.get("tiene_cambio_rutina") and chat_data.get("rutina_actualizada"):
-            chat_data["rutina_actualizada"] = await enrich_routine_data(chat_data["rutina_actualizada"])
-        return chat_data
-        
-    except Exception as e:
-        print("Chat Coach error:", e)
-        return {
-            "respuesta": "¡Hola Aarón! En este momento los servidores centrales están experimentando una alta demanda puntual. No te preocupes: para tu entrenamiento de hoy mantenemos el enfoque planeado con tus pesas de 5kg y cintas. ¡Escríbeme en unos segundos para continuar!",
-            "tiene_cambio_rutina": False,
-            "rutina_actualizada": None
-        }
-
-
 def obtener_clima_actual(latitud: float, longitud: float) -> str:
     """
     Obtiene las condiciones climáticas actuales para una ubicación geográfica
@@ -2250,101 +2143,144 @@ def _calcular_fase_y_tendencia(history: List[dict], carrera_obj: Optional[dict])
     }
 
 
+def _build_fuerza_exercises(focus: str) -> List[dict]:
+    """Deterministic Strava Strength exercises using Aarón's 5kg dumbbells & bands."""
+    if focus == "core_pierna":
+        return [
+            {"nombre": "Sentadilla Goblet (Mancuerna 5 kg)", "series": 3, "repeticiones": "15", "descanso_segundos": 45, "grupo_muscular": "Cuádriceps / Glúteos", "descripcion": "Espalda recta, baja controlado en 3 segundos."},
+            {"nombre": "Puente de Glúteo con Cinta", "series": 3, "repeticiones": "18", "descanso_segundos": 40, "grupo_muscular": "Glúteos / Isquios", "descripcion": "Empuje explosivo manteniendo tensión en la cinta."},
+            {"nombre": "Plancha Frontal", "series": 3, "repeticiones": "40 seg", "descanso_segundos": 35, "grupo_muscular": "Core", "descripcion": "Abdomen firme sin hundir la zona lumbar."},
+            {"nombre": "Peso Muerto Rumano (Mancuernas 5 kg)", "series": 3, "repeticiones": "14", "descanso_segundos": 45, "grupo_muscular": "Isquiotibiales", "descripcion": "Bisagra de cadera controlada."},
+        ]
+    return [
+        {"nombre": "Press de Hombros (Mancuernas 5 kg)", "series": 3, "repeticiones": "14", "descanso_segundos": 45, "grupo_muscular": "Hombros", "descripcion": "Subida fluida sin arquear la espalda."},
+        {"nombre": "Remo con Cinta Elástica", "series": 3, "repeticiones": "16", "descanso_segundos": 40, "grupo_muscular": "Espalda / Bíceps", "descripcion": "Junta escápulas al final del tirón."},
+        {"nombre": "Zancadas Alternas (5 kg)", "series": 3, "repeticiones": "12", "descanso_segundos": 45, "grupo_muscular": "Pierna / Estabilidad", "descripcion": "Rodilla alineada con la punta del pie."},
+        {"nombre": "Dead Bug (Control Core)", "series": 3, "repeticiones": "14", "descanso_segundos": 30, "grupo_muscular": "Core", "descripcion": "Zona lumbar pegada al suelo en todo momento."},
+    ]
+
+
+def _build_cardio_phases(kind: str, dur_min: int) -> List[dict]:
+    """Deterministic Runna / Cycling structured phases ready for .FIT export and Guided Mode."""
+    total_s = max(1200, int(dur_min) * 60)
+    if kind == "calidad":
+        wu = 600
+        cd = 420
+        main_s = max(600, total_s - wu - cd)
+        reps = 4 if main_s >= 1200 else 3
+        work_s = int((main_s / reps) * 0.65)
+        rest_s = max(60, int((main_s / reps) * 0.35))
+        phases = [{"name": "Calentamiento Z1-Z2", "duration_seconds": wu, "target_pace": "6:00 - 6:20", "zone": "Z2"}]
+        for i in range(reps):
+            phases.append({"name": f"Intervalo Tempo {i+1}/{reps}", "duration_seconds": work_s, "target_pace": "4:45 - 5:00", "zone": "Z4"})
+            phases.append({"name": f"Trote Recuperación {i+1}/{reps}", "duration_seconds": rest_s, "target_pace": "6:20 - 6:45", "zone": "Z1"})
+        phases.append({"name": "Enfriamiento Suave", "duration_seconds": cd, "target_pace": "6:15 - 6:40", "zone": "Z1"})
+        return phases
+    if kind == "bici":
+        wu = 600
+        cd = 480
+        main_s = max(900, total_s - wu - cd)
+        return [
+            {"name": "Calentamiento Cadencia Alta", "duration_seconds": wu, "target_pace": "90 rpm", "zone": "Z1-Z2"},
+            {"name": "Bloque Aeróbico Sostenido", "duration_seconds": main_s, "target_pace": "180-210 W", "zone": "Z2-Z3"},
+            {"name": "Soltar Piernas", "duration_seconds": cd, "target_pace": "85 rpm", "zone": "Z1"},
+        ]
+    if kind == "larga":
+        wu = 480
+        cd = 300
+        main_s = max(900, total_s - wu - cd)
+        return [
+            {"name": "Inicio Controlado Z2", "duration_seconds": wu, "target_pace": "5:50 - 6:10", "zone": "Z2"},
+            {"name": "Rodaje Aeróbico Principal", "duration_seconds": main_s, "target_pace": "5:25 - 5:45", "zone": "Z2-Z3"},
+            {"name": "Vuelta a la Calma", "duration_seconds": cd, "target_pace": "6:05 - 6:25", "zone": "Z1"},
+        ]
+    # Rodaje base / activación
+    wu = 360
+    cd = 240
+    main_s = max(600, total_s - wu - cd)
+    return [
+        {"name": "Calentamiento Z1-Z2", "duration_seconds": wu, "target_pace": "5:55 - 6:15", "zone": "Z2"},
+        {"name": "Rodaje Base Constante", "duration_seconds": main_s, "target_pace": "5:30 - 5:50", "zone": "Z2"},
+        {"name": "Enfriamiento", "duration_seconds": cd, "target_pace": "6:10 - 6:30", "zone": "Z1"},
+    ]
+
+
 def _construir_plan_semanal(history: List[dict], carrera_obj: Optional[dict]) -> dict:
     from datetime import date, timedelta
     today = date.today()
     monday = today - timedelta(days=today.weekday())
+    monday_str = monday.isoformat()
     metrics = _calcular_fase_y_tendencia(history, carrera_obj)
 
-    # Map completed activities by date in current week
+    plan_type = (database.get_setting("training_plan_type") or "mantenimiento").strip().lower()
+    if plan_type not in ("mantenimiento", "10k", "21k", "ciclismo"):
+        plan_type = "mantenimiento"
+
+    # Compute current week progress (Monday-Sunday) from real Garmin history
     completed_by_date: dict = {}
+    week_run_km = 0.0
+    week_bike_km = 0.0
+    week_strength_sessions = 0
     for act in history:
         f_str = (act.get("fecha") or "")[:10]
         if f_str:
             completed_by_date.setdefault(f_str, []).append(act)
+            if f_str >= monday_str:
+                tipo_a = act.get("tipo", "")
+                if tipo_a == "Carrera":
+                    week_run_km += float(act.get("distancia_km") or 0)
+                elif tipo_a == "Ciclismo":
+                    week_bike_km += float(act.get("distancia_km") or 0)
+                elif tipo_a == "Fuerza":
+                    week_strength_sessions += 1
 
     fase = metrics["fase_actual"]
     dias_carrera = metrics["dias_para_carrera"]
     is_taper = dias_carrera is not None and 0 <= dias_carrera <= 10
     is_peak = dias_carrera is not None and 11 <= dias_carrera <= 28
 
-    # Base weekly target km slightly upward from recent 14d/2 average (capped safely)
-    base_weekly_km = max(16.0, round((metrics["km_carrera_14d"] / 2.0) * 1.07, 1))
+    # Default goals tailored by plan_type unless user customized them
+    default_run_by_plan = {"mantenimiento": 20.0, "10k": 26.0, "21k": 34.0, "ciclismo": 12.0}
+    default_bike_by_plan = {"mantenimiento": 35.0, "10k": 25.0, "21k": 20.0, "ciclismo": 90.0}
+    raw_run_goal = database.get_setting("goal_run_km")
+    raw_bike_goal = database.get_setting("goal_bike_km")
+    raw_str_goal = database.get_setting("goal_strength_sessions")
+
+    base_weekly_km = float(raw_run_goal) if raw_run_goal else max(default_run_by_plan[plan_type], round((metrics["km_carrera_14d"] / 2.0) * 1.07, 1))
+    goal_bike_km = float(raw_bike_goal) if raw_bike_goal else default_bike_by_plan[plan_type]
+    goal_strength_sessions = int(float(raw_str_goal)) if raw_str_goal else 2
+
     if is_taper:
         base_weekly_km = round(base_weekly_km * 0.65, 1)
 
-    rodaje_km = max(6.0, round(base_weekly_km * 0.30, 1))
-    calidad_km = max(6.5, round(base_weekly_km * 0.32, 1))
-    larga_km = max(8.0, round(base_weekly_km * 0.38, 1))
+    rodaje_km = max(5.0, round(base_weekly_km * 0.30, 1))
+    calidad_km = max(5.5, round(base_weekly_km * 0.32, 1))
+    larga_km = max(7.0, round(base_weekly_km * 0.38, 1))
+    bici_media_km = max(20.0, round(goal_bike_km * 0.45, 1))
+    bici_larga_km = max(25.0, round(goal_bike_km * 0.55, 1))
 
-    # 7-day Monday-Sunday schedule: Cardio core + 2 Optional Strava Strength sessions
     day_names = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-    template = [
-        {
-            "dia_idx": 0,
-            "tipo": "Fuerza",
-            "titulo": "Fuerza Express (Opcional)",
-            "detalle": "25–30 min • Strava Strength (5 kg + cintas) si tienes hueco hoy.",
-            "opcional": True,
-            "duracion_min": 30,
-        },
-        {
-            "dia_idx": 1,
-            "tipo": "Carrera",
-            "titulo": f"Rodaje Base Z2 ({rodaje_km} km)",
-            "detalle": f"Ritmo cómodo ~5:35–5:50/km • Construcción aeróbica ascendente.",
-            "opcional": False,
-            "duracion_min": 40,
-        },
-        {
-            "dia_idx": 2,
-            "tipo": "Descanso",
-            "titulo": "Descanso / Movilidad",
-            "detalle": "Asimilación de carga y cuidado articular (93 kg).",
-            "opcional": False,
-            "duracion_min": 0,
-        },
-        {
-            "dia_idx": 3,
-            "tipo": "Carrera",
-            "titulo": (
-                f"Activación Pre-Carrera ({round(calidad_km * 0.7, 1)} km)"
-                if is_taper
-                else f"Calidad Runna / Tempo ({calidad_km} km)"
-            ),
-            "detalle": (
-                "Cambios de ritmo cortos para chispa sin fatiga."
-                if is_taper
-                else f"Intervalos progresivos estilo Runna {'específicos de carrera' if is_peak else 'para subir umbral'}."
-            ),
-            "opcional": False,
-            "duracion_min": 45 if not is_taper else 30,
-        },
-        {
-            "dia_idx": 4,
-            "tipo": "Fuerza",
-            "titulo": "Fuerza Core & Pierna (Opcional)",
-            "detalle": "25 min • Prevención de lesiones (opcional según agenda).",
-            "opcional": True,
-            "duracion_min": 25,
-        },
-        {
-            "dia_idx": 5,
-            "tipo": "Carrera",
-            "titulo": f"Tirada Larga Progresiva ({larga_km} km)",
-            "detalle": "Ritmo controlado Z2–Z3 • Base sólida o bici en ruta alternativa.",
-            "opcional": False,
-            "duracion_min": 55 if not is_taper else 35,
-        },
-        {
-            "dia_idx": 6,
-            "tipo": "Descanso",
-            "titulo": "Recuperación Semanal",
-            "detalle": "Descanso completo para consolidar la tendencia ascendente.",
-            "opcional": False,
-            "duracion_min": 0,
-        },
-    ]
+    if plan_type == "ciclismo":
+        template = [
+            {"dia_idx": 0, "tipo": "Fuerza", "titulo": "Fuerza Express (Opcional)", "detalle": "25–30 min • Strava Strength (5 kg + cintas).", "opcional": True, "duracion_min": 30, "distancia_km": 0.0, "zona_objetivo": "Fuerza Funcional", "ejercicios": _build_fuerza_exercises("upper")},
+            {"dia_idx": 1, "tipo": "Ciclismo", "titulo": f"Fondo Aeróbico Bici ({bici_media_km} km)", "detalle": "Cadencia ágil 85–95 rpm en zona aeróbica.", "opcional": False, "duracion_min": 65, "distancia_km": bici_media_km, "zona_objetivo": "Z2–Z3 Aeróbico", "phases": _build_cardio_phases("bici", 65)},
+            {"dia_idx": 2, "tipo": "Carrera", "titulo": f"Rodaje Complementario ({rodaje_km} km)", "detalle": "Carrera suave Z2 para mantener base de carrera.", "opcional": False, "duracion_min": 35, "distancia_km": rodaje_km, "zona_objetivo": "Z2 Base", "phases": _build_cardio_phases("base", 35)},
+            {"dia_idx": 3, "tipo": "Descanso", "titulo": "Descanso / Movilidad", "detalle": "Asimilación de carga y cuidado articular.", "opcional": False, "duracion_min": 0, "distancia_km": 0.0, "zona_objetivo": "Recuperación"},
+            {"dia_idx": 4, "tipo": "Fuerza", "titulo": "Fuerza Core & Pierna (Opcional)", "detalle": "25 min • Prevención de lesiones (opcional).", "opcional": True, "duracion_min": 25, "distancia_km": 0.0, "zona_objetivo": "Core & Fuerza", "ejercicios": _build_fuerza_exercises("core_pierna")},
+            {"dia_idx": 5, "tipo": "Ciclismo", "titulo": f"Gran Fondo en Ruta ({bici_larga_km} km)", "detalle": "Salida larga de ciclismo en ruta con desnivel progresivo.", "opcional": False, "duracion_min": 110, "distancia_km": bici_larga_km, "zona_objetivo": "Z2–Z3 Fondo", "phases": _build_cardio_phases("bici", 110)},
+            {"dia_idx": 6, "tipo": "Descanso", "titulo": "Recuperación Semanal", "detalle": "Descanso completo para consolidar la semana.", "opcional": False, "duracion_min": 0, "distancia_km": 0.0, "zona_objetivo": "Recuperación"},
+        ]
+    else:
+        plan_tag = "Media Maratón" if plan_type == "21k" else "10K" if plan_type == "10k" else "Base"
+        template = [
+            {"dia_idx": 0, "tipo": "Fuerza", "titulo": "Fuerza Express (Opcional)", "detalle": "25–30 min • Strava Strength (5 kg + cintas) si tienes hueco hoy.", "opcional": True, "duracion_min": 30, "distancia_km": 0.0, "zona_objetivo": "Fuerza Funcional", "ejercicios": _build_fuerza_exercises("upper")},
+            {"dia_idx": 1, "tipo": "Carrera", "titulo": f"Rodaje {plan_tag} Z2 ({rodaje_km} km)", "detalle": "Ritmo cómodo ~5:30–5:50/km • Construcción aeróbica.", "opcional": False, "duracion_min": 40, "distancia_km": rodaje_km, "zona_objetivo": "Z2 Base", "phases": _build_cardio_phases("base", 40)},
+            {"dia_idx": 2, "tipo": "Ciclismo" if goal_bike_km >= 20 else "Descanso", "titulo": f"Rodaje Suave Bici ({round(goal_bike_km * 0.5, 1)} km)" if goal_bike_km >= 20 else "Descanso / Movilidad", "detalle": "Descarga articular en bici Z1–Z2." if goal_bike_km >= 20 else "Asimilación de carga (93 kg).", "opcional": goal_bike_km >= 20, "duracion_min": 45 if goal_bike_km >= 20 else 0, "distancia_km": round(goal_bike_km * 0.5, 1) if goal_bike_km >= 20 else 0.0, "zona_objetivo": "Z1–Z2 Regenerativo" if goal_bike_km >= 20 else "Recuperación", **({"phases": _build_cardio_phases("bici", 45)} if goal_bike_km >= 20 else {})},
+            {"dia_idx": 3, "tipo": "Carrera", "titulo": f"Activación Pre-Carrera ({round(calidad_km * 0.7, 1)} km)" if is_taper else f"Calidad Runna / Tempo ({calidad_km} km)", "detalle": "Cambios de ritmo cortos para chispa sin fatiga." if is_taper else f"Intervalos progresivos estilo Runna {'específicos de carrera' if is_peak else 'para subir umbral'}.", "opcional": False, "duracion_min": 30 if is_taper else 45, "distancia_km": round(calidad_km * 0.7, 1) if is_taper else calidad_km, "zona_objetivo": "Z3–Z4 Intervalos", "phases": _build_cardio_phases("calidad", 30 if is_taper else 45)},
+            {"dia_idx": 4, "tipo": "Fuerza", "titulo": "Fuerza Core & Pierna (Opcional)", "detalle": "25 min • Prevención de lesiones (opcional según agenda).", "opcional": True, "duracion_min": 25, "distancia_km": 0.0, "zona_objetivo": "Core & Fuerza", "ejercicios": _build_fuerza_exercises("core_pierna")},
+            {"dia_idx": 5, "tipo": "Carrera", "titulo": f"Tirada Larga Progresiva ({larga_km} km)", "detalle": "Ritmo controlado Z2–Z3 • Resistencia aeróbica.", "opcional": False, "duracion_min": 35 if is_taper else (75 if plan_type == "21k" else 55), "distancia_km": larga_km, "zona_objetivo": "Z2–Z3 Fondo", "phases": _build_cardio_phases("larga", 35 if is_taper else (75 if plan_type == "21k" else 55))},
+            {"dia_idx": 6, "tipo": "Descanso", "titulo": "Recuperación Semanal", "detalle": "Descanso completo para consolidar la tendencia ascendente.", "opcional": False, "duracion_min": 0, "distancia_km": 0.0, "zona_objetivo": "Recuperación"},
+        ]
 
     dias = []
     for item in template:
@@ -2361,19 +2297,37 @@ def _construir_plan_semanal(history: List[dict], carrera_obj: Optional[dict]) ->
             "fecha": d_str,
             "es_hoy": d_date == today,
             "tipo": "Carrera Objetivo" if is_race_day else item["tipo"],
-            "titulo": f"🏁 {carrera_obj['nombre']} ({carrera_obj['distancia_km']} km)" if is_race_day else item["titulo"],
+            "titulo": f"{carrera_obj['nombre']} ({carrera_obj['distancia_km']} km)" if is_race_day else item["titulo"],
             "detalle": "¡Día de competición! Disfruta todo el trabajo acumulado." if is_race_day else item["detalle"],
             "opcional": False if is_race_day else item["opcional"],
             "duracion_min": item["duracion_min"],
+            "distancia_km": float(carrera_obj["distancia_km"]) if is_race_day else item["distancia_km"],
+            "zona_objetivo": "Competición" if is_race_day else item["zona_objetivo"],
             "completado": len(acts_today) > 0,
             "garmin_actividades": [a.get("nombre") for a in acts_today],
         }
+        if "phases" in item:
+            entry["phases"] = item["phases"]
+        if "ejercicios" in item:
+            entry["ejercicios"] = item["ejercicios"]
         dias.append(entry)
 
     return {
         "semana_inicio": monday.isoformat(),
         "semana_fin": (monday + timedelta(days=6)).isoformat(),
+        "plan_type": plan_type,
         "objetivo_km_carrera": base_weekly_km,
+        "goals": {
+            "plan_type": plan_type,
+            "goal_run_km": base_weekly_km,
+            "goal_bike_km": goal_bike_km,
+            "goal_strength_sessions": goal_strength_sessions,
+        },
+        "week_progress": {
+            "run_km": round(week_run_km, 1),
+            "bike_km": round(week_bike_km, 1),
+            "strength_sessions": week_strength_sessions,
+        },
         "metrics": metrics,
         "carrera_objetivo": carrera_obj,
         "dias": dias,
@@ -2418,6 +2372,29 @@ async def get_plan_semanal():
     history = await get_intervals_history()
     plan = _construir_plan_semanal(history, state_data.get("carrera_objetivo"))
     return plan
+
+
+class TrainingGoalsPayload(BaseModel):
+    plan_type: str = "mantenimiento"
+    goal_run_km: float = 20.0
+    goal_bike_km: float = 35.0
+    goal_strength_sessions: int = 2
+
+
+@app.post("/api/training/goals")
+async def post_training_goals(payload: TrainingGoalsPayload):
+    pt = payload.plan_type.strip().lower()
+    if pt not in ("mantenimiento", "10k", "21k", "ciclismo"):
+        pt = "mantenimiento"
+    database.set_setting("training_plan_type", pt)
+    database.set_setting("goal_run_km", str(max(0.0, float(payload.goal_run_km))))
+    database.set_setting("goal_bike_km", str(max(0.0, float(payload.goal_bike_km))))
+    database.set_setting("goal_strength_sessions", str(max(0, int(payload.goal_strength_sessions))))
+
+    state_data = _load_plan_state()
+    history = await get_intervals_history()
+    plan = _construir_plan_semanal(history, state_data.get("carrera_objetivo"))
+    return {"status": "ok", "plan": plan}
 
 
 # ============================================================

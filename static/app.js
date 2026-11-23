@@ -73,7 +73,7 @@ let state = {
   },
   currentWorkout: null
 };
-let chatHistory = [];
+let _latestWeeklyPlan = null;
 
 // ============================================================
 // DOM — Main UI
@@ -104,12 +104,6 @@ const elAdaptationBanner  = document.getElementById("adaptation-banner");
 const elAdaptationText    = document.getElementById("adaptation-text");
 const elDecisionBanner    = document.getElementById("decision-banner");
 const elDecisionText      = document.getElementById("decision-text");
-
-// Coach Chat DOM
-const elCoachChatCard     = document.getElementById("coach-chat-card");
-const elChatMessages      = document.getElementById("chat-messages");
-const elChatInput         = document.getElementById("chat-input");
-const elBtnSendChat       = document.getElementById("btn-send-chat");
 
 // Last Workout DOM
 const elLastWorkoutBox    = document.getElementById("last-workout-box");
@@ -190,12 +184,6 @@ document.addEventListener("DOMContentLoaded", () => {
     elBtnDiaGris.addEventListener("click", () => iniciarGeneracionEntrenamiento("Fuerza", true));
   }
 
-
-  // Chat events
-  elBtnSendChat.addEventListener("click", enviarMensajeChat);
-  elChatInput.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") enviarMensajeChat();
-  });
 
   // Online/offline status
   window.addEventListener("online",  updateOnlineStatus);
@@ -2058,104 +2046,216 @@ function showSuccessBanner(completado, synced = false) {
 function hideSuccessBanner() { elSuccessBanner.style.display = "none"; }
 
 // ============================================================
-// COACH CHAT LOGIC (AARÓN COACH CHAT)
+// STRAVA TRAINING TAB (#tab-training)
 // ============================================================
-function renderChatMessages() {
-  elChatMessages.innerHTML = "";
-  
-  chatHistory.forEach(msg => {
-    const isCoach = msg.role === "model";
-    const bubble = document.createElement("div");
-    bubble.className = `chat-message-bubble ${isCoach ? "coach" : "user"}`;
-    // Replace markdown double asterisks with bold and newlines with br
-    let formattedText = msg.parts
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\n/g, '<br>');
-    bubble.innerHTML = formattedText;
-    elChatMessages.appendChild(bubble);
-  });
-  
-  // Scroll to bottom
-  elChatMessages.scrollTop = elChatMessages.scrollHeight;
+function _buildWorkoutFromPlannedDay(d) {
+  const isFuerza = d.tipo === "Fuerza";
+  return {
+    tipo_sesion: isFuerza ? "Fuerza" : (d.tipo === "Ciclismo" ? "Ciclismo" : "Carrera"),
+    explicacion_tipo: d.detalle || d.titulo,
+    mensaje_adaptacion: `${d.dia} (${d.fecha}) • ${d.zona_objetivo || ""}`,
+    nota_coach: d.detalle || "",
+    ejercicios: d.ejercicios || [],
+    phases: d.phases || []
+  };
 }
 
-function saveChat() {
-  if (chatHistory.length > 25) {
-    chatHistory = chatHistory.slice(-25);
+function renderTrainingTab(plan) {
+  if (!plan) return;
+  _latestWeeklyPlan = plan;
+
+  const weekRange = document.getElementById("training-week-range");
+  if (weekRange && plan.semana_inicio && plan.semana_fin) {
+    weekRange.textContent = `${plan.semana_inicio} – ${plan.semana_fin}`;
   }
-  localStorage.setItem("coach_chat_history", JSON.stringify(chatHistory));
+
+  const goals = plan.goals || {};
+  const prog = plan.week_progress || {};
+  const gRun = Number(goals.goal_run_km ?? plan.objetivo_km_carrera ?? 20);
+  const gBike = Number(goals.goal_bike_km ?? 35);
+  const gStr = Number(goals.goal_strength_sessions ?? 2);
+  const pRun = Number(prog.run_km || 0);
+  const pBike = Number(prog.bike_km || 0);
+  const pStr = Number(prog.strength_sessions || 0);
+
+  const setBar = (lblId, barId, txt, pct) => {
+    const l = document.getElementById(lblId);
+    const b = document.getElementById(barId);
+    if (l) l.textContent = txt;
+    if (b) b.style.width = `${Math.min(100, Math.max(0, Math.round(pct)))}%`;
+  };
+  setBar("goal-run-progress-label", "goal-run-bar", `${pRun.toFixed(1)} / ${gRun} km`, gRun > 0 ? (pRun / gRun) * 100 : 0);
+  setBar("goal-bike-progress-label", "goal-bike-bar", `${pBike.toFixed(1)} / ${gBike} km`, gBike > 0 ? (pBike / gBike) * 100 : 0);
+  setBar("goal-strength-progress-label", "goal-strength-bar", `${pStr} / ${gStr} ses`, gStr > 0 ? (pStr / gStr) * 100 : 0);
+
+  const inRun = document.getElementById("input-goal-run-km");
+  const inBike = document.getElementById("input-goal-bike-km");
+  const inStr = document.getElementById("input-goal-strength-ses");
+  if (inRun) inRun.value = gRun;
+  if (inBike) inBike.value = gBike;
+  if (inStr) inStr.value = gStr;
+
+  const planType = plan.plan_type || goals.plan_type || "mantenimiento";
+  const planLabels = {
+    mantenimiento: "BASE / MANTENIMIENTO",
+    "10k": "PLAN 10K",
+    "21k": "PLAN MEDIA MARATÓN",
+    ciclismo: "GRAN FONDO BICI"
+  };
+  const badge = document.getElementById("training-plan-badge");
+  if (badge) badge.textContent = planLabels[planType] || "BASE / MANTENIMIENTO";
+
+  document.querySelectorAll(".training-plan-pill").forEach(btn => {
+    btn.classList.toggle("active", btn.getAttribute("data-plan") === planType);
+  });
+
+  const race = plan.carrera_objetivo;
+  if (race && race.activo) {
+    const rName = document.getElementById("training-race-name");
+    const rDate = document.getElementById("training-race-date");
+    const rDist = document.getElementById("training-race-dist");
+    if (rName) rName.value = race.nombre || "";
+    if (rDate) rDate.value = (race.fecha || "").slice(0, 10);
+    if (rDist) rDist.value = race.distancia_km || 10;
+  }
+
+  const calEl = document.getElementById("training-weekly-calendar");
+  if (!calEl || !Array.isArray(plan.dias)) return;
+
+  calEl.innerHTML = plan.dias.map((d, idx) => {
+    const isRest = d.tipo === "Descanso";
+    const isFuerza = d.tipo === "Fuerza";
+    const isBici = d.tipo === "Ciclismo";
+    const badgeCls = isFuerza ? "orange" : isBici ? "cyan" : "";
+    const hasActions = !isRest;
+    const distInfo = d.distancia_km > 0 ? `${d.distancia_km} km` : (d.duracion_min > 0 ? `${d.duracion_min} min` : "Descanso");
+
+    return `
+      <div class="training-day-card ${d.es_hoy ? "is-today" : ""}">
+        <div class="training-day-info">
+          <div class="training-day-head">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <strong style="font-size:0.92rem; color:${d.es_hoy ? "var(--primary-text)" : "var(--on-surface)"};">${d.dia}${d.es_hoy ? " • HOY" : ""}</strong>
+              <span class="body-xs tabular-num">${d.fecha}</span>
+              <span class="pill-tag ${badgeCls}">${d.tipo}</span>
+              ${d.opcional ? `<span class="pill-tag">OPCIONAL</span>` : ""}
+            </div>
+            ${d.completado
+              ? `<span class="pill-tag" style="background:rgba(21,128,61,0.12); color:#15803D;">✓ Garmin</span>`
+              : `<span class="body-xs tabular-num">${distInfo}${d.zona_objetivo ? ` • ${d.zona_objetivo}` : ""}</span>`}
+          </div>
+          <div style="font-weight:800; font-size:0.96rem; color:var(--on-surface); margin-top:4px;">${d.titulo}</div>
+          <div class="body-xs" style="margin-top:2px;">${d.detalle}</div>
+        </div>
+        ${hasActions ? `
+          <div class="training-day-actions">
+            <button type="button" class="btn btn-primary" style="padding:8px 12px; font-size:0.8rem;" onclick="startPlannedWorkout(${idx})">Ver / Iniciar</button>
+            <button type="button" class="btn btn-ghost" style="padding:8px 12px; font-size:0.8rem;" onclick="sendPlannedDayToGarmin(${idx})">Enviar a Garmin (.FIT)</button>
+          </div>
+        ` : ""}
+      </div>
+    `;
+  }).join("");
 }
 
-async function enviarMensajeChat() {
-  const text = elChatInput.value.trim();
-  if (!text) return;
-  
-  elChatInput.value = "";
-  
-  // 1. Add user message to state, render and save
-  chatHistory.push({ role: "user", parts: text });
-  renderChatMessages();
-  saveChat();
-  
-  // 2. Show typing indicator
-  const indicator = document.createElement("div");
-  indicator.className = "chat-typing-indicator";
-  indicator.id = "chat-typing-indicator";
-  indicator.innerHTML = `
-    <span class="chat-typing-dot"></span>
-    <span class="chat-typing-dot"></span>
-    <span class="chat-typing-dot"></span>
-  `;
-  elChatMessages.appendChild(indicator);
-  elChatMessages.scrollTop = elChatMessages.scrollHeight;
-  
+function selectTrainingPlanType(planType, btnEl) {
+  document.querySelectorAll(".training-plan-pill").forEach(b => b.classList.remove("active"));
+  if (btnEl) btnEl.classList.add("active");
+  saveTrainingGoals(planType);
+}
+
+async function saveTrainingGoals(overridePlanType = null) {
+  const activePill = document.querySelector(".training-plan-pill.active");
+  const planType = overridePlanType || (activePill ? activePill.getAttribute("data-plan") : "mantenimiento");
+  const goalRun = parseFloat(document.getElementById("input-goal-run-km")?.value || "20");
+  const goalBike = parseFloat(document.getElementById("input-goal-bike-km")?.value || "35");
+  const goalStrength = parseInt(document.getElementById("input-goal-strength-ses")?.value || "2", 10);
+
   try {
-    const res = await fetch("/chat-coach", {
+    const res = await fetch("/api/training/goals", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mensaje: text, historial: chatHistory.slice(0, -1) }) // send history without the last user message to avoid duplication
+      body: JSON.stringify({
+        plan_type: planType,
+        goal_run_km: goalRun,
+        goal_bike_km: goalBike,
+        goal_strength_sessions: goalStrength
+      })
     });
-    
-    // Remove typing indicator
-    const existingIndicator = document.getElementById("chat-typing-indicator");
-    if (existingIndicator) existingIndicator.remove();
-    
-    if (res.ok) {
-      const data = await res.json();
-      chatHistory.push({ role: "model", parts: data.respuesta });
-      renderChatMessages();
-      saveChat();
-      
-      // Real-time workout reconfiguration from chat!
-      if (data.rutina_actualizada) {
-        state.currentWorkout = data.rutina_actualizada;
-        localStorage.setItem("cached_workout", JSON.stringify(state.currentWorkout));
-        localStorage.setItem("cached_workout_date", new Date().toDateString());
-        
-        renderWorkout(state.currentWorkout);
-        showSuccessBanner("✨ Tu Coach IA ha adaptado tu entrenamiento de hoy.");
-      }
-    } else {
-      chatHistory.push({ role: "model", parts: "Disculpa Aarón, he tenido un problema al procesar tu mensaje. ¿Puedes repetirlo?" });
-      renderChatMessages();
-      saveChat();
-    }
-  } catch (err) {
-    console.error("Chat error:", err);
-    const existingIndicator = document.getElementById("chat-typing-indicator");
-    if (existingIndicator) existingIndicator.remove();
-    
-    chatHistory.push({ role: "model", parts: "Aarón, parece que hay un problema de conexión a internet. ¿Lo intentamos de nuevo?" });
-    renderChatMessages();
-    saveChat();
-  }
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.plan) renderWeeklyPlan(data.plan);
+    showSuccessBanner("Objetivos y plan semanal guardados.");
+  } catch (e) {}
 }
 
-function enviarTextoChat(texto) {
-  const elChatInput = document.getElementById("chat-input");
-  if (elChatInput) {
-    elChatInput.value = texto;
-    enviarMensajeChat();
+async function saveTrainingRaceGoal() {
+  const name = document.getElementById("training-race-name")?.value.trim();
+  const dateVal = document.getElementById("training-race-date")?.value;
+  const distVal = parseFloat(document.getElementById("training-race-dist")?.value || "10");
+  if (!name || !dateVal) {
+    showSuccessBanner("Introduce nombre y fecha de la carrera objetivo.");
+    return;
+  }
+  try {
+    const res = await fetch("/api/carrera-objetivo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre: name, fecha: dateVal, distancia_km: distVal, activo: true })
+    });
+    const data = await res.json();
+    if (data.plan) renderWeeklyPlan(data.plan);
+    showSuccessBanner(`Plan adaptado a ${name}.`);
+  } catch (e) {}
+}
+
+function startPlannedWorkout(dayIdx) {
+  if (!_latestWeeklyPlan || !_latestWeeklyPlan.dias || !_latestWeeklyPlan.dias[dayIdx]) return;
+  const d = _latestWeeklyPlan.dias[dayIdx];
+  const w = _buildWorkoutFromPlannedDay(d);
+  state.currentWorkout = w;
+  switchTab("tab-dashboard");
+  renderWorkout(w);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function sendPlannedDayToGarmin(dayIdx) {
+  if (!_latestWeeklyPlan || !_latestWeeklyPlan.dias || !_latestWeeklyPlan.dias[dayIdx]) return;
+  const d = _latestWeeklyPlan.dias[dayIdx];
+  const workout = _buildWorkoutFromPlannedDay(d);
+  try {
+    const sendRes = await fetch("/api/garmin/send-workout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(workout)
+    });
+    if (sendRes.ok) {
+      const sendData = await sendRes.json();
+      if (sendData.status === "ok" && sendData.sent) {
+        showSuccessBanner(`Sesión "${d.titulo}" enviada directamente a tu reloj Garmin.`);
+        return;
+      }
+    }
+    // Fallback to native .FIT download
+    const fitRes = await fetch("/api/garmin/export-fit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(workout)
+    });
+    if (fitRes.ok) {
+      const blob = await fitRes.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `aaronfit_${(d.tipo || "sesion").toLowerCase()}.fit`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showSuccessBanner(`Archivo .FIT generado para "${d.titulo}".`);
+    }
+  } catch (e) {
+    showSuccessBanner("No se pudo exportar la sesión a Garmin.");
   }
 }
 
@@ -2996,6 +3096,7 @@ function renderWeeklyPlan(plan) {
     });
     listEl.innerHTML = html;
   }
+  renderTrainingTab(plan);
 }
 
 function toggleRaceGoalForm() {

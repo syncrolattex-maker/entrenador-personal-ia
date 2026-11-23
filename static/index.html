@@ -17,7 +17,7 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=76">
+  <link rel="stylesheet" href="/style.css?v=77">
 
   <!-- Icons & Fonts (Hanken Grotesk & JetBrains Mono) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -40,7 +40,7 @@
         <nav class="desktop-nav" aria-label="Navegación principal">
           <button type="button" class="nav-tab-btn desktop-nav-btn active" data-target="tab-dashboard" onclick="switchTab('tab-dashboard')">Inicio</button>
           <button type="button" class="nav-tab-btn desktop-nav-btn" data-target="tab-metrics" onclick="switchTab('tab-metrics')">Entrenamiento</button>
-          <button type="button" class="nav-tab-btn desktop-nav-btn" data-target="tab-chat" onclick="switchTab('tab-chat')">Coach IA</button>
+          <button type="button" class="nav-tab-btn desktop-nav-btn" data-target="tab-training" onclick="switchTab('tab-training')">Entrenamientos</button>
           <button type="button" class="nav-tab-btn desktop-nav-btn" data-target="tab-profile" onclick="switchTab('tab-profile')">Perfil</button>
         </nav>
       </div>
@@ -183,7 +183,7 @@
                   <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
 
-                <button id="btn-select-bici" class="selection-btn" onclick="enviarTextoChat('Hoy quiero salir en bici en ruta, adapta mi plan semanal y la fatiga')">
+                <button id="btn-select-bici" class="selection-btn" onclick="switchTab('tab-training')">
                   <div class="btn-icon-wrap figma-tile-lavender">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>
                   </div>
@@ -527,41 +527,95 @@
       </section>
 
       <!-- ================================================================= -->
-      <!-- TAB 3: COACH IA                                                   -->
+      <!-- TAB 3: ENTRENAMIENTOS (STRAVA TRAINING PLAN & WEEKLY GOALS)       -->
       <!-- ================================================================= -->
-      <section id="tab-chat" class="tab-view">
+      <section id="tab-training" class="tab-view">
         <div class="greeting-header">
-          <h1 class="greeting-title">Coach IA de Aarón</h1>
+          <h1 class="greeting-title">Entrenamientos</h1>
+          <p class="body-sm-muted">Plan semanal determinista Lunes–Domingo sincronizado con Garmin Connect</p>
         </div>
 
-        <div id="coach-chat-card" class="glass-card coach-chat-card-full">
-          <div class="chat-card-header">
-            <div class="coach-avatar-wrap">
-              <div class="coach-avatar">A</div>
-              <span class="coach-status-dot"></span>
+        <div class="training-top-grid">
+          <!-- Bloque 1: Objetivos Semanales (Lunes–Domingo) -->
+          <div class="glass-card" id="training-goals-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <h2 class="headline-sm" style="margin:0;">Objetivos Semanales (L–D)</h2>
+              <span id="training-week-range" class="body-xs tabular-num">—</span>
             </div>
-            <div class="coach-info">
-              <h2 class="headline-sm" style="margin:0;">Coach Personal IA</h2>
-              <span class="label-caps" style="color: var(--primary-text);">ACTIVO • RECONFIGURACIÓN EN TIEMPO REAL</span>
+
+            <div class="training-goal-row">
+              <div class="training-goal-head">
+                <span class="label-caps">CARRERA (KM)</span>
+                <span id="goal-run-progress-label" class="body-xs tabular-num" style="font-weight:700;">0.0 / 20 km</span>
+              </div>
+              <div class="progress-bar-wrap"><div id="goal-run-bar" class="progress-fill orange" style="width:0%;"></div></div>
             </div>
+
+            <div class="training-goal-row">
+              <div class="training-goal-head">
+                <span class="label-caps">CICLISMO (KM)</span>
+                <span id="goal-bike-progress-label" class="body-xs tabular-num" style="font-weight:700;">0.0 / 35 km</span>
+              </div>
+              <div class="progress-bar-wrap"><div id="goal-bike-bar" class="progress-fill blue" style="width:0%;"></div></div>
+            </div>
+
+            <div class="training-goal-row">
+              <div class="training-goal-head">
+                <span class="label-caps">FUERZA (SESIONES)</span>
+                <span id="goal-strength-progress-label" class="body-xs tabular-num" style="font-weight:700;">0 / 2 ses</span>
+              </div>
+              <div class="progress-bar-wrap"><div id="goal-strength-bar" class="progress-fill orange" style="width:0%;"></div></div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding-top:8px; border-top:1px solid var(--border-glass);">
+              <div>
+                <label class="label-caps" for="input-goal-run-km" style="display:block; margin-bottom:4px;">Obj. Run km</label>
+                <input type="number" id="input-goal-run-km" class="strava-input tabular-num" min="0" step="1" value="20">
+              </div>
+              <div>
+                <label class="label-caps" for="input-goal-bike-km" style="display:block; margin-bottom:4px;">Obj. Bici km</label>
+                <input type="number" id="input-goal-bike-km" class="strava-input tabular-num" min="0" step="5" value="35">
+              </div>
+              <div>
+                <label class="label-caps" for="input-goal-strength-ses" style="display:block; margin-bottom:4px;">Obj. Fuerza</label>
+                <input type="number" id="input-goal-strength-ses" class="strava-input tabular-num" min="0" max="5" step="1" value="2">
+              </div>
+            </div>
+            <button type="button" class="btn btn-primary" style="width:100%;" onclick="saveTrainingGoals()">Guardar Objetivos</button>
           </div>
 
-          <!-- Quick Suggestion Chips -->
-          <div class="chat-chips-scroll">
-            <button class="chat-chip" onclick="enviarTextoChat('¿Tengo solo 20 minutos hoy, cómo adaptamos el entreno?')">⏱️ 20 min hoy</button>
-            <button class="chat-chip" onclick="enviarTextoChat('Quiero planificar una salida de ciclismo en ruta esta semana')">🚴 Ruta en Bici</button>
-            <button class="chat-chip" onclick="enviarTextoChat('¿Tengo molestias en las piernas, qué hacemos?')">🦵 Molestias musculares</button>
+          <!-- Bloque 2: Selector de Plan Activo -->
+          <div class="glass-card" id="training-plan-selector-card">
+            <h2 class="headline-sm" style="margin:0;">Selector de Plan Activo</h2>
+            <p class="body-sm-muted" style="font-size:0.82rem;">Elige el enfoque de tu bloque semanal y vincula una carrera objetivo si tienes prueba en el calendario.</p>
+
+            <div id="training-plan-pills" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+              <button type="button" class="strava-chip-btn training-plan-pill active" data-plan="mantenimiento" onclick="selectTrainingPlanType('mantenimiento', this)">Base / Mantenimiento</button>
+              <button type="button" class="strava-chip-btn training-plan-pill" data-plan="10k" onclick="selectTrainingPlanType('10k', this)">Plan 10K</button>
+              <button type="button" class="strava-chip-btn training-plan-pill" data-plan="21k" onclick="selectTrainingPlanType('21k', this)">Plan Media Maratón</button>
+              <button type="button" class="strava-chip-btn training-plan-pill" data-plan="ciclismo" onclick="selectTrainingPlanType('ciclismo', this)">Gran Fondo Bici</button>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:8px; padding-top:8px; border-top:1px solid var(--border-glass);">
+              <span class="label-caps">CARRERA OBJETIVO (OPCIONAL)</span>
+              <input type="text" id="training-race-name" class="strava-input" placeholder="Nombre de la carrera (ej. 10K Valencia)">
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <input type="date" id="training-race-date" class="strava-input">
+                <input type="number" id="training-race-dist" class="strava-input tabular-num" step="0.5" min="1" value="10" placeholder="km">
+              </div>
+              <button type="button" class="btn btn-ghost" onclick="saveTrainingRaceGoal()">Vincular Carrera Objetivo</button>
+            </div>
           </div>
+        </div>
 
-          <!-- Messages Container -->
-          <div id="chat-messages" class="chat-messages-container"></div>
-
-          <!-- Input Row -->
-          <div class="chat-input-container">
-            <input type="text" id="chat-input" placeholder="Pregunta o pide adaptar tu rutina..." autocomplete="off">
-            <button id="btn-send-chat" class="chat-send-btn" aria-label="Enviar">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            </button>
+        <!-- Bloque 3: Calendario Semanal de Entrenamientos (7 días) -->
+        <div class="glass-card" id="training-calendar-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <h2 class="headline-sm" style="margin:0;">Calendario Semanal (Lunes – Domingo)</h2>
+            <span id="training-plan-badge" class="pill-tag orange">BASE / MANTENIMIENTO</span>
+          </div>
+          <div id="training-weekly-calendar" class="training-weekly-calendar">
+            <div class="skeleton-shimmer" style="height:90px;"></div>
           </div>
         </div>
       </section>
@@ -682,9 +736,9 @@
         <span class="label-caps tab-label">Entreno</span>
       </button>
 
-      <button class="nav-tab-btn" data-target="tab-chat" onclick="switchTab('tab-chat')">
-        <svg class="tab-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        <span class="label-caps tab-label">Coach IA</span>
+      <button class="nav-tab-btn" data-target="tab-training" onclick="switchTab('tab-training')">
+        <svg class="tab-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span class="label-caps tab-label">Entrenos</span>
       </button>
 
       <button class="nav-tab-btn" data-target="tab-profile" onclick="switchTab('tab-profile')">
@@ -1087,6 +1141,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=76"></script>
+  <script src="/app.js?v=77"></script>
 </body>
 </html>

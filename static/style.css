@@ -1969,3 +1969,90 @@ body {
 .figma-stat-green    { background: #EEF8DF; border-color: #D5EDAD; }
 .figma-stat-amber    { background: #FFF6DD; border-color: #FCD076; }
 .figma-stat-lavender { background: #F2ECFF; border-color: #BC99FA; }
+
+
+/* ==========================================================================
+   STRAVA TRAINING TAB (#tab-training)
+   ========================================================================== */
+.training-top-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 1024px) {
+  .training-top-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+}
+
+.training-goal-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.training-goal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.training-plan-pill {
+  padding: 9px 10px;
+  font-size: 0.8rem;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.training-weekly-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.training-day-card {
+  background: #F7F7FA;
+  border: 1px solid #E5E5EA;
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.training-day-card.is-today {
+  background: #FFF7F3;
+  border: 1.5px solid #FC5200;
+}
+
+.training-day-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.training-day-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (min-width: 1024px) {
+  .training-day-card {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .training-day-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .training-day-actions {
+    flex-shrink: 0;
+  }
+}
