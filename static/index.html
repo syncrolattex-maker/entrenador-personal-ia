@@ -475,47 +475,186 @@
     <div id="guided-phase-label" class="label-caps" style="color: var(--primary); font-size: 0.9rem;">PREPARADO</div>
 
     <div class="guided-main">
-      <!-- Video & Kinetic Biomechanics Motion Card -->
-      <div id="guided-video-card" class="guided-video-card">
-        <div class="video-container">
-          <!-- Biomechanics SVG Engine -->
-          <div id="guided-biomechanics-canvas" class="biomechanics-canvas anim-squat">
-            <svg viewBox="0 0 200 180" class="biomechanics-svg">
-              <ellipse id="guided-muscle-glow" cx="100" cy="110" rx="40" ry="25" fill="rgba(195,244,0,0.25)"/>
-              <g id="guided-body-group">
-                <circle cx="100" cy="40" r="12" fill="#E5E2E1"/>
-                <path d="M100 52 L100 100" stroke="#E5E2E1" stroke-width="8" stroke-linecap="round"/>
-                <path id="guided-arms" d="M80 65 L100 75 L120 65" stroke="#C3F400" stroke-width="5" stroke-linecap="round" fill="none"/>
-                <circle id="guided-weight-l" cx="75" cy="65" r="7" fill="#00EEFC"/>
-                <circle id="guided-weight-r" cx="125" cy="65" r="7" fill="#00EEFC"/>
-                <path id="guided-legs" d="M100 100 L85 145 M100 100 L115 145" stroke="#C3F400" stroke-width="7" stroke-linecap="round"/>
-              </g>
-              <line x1="40" y1="152" x2="160" y2="152" stroke="#353534" stroke-width="4" stroke-linecap="round"/>
-            </svg>
-            <div class="media-tech-badge">
-              <span id="guided-muscle-name" class="label-caps" style="color: var(--primary);">TREN INFERIOR • GLÚTEOS</span>
+      <!-- ================== SISTEMA DE FUERZA (ESTILO STRAVA) ================== -->
+      <div id="guided-strength-container" style="display:none; width:100%; flex-direction:column; align-items:center; gap:10px;">
+        <!-- Video & Kinetic Biomechanics Motion Card -->
+        <div id="guided-video-card" class="guided-video-card">
+          <div class="video-container">
+            <!-- Biomechanics SVG Engine -->
+            <div id="guided-biomechanics-canvas" class="biomechanics-canvas anim-squat">
+              <svg viewBox="0 0 200 180" class="biomechanics-svg">
+                <ellipse id="guided-muscle-glow" cx="100" cy="110" rx="40" ry="25" fill="rgba(252,82,0,0.3)"/>
+                <g id="guided-body-group">
+                  <circle cx="100" cy="40" r="12" fill="#E5E2E1"/>
+                  <path d="M100 52 L100 100" stroke="#E5E2E1" stroke-width="8" stroke-linecap="round"/>
+                  <path id="guided-arms" d="M80 65 L100 75 L120 65" stroke="#FC5200" stroke-width="5" stroke-linecap="round" fill="none"/>
+                  <circle id="guided-weight-l" cx="75" cy="65" r="7" fill="#FC5200"/>
+                  <circle id="guided-weight-r" cx="125" cy="65" r="7" fill="#FC5200"/>
+                  <path id="guided-legs" d="M100 100 L85 145 M100 100 L115 145" stroke="#FC5200" stroke-width="7" stroke-linecap="round"/>
+                </g>
+                <line x1="40" y1="152" x2="160" y2="152" stroke="#353534" stroke-width="4" stroke-linecap="round"/>
+              </svg>
+              <div class="media-tech-badge">
+                <span id="guided-muscle-name" class="label-caps" style="color: #FC5200;">GLÚTEOS • CUÁDRICEPS</span>
+              </div>
+            </div>
+
+            <img id="guided-exercise-img" class="guided-video-element" src="" alt="Demostración de ejercicio" style="display:none;" />
+          </div>
+          
+          <div class="technique-tempo-bar">
+            <span class="label-caps" style="color: var(--secondary);">TEMPO STRAVA:</span>
+            <span id="guided-tempo-text" class="label-caps" style="color: #FC5200;">3s Bajar • 1s Pausa • 1s Subir</span>
+          </div>
+        </div>
+
+        <div id="guided-exercise-name" class="display-lg-mobile">—</div>
+        <p id="guided-exercise-desc" class="body-sm-muted" style="max-width: 340px; margin: 0 auto; text-align: center;"></p>
+
+        <!-- Strava Sets & Weights Interactive Logger Card -->
+        <div id="strava-sets-logger" class="strava-logger-card">
+          <div class="strava-logger-header">
+            <span class="strava-badge">STRAVA STRENGTH</span>
+            <span id="guided-set-counter-badge" class="strava-set-badge">Serie 1 de 4</span>
+            <span id="strava-total-volume-chip" class="strava-volume-chip">0 kg movidos</span>
+          </div>
+
+          <div class="strava-inputs-row">
+            <!-- Peso en Kg -->
+            <div class="strava-input-group">
+              <label class="strava-input-label">PESO (KG)</label>
+              <div class="strava-counter-ctrl">
+                <button type="button" class="strava-counter-btn" onclick="adjustWeight(-2.5)">-2.5</button>
+                <input id="strava-weight-input" type="number" step="0.5" min="0" value="40" class="strava-number-input" onchange="onWeightChange(this.value)">
+                <button type="button" class="strava-counter-btn" onclick="adjustWeight(+2.5)">+2.5</button>
+              </div>
+            </div>
+
+            <!-- Repeticiones -->
+            <div class="strava-input-group">
+              <label class="strava-input-label">REPS</label>
+              <div class="strava-counter-ctrl">
+                <button type="button" class="strava-counter-btn" onclick="adjustReps(-1)">-1</button>
+                <input id="strava-reps-input" type="number" min="1" max="100" value="12" class="strava-number-input" onchange="onRepsChange(this.value)">
+                <button type="button" class="strava-counter-btn" onclick="adjustReps(+1)">+1</button>
+              </div>
             </div>
           </div>
 
-          <img id="guided-exercise-img" class="guided-video-element" src="" alt="Demostración de ejercicio" style="display:none;" />
-        </div>
-        
-        <div class="technique-tempo-bar">
-          <span class="label-caps" style="color: var(--secondary);">RITMO Y TEMPO:</span>
-          <span id="guided-tempo-text" class="label-caps" style="color: var(--primary);">3s Bajar • 1s Pausa • 1s Subir</span>
+          <!-- Heatmap Muscular Anatómico Strava -->
+          <div class="strava-heatmap-container">
+            <div class="strava-heatmap-header">
+              <span class="label-caps" style="color: #FC5200; font-size: 0.72rem;">ACTIVACIÓN MUSCULAR</span>
+              <span id="strava-active-muscles-text" class="body-xs" style="color: var(--text-secondary);">Tren Inferior</span>
+            </div>
+            <div class="strava-body-heatmap">
+              <!-- Front Silhouette -->
+              <svg viewBox="0 0 100 160" class="strava-anatomy-svg">
+                <g id="heatmap-front-head"><circle cx="50" cy="18" r="10" fill="#2A2A2A"/></g>
+                <g id="heatmap-front-chest"><path d="M38 32 H62 L60 50 H40 Z" class="muscle-poly" data-muscle="pectoral"/></g>
+                <g id="heatmap-front-abs"><path d="M42 52 H58 L56 75 H44 Z" class="muscle-poly" data-muscle="core"/></g>
+                <g id="heatmap-front-delts"><circle cx="30" cy="36" r="6" class="muscle-poly" data-muscle="hombros"/><circle cx="70" cy="36" r="6" class="muscle-poly" data-muscle="hombros"/></g>
+                <g id="heatmap-front-arms"><rect x="24" y="44" width="7" height="22" rx="3" class="muscle-poly" data-muscle="biceps"/><rect x="69" y="44" width="7" height="22" rx="3" class="muscle-poly" data-muscle="biceps"/></g>
+                <g id="heatmap-front-quads"><path d="M38 80 H48 L46 120 H36 Z" class="muscle-poly" data-muscle="cuadriceps"/><path d="M52 80 H62 L64 120 H54 Z" class="muscle-poly" data-muscle="cuadriceps"/></g>
+                <g id="heatmap-front-calves"><rect x="37" y="124" width="8" height="26" rx="4" class="muscle-poly" data-muscle="gemelos"/><rect x="55" y="124" width="8" height="26" rx="4" class="muscle-poly" data-muscle="gemelos"/></g>
+                <text x="50" y="158" font-size="7" fill="#666" text-anchor="middle">FRONTAL</text>
+              </svg>
+
+              <!-- Back Silhouette -->
+              <svg viewBox="0 0 100 160" class="strava-anatomy-svg">
+                <g id="heatmap-back-head"><circle cx="50" cy="18" r="10" fill="#2A2A2A"/></g>
+                <g id="heatmap-back-traps"><path d="M40 30 H60 L56 42 H44 Z" class="muscle-poly" data-muscle="trapecio"/></g>
+                <g id="heatmap-back-lats"><path d="M36 44 H64 L58 68 H42 Z" class="muscle-poly" data-muscle="espalda"/></g>
+                <g id="heatmap-back-triceps"><rect x="23" y="42" width="7" height="22" rx="3" class="muscle-poly" data-muscle="triceps"/><rect x="70" y="42" width="7" height="22" rx="3" class="muscle-poly" data-muscle="triceps"/></g>
+                <g id="heatmap-back-glutes"><ellipse cx="44" cy="78" rx="8" ry="7" class="muscle-poly" data-muscle="gluteos"/><ellipse cx="56" cy="78" rx="8" ry="7" class="muscle-poly" data-muscle="gluteos"/></g>
+                <g id="heatmap-back-hamstrings"><rect x="36" y="88" width="10" height="32" rx="4" class="muscle-poly" data-muscle="isquiotibiales"/><rect x="54" y="88" width="10" height="32" rx="4" class="muscle-poly" data-muscle="isquiotibiales"/></g>
+                <g id="heatmap-back-calves"><rect x="37" y="124" width="8" height="26" rx="4" class="muscle-poly" data-muscle="gemelos"/><rect x="55" y="124" width="8" height="26" rx="4" class="muscle-poly" data-muscle="gemelos"/></g>
+                <text x="50" y="158" font-size="7" fill="#666" text-anchor="middle">DORSAL</text>
+              </svg>
+            </div>
+          </div>
         </div>
       </div>
 
+      <!-- ================== SISTEMA DE CARRERA (ESTILO RUNNA) ================== -->
+      <div id="guided-running-container" style="display:none; width:100%; flex-direction:column; align-items:center; gap:12px;">
+        <!-- Runna Interval Timeline -->
+        <div class="runna-timeline-card">
+          <div class="runna-timeline-header">
+            <span class="runna-badge">RUNNA INTERVALS</span>
+            <span id="runna-step-badge" class="runna-step-badge">Fase 1 de 5</span>
+          </div>
+          <div id="runna-timeline-steps" class="runna-timeline-steps">
+            <!-- Dynamically populated step chips -->
+          </div>
+        </div>
 
-      <div id="guided-exercise-name" class="display-lg-mobile">—</div>
-      <p id="guided-exercise-desc" class="body-sm-muted" style="max-width: 340px; margin: 0 auto; text-align: center;"></p>
+        <!-- Runna Cadence Motion Avatar -->
+        <div class="runna-avatar-card">
+          <div id="runna-avatar-canvas" class="runna-runner-motion cadence-jog">
+            <svg viewBox="0 0 160 120" class="runna-runner-svg">
+              <!-- Ground line -->
+              <line x1="20" y1="108" x2="140" y2="108" stroke="#333" stroke-width="2"/>
+              <!-- Runner Group -->
+              <g id="runna-runner-body">
+                <!-- Head -->
+                <circle cx="80" cy="30" r="9" fill="#E5E2E1"/>
+                <!-- Torso inclined forward for running form -->
+                <line x1="80" y1="38" x2="74" y2="68" stroke="#E5E2E1" stroke-width="7" stroke-linecap="round"/>
+                <!-- Arms running stride -->
+                <path id="runna-arm-back" d="M78 44 L92 56 L104 50" stroke="#00E676" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+                <path id="runna-arm-front" d="M78 44 L62 54 L52 46" stroke="#00E676" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+                <!-- Legs running stride -->
+                <path id="runna-leg-back" d="M74 68 L88 84 L102 96" stroke="#00E676" stroke-width="5" stroke-linecap="round" fill="none"/>
+                <path id="runna-leg-front" d="M74 68 L56 80 L44 104" stroke="#00E676" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+              </g>
+            </svg>
+          </div>
+          <div class="runna-avatar-stats">
+            <span id="runna-cadence-badge" class="runna-cadence-pill">⚡ Cadencia: ~175 ppm</span>
+            <span id="runna-coach-speech" class="runna-speech-bubble">"Mantén la postura erguida y mirada al frente"</span>
+          </div>
+        </div>
 
-      <div id="guided-set-counter" class="body-lg" style="display:none; color: var(--text-secondary);">
-        Serie <span id="guided-set-current">1</span> de <span id="guided-set-total">4</span>
+        <!-- Runna Pace Target Zone Gauge -->
+        <div class="runna-pace-card">
+          <div class="runna-pace-header">
+            <span class="label-caps" style="color: #00E676; font-size: 0.75rem;">RITMO OBJETIVO RUNNA</span>
+            <span id="runna-target-zone-status" class="runna-zone-pill zone-optimal">¡EN RITMO!</span>
+          </div>
+
+          <div class="runna-target-pace-display">
+            <span id="runna-target-pace-val" class="metric-xl" style="color: #00E676;">4:30 - 4:45</span>
+            <span class="label-caps" style="color: var(--text-secondary); margin-left: 4px;">min/km</span>
+          </div>
+
+          <!-- 3-Zone Pace Bar -->
+          <div class="runna-pace-gauge-bar">
+            <div class="pace-zone-seg zone-slow">Lento (>4:45)</div>
+            <div class="pace-zone-seg zone-target">Objetivo (4:30 - 4:45)</div>
+            <div class="pace-zone-seg zone-fast">Rápido (<4:30)</div>
+            <div id="runna-pace-indicator" class="pace-needle" style="left: 50%;"></div>
+          </div>
+
+          <!-- Runna Live HUD Stats -->
+          <div class="runna-hud-row">
+            <div class="runna-hud-item">
+              <span class="body-xs" style="color: var(--text-muted);">TIEMPO FASE</span>
+              <span id="runna-hud-time" class="headline-sm" style="color: #FFF;">--:--</span>
+            </div>
+            <div class="runna-hud-item">
+              <span class="body-xs" style="color: var(--text-muted);">DIST. EST.</span>
+              <span id="runna-hud-dist" class="headline-sm" style="color: #FFF;">-- km</span>
+            </div>
+            <div class="runna-hud-item">
+              <span class="body-xs" style="color: var(--text-muted);">ZONA FC</span>
+              <span id="runna-hud-hr" class="headline-sm" style="color: #00E676;">Z3 Tempo</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div id="guided-reps" class="headline-md" style="display:none; color: var(--primary);">—</div>
-
+      <!-- Common Timer Ring (Rest or Time-based exercises) -->
       <div id="guided-timer-wrap" class="guided-timer-wrap" style="display:none;">
         <svg class="guided-timer-ring" viewBox="0 0 120 120">
           <circle class="guided-timer-track" cx="60" cy="60" r="54"/>
@@ -523,32 +662,42 @@
         </svg>
         <span id="guided-timer-display" class="metric-xl" style="position: absolute;">60</span>
       </div>
+
+      <!-- Strava Rest Quick Controls -->
+      <div id="strava-rest-quick-ctrls" style="display:none; gap:10px; margin-top:8px;">
+        <button type="button" class="strava-chip-btn" onclick="adjustRestTimer(-15)">-15s</button>
+        <button type="button" class="strava-chip-btn" onclick="adjustRestTimer(+15)">+15s</button>
+      </div>
     </div>
 
 
     <div class="guided-footer">
       <div id="guided-actions-fuerza" style="display:none; flex-direction:column; gap:12px; width:100%;">
-        <button id="btn-serie-done" class="btn btn-primary guided-action-btn">
+        <button id="btn-serie-done" class="btn btn-primary guided-action-btn" style="background: linear-gradient(135deg, #FC5200 0%, #FF7A00 100%); border:none; box-shadow: 0 4px 18px rgba(252,82,0,0.35);">
           <i data-lucide="check" style="width:22px;height:22px;"></i>
-          Serie completada
+          Completar Serie
         </button>
-        <button id="btn-skip-exercise" class="btn btn-ghost" style="font-size:0.9rem; padding:14px;">
+        <button id="btn-skip-exercise" class="btn btn-ghost" style="font-size:0.9rem; padding:12px;">
           <i data-lucide="skip-forward" style="width:18px;height:18px;"></i>
           Saltar ejercicio
         </button>
       </div>
 
       <div id="guided-actions-rest" style="display:none; flex-direction:column; gap:12px; width:100%;">
-        <button id="btn-skip-rest" class="btn btn-ghost" style="font-size:0.9rem; padding:14px;">
+        <div style="display:flex; justify-content:center; gap:10px;">
+          <button type="button" class="btn btn-ghost" style="padding:10px 16px; font-size:0.85rem;" onclick="adjustRestTimer(-15)">-15s Descanso</button>
+          <button type="button" class="btn btn-ghost" style="padding:10px 16px; font-size:0.85rem;" onclick="adjustRestTimer(+15)">+15s Descanso</button>
+        </div>
+        <button id="btn-skip-rest" class="btn btn-ghost" style="font-size:0.9rem; padding:12px;">
           <i data-lucide="fast-forward" style="width:18px;height:18px;"></i>
           Saltar descanso
         </button>
       </div>
 
       <div id="guided-actions-carrera" style="display:none; flex-direction:column; gap:12px; width:100%;">
-        <button id="btn-pause-carrera" class="btn btn-ghost" style="font-size:0.9rem; padding:14px;">
+        <button id="btn-pause-carrera" class="btn btn-ghost" style="font-size:0.9rem; padding:14px; border: 1px solid rgba(0,230,118,0.3); color:#00E676;">
           <i data-lucide="pause" style="width:18px;height:18px;"></i>
-          Pausar
+          Pausar Intervalo
         </button>
       </div>
 

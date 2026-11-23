@@ -1738,6 +1738,507 @@ body {
   }
 }
 
+/* ============================================================
+   STRAVA STRENGTH SYSTEM STYLES
+   ============================================================ */
+.strava-logger-card {
+  width: 100%;
+  max-width: 380px;
+  background: rgba(26, 26, 26, 0.7);
+  border: 1px solid rgba(252, 82, 0, 0.25);
+  border-radius: var(--rounded-lg);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.strava-logger-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.strava-badge {
+  background: #FC5200;
+  color: #FFF;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.strava-set-badge {
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFF;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: var(--rounded-full);
+}
+
+.strava-volume-chip {
+  background: rgba(252, 82, 0, 0.15);
+  color: #FC5200;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: var(--rounded-full);
+  border: 1px solid rgba(252, 82, 0, 0.3);
+}
+
+.strava-inputs-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.strava-input-group {
+  background: rgba(18, 18, 18, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--rounded-md);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.strava-input-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.strava-counter-ctrl {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 6px;
+}
+
+.strava-counter-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #FFF;
+  font-size: 0.75rem;
+  font-weight: 800;
+  border-radius: var(--rounded-sm);
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.strava-counter-btn:active {
+  background: #FC5200;
+  color: #FFF;
+  transform: scale(0.92);
+}
+
+.strava-number-input {
+  width: 54px;
+  background: transparent;
+  border: none;
+  color: #FFF;
+  font-size: 1.25rem;
+  font-weight: 800;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+.strava-number-input::-webkit-outer-spin-button,
+.strava-number-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Heatmap Muscular Anatómico Strava */
+.strava-heatmap-container {
+  background: rgba(14, 14, 14, 0.7);
+  border-radius: var(--rounded-md);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.strava-heatmap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.strava-body-heatmap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  height: 110px;
+}
+
+.strava-anatomy-svg {
+  height: 100%;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.6));
+}
+
+.muscle-poly {
+  fill: #222222;
+  transition: fill 0.3s ease, filter 0.3s ease;
+}
+
+.muscle-poly.active-target {
+  fill: #FC5200 !important;
+  filter: drop-shadow(0 0 6px rgba(252, 82, 0, 0.8));
+}
+
+.muscle-poly.secondary-target {
+  fill: #FF9800 !important;
+  filter: drop-shadow(0 0 4px rgba(255, 152, 0, 0.5));
+}
+
+.strava-chip-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #FFF;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: var(--rounded-full);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.strava-chip-btn:active {
+  background: #FC5200;
+  border-color: #FC5200;
+  transform: scale(0.95);
+}
+
+/* ============================================================
+   RUNNA RUNNING SYSTEM STYLES
+   ============================================================ */
+.runna-timeline-card {
+  width: 100%;
+  max-width: 380px;
+  background: rgba(20, 20, 20, 0.7);
+  border: 1px solid rgba(0, 230, 118, 0.2);
+  border-radius: var(--rounded-lg);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.runna-timeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.runna-badge {
+  background: #00E676;
+  color: #000;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.runna-step-badge {
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFF;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--rounded-full);
+}
+
+.runna-timeline-steps {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.runna-timeline-steps::-webkit-scrollbar {
+  display: none;
+}
+
+.runna-step-chip {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-radius: var(--rounded-md);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  min-width: 76px;
+  transition: all 0.25s ease;
+}
+
+.runna-step-chip.active {
+  background: rgba(0, 230, 118, 0.15);
+  border-color: #00E676;
+  box-shadow: 0 0 12px rgba(0, 230, 118, 0.35);
+  transform: translateY(-2px);
+}
+
+.runna-step-chip.completed {
+  opacity: 0.45;
+  border-color: transparent;
+}
+
+.runna-step-chip-name {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #FFF;
+  white-space: nowrap;
+}
+
+.runna-step-chip-target {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+}
+
+.runna-step-chip.active .runna-step-chip-target {
+  color: #00E676;
+  font-weight: 700;
+}
+
+/* Runna Cadence Motion Avatar Card */
+.runna-avatar-card {
+  width: 100%;
+  max-width: 380px;
+  background: rgba(14, 18, 15, 0.75);
+  border: 1px solid rgba(0, 230, 118, 0.18);
+  border-radius: var(--rounded-lg);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.runna-runner-motion {
+  width: 140px;
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.runna-runner-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Running Avatar Keyframe Strides */
+@keyframes runnaStrideLegFront {
+  0%   { d: path("M74 68 L56 80 L44 104"); }
+  50%  { d: path("M74 68 L88 84 L102 96"); }
+  100% { d: path("M74 68 L56 80 L44 104"); }
+}
+
+@keyframes runnaStrideLegBack {
+  0%   { d: path("M74 68 L88 84 L102 96"); }
+  50%  { d: path("M74 68 L56 80 L44 104"); }
+  100% { d: path("M74 68 L88 84 L102 96"); }
+}
+
+@keyframes runnaStrideArmFront {
+  0%   { d: path("M78 44 L62 54 L52 46"); }
+  50%  { d: path("M78 44 L92 56 L104 50"); }
+  100% { d: path("M78 44 L62 54 L52 46"); }
+}
+
+@keyframes runnaStrideArmBack {
+  0%   { d: path("M78 44 L92 56 L104 50"); }
+  50%  { d: path("M78 44 L62 54 L52 46"); }
+  100% { d: path("M78 44 L92 56 L104 50"); }
+}
+
+@keyframes runnaTorsoBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.cadence-sprint #runna-leg-front { animation: runnaStrideLegFront 0.38s infinite linear; }
+.cadence-sprint #runna-leg-back  { animation: runnaStrideLegBack 0.38s infinite linear; }
+.cadence-sprint #runna-arm-front { animation: runnaStrideArmFront 0.38s infinite linear; }
+.cadence-sprint #runna-arm-back  { animation: runnaStrideArmBack 0.38s infinite linear; }
+.cadence-sprint #runna-runner-body { animation: runnaTorsoBounce 0.19s infinite ease-in-out; }
+
+.cadence-jog #runna-leg-front { animation: runnaStrideLegFront 0.6s infinite linear; }
+.cadence-jog #runna-leg-back  { animation: runnaStrideLegBack 0.6s infinite linear; }
+.cadence-jog #runna-arm-front { animation: runnaStrideArmFront 0.6s infinite linear; }
+.cadence-jog #runna-arm-back  { animation: runnaStrideArmBack 0.6s infinite linear; }
+.cadence-jog #runna-runner-body { animation: runnaTorsoBounce 0.3s infinite ease-in-out; }
+
+.cadence-warmup #runna-leg-front { animation: runnaStrideLegFront 0.85s infinite linear; }
+.cadence-warmup #runna-leg-back  { animation: runnaStrideLegBack 0.85s infinite linear; }
+.cadence-warmup #runna-arm-front { animation: runnaStrideArmFront 0.85s infinite linear; }
+.cadence-warmup #runna-arm-back  { animation: runnaStrideArmBack 0.85s infinite linear; }
+.cadence-warmup #runna-runner-body { animation: runnaTorsoBounce 0.42s infinite ease-in-out; }
+
+.runna-avatar-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.runna-cadence-pill {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #00E676;
+  background: rgba(0, 230, 118, 0.12);
+  padding: 3px 10px;
+  border-radius: var(--rounded-full);
+}
+
+.runna-speech-bubble {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  text-align: center;
+  max-width: 280px;
+}
+
+/* Runna Pace Target Zone Gauge Card */
+.runna-pace-card {
+  width: 100%;
+  max-width: 380px;
+  background: rgba(20, 20, 20, 0.75);
+  border: 1px solid rgba(0, 230, 118, 0.25);
+  border-radius: var(--rounded-lg);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.runna-pace-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.runna-zone-pill {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: var(--rounded-full);
+}
+
+.runna-zone-pill.zone-optimal {
+  background: #00E676;
+  color: #000;
+  box-shadow: 0 0 10px rgba(0, 230, 118, 0.5);
+}
+
+.runna-zone-pill.zone-slow {
+  background: #2979FF;
+  color: #FFF;
+}
+
+.runna-zone-pill.zone-fast {
+  background: #FF1744;
+  color: #FFF;
+}
+
+.runna-target-pace-display {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+}
+
+/* 3-Zone Pace Bar */
+.runna-pace-gauge-bar {
+  width: 100%;
+  height: 24px;
+  border-radius: var(--rounded-full);
+  display: flex;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.pace-zone-seg {
+  height: 100%;
+  font-size: 0.58rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.pace-zone-seg.zone-slow {
+  width: 30%;
+  background: rgba(41, 121, 255, 0.6);
+}
+
+.pace-zone-seg.zone-target {
+  width: 40%;
+  background: rgba(0, 230, 118, 0.85);
+  color: #000;
+  font-weight: 900;
+}
+
+.pace-zone-seg.zone-fast {
+  width: 30%;
+  background: rgba(255, 23, 68, 0.6);
+}
+
+.pace-needle {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 5px;
+  background: #FFF;
+  border-radius: 2px;
+  box-shadow: 0 0 8px #FFF, 0 0 14px rgba(0, 230, 118, 0.8);
+  transform: translateX(-50%);
+  transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Runna HUD Stats Row */
+.runna-hud-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.runna-hud-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
 
 
 

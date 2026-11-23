@@ -890,8 +890,193 @@ async function handleRest() {
 
 
 // ============================================================
-// GUIDED SESSION — START
+// GUIDED SESSION — START (STRAVA & RUNNA INTEGRATION)
 // ============================================================
+let stravaState = {
+  sessionVolume: 0,
+  currentWeight: 40,
+  currentReps: 12,
+  workedMuscles: new Set()
+};
+
+let _runnaNeedleInterval = null;
+
+function speakRunnaCoach(text) {
+  if (_audioMuted) return;
+  if (!("speechSynthesis" in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "es-ES";
+    u.rate = 1.05;
+    u.pitch = 1.0;
+    const voices = window.speechSynthesis.getVoices();
+    const esV = voices.find(v => v.lang.startsWith("es"));
+    if (esV) u.voice = esV;
+    window.speechSynthesis.speak(u);
+  } catch (e) {}
+
+  const bubble = document.getElementById("runna-coach-speech");
+  if (bubble) bubble.textContent = `"${text}"`;
+}
+
+const MUSCLE_MAP = {
+  cuadriceps: ["sentadilla", "squat", "prensa", "zancada", "lunge", "extension", "pierna"],
+  gluteos: ["sentadilla", "squat", "gluteo", "hip thrust", "puente", "zancada", "lunge", "peso muerto", "deadlift"],
+  isquiotibiales: ["peso muerto", "deadlift", "femoral", "curl femoral", "isquio", "buenos dias"],
+  pectoral: ["press banca", "bench press", "flexiones", "push up", "aperturas", "pecho"],
+  espalda: ["remo", "row", "dominadas", "pull up", "dorsal", "jalon"],
+  hombros: ["press militar", "overhead", "militar", "elevaciones", "deltoid", "hombro"],
+  biceps: ["curl", "biceps", "dominadas supinas"],
+  triceps: ["fondos", "dips", "press frances", "triceps", "extension triceps"],
+  core: ["plancha", "plank", "abdominales", "crunch", "rueda", "pallof", "core"],
+  gemelos: ["gemelos", "pantorrilla", "elevacion talon"],
+  trapecio: ["encogimientos", "remo al cuello", "peso muerto"]
+};
+
+function identifyExerciseMuscles(name) {
+  const n = (name || "").toLowerCase();
+  const active = [];
+  for (const [m, keys] of Object.entries(MUSCLE_MAP)) {
+    if (keys.some(k => n.includes(k))) active.push(m);
+  }
+  return active.length > 0 ? active : ["cuadriceps", "core"];
+}
+
+function updateStravaHeatmap(exerciseName) {
+  const active = identifyExerciseMuscles(exerciseName);
+  active.forEach(m => stravaState.workedMuscles.add(m));
+
+  document.querySelectorAll(".muscle-poly").forEach(el => {
+    el.classList.remove("active-target", "secondary-target");
+  });
+
+  active.forEach((m, idx) => {
+    document.querySelectorAll(`.muscle-poly[data-muscle="${m}"]`).forEach(el => {
+      el.classList.add(idx === 0 ? "active-target" : "secondary-target");
+    });
+  });
+
+  const txt = document.getElementById("strava-active-muscles-text");
+  if (txt) {
+    txt.textContent = active.map(m => m.charAt(0).toUpperCase() + m.slice(1)).join(", ");
+  }
+}
+
+function adjustWeight(delta) {
+  stravaState.currentWeight = Math.max(0, Math.round((stravaState.currentWeight + delta) * 10) / 10);
+  const input = document.getElementById("strava-weight-input");
+  if (input) input.value = stravaState.currentWeight;
+}
+
+function adjustReps(delta) {
+  stravaState.currentReps = Math.max(1, stravaState.currentReps + delta);
+  const input = document.getElementById("strava-reps-input");
+  if (input) input.value = stravaState.currentReps;
+}
+
+function onWeightChange(val) {
+  stravaState.currentWeight = Math.max(0, parseFloat(val) || 0);
+}
+
+function onRepsChange(val) {
+  stravaState.currentReps = Math.max(1, parseInt(val, 10) || 1);
+}
+
+function adjustRestTimer(deltaSeconds) {
+  if (guided.timerRemaining !== undefined) {
+    guided.timerRemaining = Math.max(5, guided.timerRemaining + deltaSeconds);
+    guided.timerTotal = Math.max(guided.timerTotal, guided.timerRemaining);
+    updateTimerUI(guided.timerRemaining, guided.timerTotal);
+    playBeep(750, 0.08);
+  }
+}
+
+function getPhasePaceTarget(phase) {
+  const type = (phase.type || "").toUpperCase();
+  const name = (phase.name || "").toLowerCase();
+  if (type === "WARMUP" || name.includes("calentam")) return "5:30 - 5:50 /km";
+  if (type === "COOLDOWN" || name.includes("enfria") || name.includes("calma")) return "5:50 - 6:20 /km";
+  if (name.includes("recup") || name.includes("descanso") || type === "REST") return "6:00 - 6:30 /km";
+  if (name.includes("tempo") || name.includes("ritmo")) return "4:35 - 4:45 /km";
+  if (name.includes("sprint") || name.includes("intervalo") || name.includes("serie")) return "4:10 - 4:25 /km";
+  return "4:30 - 4:45 /km";
+}
+
+function renderRunnaTimeline() {
+  const container = document.getElementById("runna-timeline-steps");
+  if (!container) return;
+  container.innerHTML = "";
+
+  guided.exercises.forEach((phase, idx) => {
+    const chip = document.createElement("div");
+    chip.className = `runna-step-chip ${idx === guided.exIndex ? "active" : ""} ${idx < guided.exIndex ? "completed" : ""}`;
+    const durationMin = Math.round((phase.duration_seconds || 300) / 60);
+    const targetPace = getPhasePaceTarget(phase);
+
+    chip.innerHTML = `
+      <span class="runna-step-chip-name">${idx + 1}. ${phase.name || "Bloque"}</span>
+      <span class="runna-step-chip-target">${targetPace || (durationMin + " min")}</span>
+    `;
+    container.appendChild(chip);
+  });
+
+  const stepBadge = document.getElementById("runna-step-badge");
+  if (stepBadge) {
+    stepBadge.textContent = `Fase ${guided.exIndex + 1} de ${guided.exercises.length}`;
+  }
+
+  const activeChip = container.querySelector(".runna-step-chip.active");
+  if (activeChip) {
+    activeChip.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }
+}
+
+function updateRunnaRunningDisplay(phase) {
+  const targetPaceStr = getPhasePaceTarget(phase);
+  const targetPaceEl = document.getElementById("runna-target-pace-val");
+  if (targetPaceEl) targetPaceEl.textContent = targetPaceStr.replace("/km", "").trim();
+
+  const avatarEl = document.getElementById("runna-avatar-canvas");
+  const cadenceBadge = document.getElementById("runna-cadence-badge");
+  const isSprint = targetPaceStr.includes("4:10") || targetPaceStr.includes("4:25");
+  const isWarmup = targetPaceStr.includes("5:30") || targetPaceStr.includes("6:00");
+
+  if (avatarEl) {
+    avatarEl.className = isSprint ? "runna-runner-motion cadence-sprint"
+      : isWarmup ? "runna-runner-motion cadence-warmup"
+      : "runna-runner-motion cadence-jog";
+  }
+
+  if (cadenceBadge) {
+    cadenceBadge.textContent = isSprint ? "⚡ Cadencia: ~182 ppm"
+      : isWarmup ? "🌱 Cadencia: ~160 ppm"
+      : "🏃 Cadencia: ~174 ppm";
+  }
+
+  const hrEl = document.getElementById("runna-hud-hr");
+  if (hrEl) {
+    hrEl.textContent = isSprint ? "Z4 Umbral" : isWarmup ? "Z1-Z2 Aeróbica" : "Z3 Tempo";
+    hrEl.style.color = isSprint ? "#FF1744" : isWarmup ? "#2979FF" : "#00E676";
+  }
+
+  if (_runnaNeedleInterval) clearInterval(_runnaNeedleInterval);
+  const needle = document.getElementById("runna-pace-indicator");
+  _runnaNeedleInterval = setInterval(() => {
+    if (needle && guided.phase === "running") {
+      const jitter = 48 + Math.sin(Date.now() / 600) * 4;
+      needle.style.left = `${jitter}%`;
+    }
+  }, 300);
+
+  const coachPrompt = isSprint
+    ? `Comenzando intervalo. Objetivo: ritmo ${targetPaceStr}. ¡Aumenta la zancada!`
+    : isWarmup
+    ? `Fase de ${phase.name || "calentamiento"}. Ritmo suave ${targetPaceStr}. Respira con calma.`
+    : `Bloque de carrera. Mantén el ritmo en ${targetPaceStr}.`;
+  speakRunnaCoach(coachPrompt);
+}
+
 function startGuidedSession() {
   const workout = state.currentWorkout;
   if (!workout) return;
@@ -904,6 +1089,9 @@ function startGuidedSession() {
   guided.startTime  = new Date();
   guided.selectedFeedback = null;
   guided.paused     = false;
+
+  stravaState.sessionVolume = 0;
+  stravaState.workedMuscles.clear();
 
   clearTimer();
   elGuidedFeedbackBtns.forEach(b => b.classList.remove("active"));
@@ -934,11 +1122,16 @@ function startGuidedSession() {
 
 function closeGuided() {
   clearTimer();
+  if (_runnaNeedleInterval) {
+    clearInterval(_runnaNeedleInterval);
+    _runnaNeedleInterval = null;
+  }
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
   elGuidedOverlay.style.display = "none";
 }
 
 // ============================================================
-// FUERZA — exercise display & progression
+// FUERZA — exercise display & progression (STRAVA STRENGTH)
 // ============================================================
 function showFuerzaExercise() {
   const ex = guided.exercises[guided.exIndex];
@@ -947,6 +1140,14 @@ function showFuerzaExercise() {
   updateProgress();
   setPhaseLabel("EJERCICIO", "working");
 
+  // Show Strength container, hide Running container
+  const strengthCont = document.getElementById("guided-strength-container");
+  const runningCont  = document.getElementById("guided-running-container");
+  const restCtrls    = document.getElementById("strava-rest-quick-ctrls");
+  if (strengthCont) strengthCont.style.display = "flex";
+  if (runningCont)  runningCont.style.display  = "none";
+  if (restCtrls)    restCtrls.style.display    = "none";
+
   // Update Assisted Video Demo & Tempo Cues
   updateGuidedVideo(ex.nombre, ex.descripcion);
 
@@ -954,6 +1155,24 @@ function showFuerzaExercise() {
   elGuidedExName.style.animation = "none";
   requestAnimationFrame(() => elGuidedExName.style.animation = "");
 
+  // Parse suggested reps or default
+  const parsedReps = parseInt((ex.repeticiones || "").replace(/\D/g, ""), 10) || 12;
+  stravaState.currentReps = parsedReps;
+
+  const repsInput = document.getElementById("strava-reps-input");
+  if (repsInput) repsInput.value = stravaState.currentReps;
+
+  const weightInput = document.getElementById("strava-weight-input");
+  if (weightInput) weightInput.value = stravaState.currentWeight;
+
+  const setBadge = document.getElementById("guided-set-counter-badge");
+  if (setBadge) setBadge.textContent = `Serie ${guided.setIndex + 1} de ${ex.series}`;
+
+  const volumeChip = document.getElementById("strava-total-volume-chip");
+  if (volumeChip) volumeChip.textContent = `${stravaState.sessionVolume} kg movidos`;
+
+  // Update Strava Muscular Heatmap
+  updateStravaHeatmap(ex.nombre);
 
   elGuidedSetCurrent.textContent = guided.setIndex + 1;
   elGuidedSetTotal.textContent   = ex.series;
@@ -986,11 +1205,11 @@ function showFuerzaExercise() {
     updateTimerUI(workSeconds, workSeconds);
 
     elGuidedActionsFuerza.innerHTML = `
-      <button id="btn-start-work-fuerza" class="btn btn-primary guided-action-btn ${isYoga ? 'yoga' : ''}">
+      <button id="btn-start-work-fuerza" class="btn btn-primary guided-action-btn ${isYoga ? 'yoga' : ''}" style="${isYoga ? '' : 'background: linear-gradient(135deg, #FC5200 0%, #FF7A00 100%); border:none;'}">
         <i data-lucide="play" style="width:22px;height:22px;"></i>
         ${isYoga ? 'Mantener Postura' : 'Iniciar Serie'} (${ex.repeticiones})
       </button>
-      <button id="btn-skip-exercise" class="btn btn-secondary" style="font-size:0.9rem; padding:14px;">
+      <button id="btn-skip-exercise" class="btn btn-ghost" style="font-size:0.9rem; padding:12px;">
         <i data-lucide="skip-forward" style="width:18px;height:18px;"></i>
         ${isYoga ? 'Saltar Postura' : 'Saltar ejercicio'}
       </button>
@@ -998,11 +1217,10 @@ function showFuerzaExercise() {
     lucide.createIcons();
 
     document.getElementById("btn-start-work-fuerza").addEventListener("click", () => {
-      // Switch button to let user skip the working timer if needed
       elGuidedActionsFuerza.innerHTML = `
-        <button id="btn-skip-work-timer" class="btn btn-primary guided-action-btn ${isYoga ? 'yoga' : ''}" style="${isYoga ? 'background: #A78BFA !important; box-shadow: 0 8px 30px rgba(167, 139, 250, 0.3) !important; color:#0e0e10 !important;' : 'background: var(--guided-accent-fuerza) !important; box-shadow: 0 8px 30px rgba(251, 113, 133, 0.3) !important;'}">
+        <button id="btn-skip-work-timer" class="btn btn-primary guided-action-btn ${isYoga ? 'yoga' : ''}" style="${isYoga ? 'background: #A78BFA !important; box-shadow: 0 8px 30px rgba(167, 139, 250, 0.3) !important; color:#0e0e10 !important;' : 'background: #FC5200 !important; box-shadow: 0 8px 30px rgba(252, 82, 0, 0.35) !important;'}">
           <i data-lucide="skip-forward" style="width:22px;height:22px;"></i>
-          ${isYoga ? 'Siguiente Asana' : 'Saltar e ir a Descanso'}
+          ${isYoga ? 'Siguiente Asana' : `Completar Serie (${stravaState.currentWeight}kg × ${stravaState.currentReps})`}
         </button>
       `;
       lucide.createIcons();
@@ -1020,11 +1238,11 @@ function showFuerzaExercise() {
   } else {
     hide(elGuidedTimerWrap);
     elGuidedActionsFuerza.innerHTML = `
-      <button id="btn-serie-done" class="btn btn-primary guided-action-btn ${isYoga ? 'yoga' : ''}">
+      <button id="btn-serie-done" class="btn btn-primary guided-action-btn ${isYoga ? 'yoga' : ''}" style="${isYoga ? '' : 'background: linear-gradient(135deg, #FC5200 0%, #FF7A00 100%); border:none; box-shadow: 0 4px 18px rgba(252,82,0,0.35);'}">
         <i data-lucide="check" style="width:22px;height:22px;"></i>
-        ${isYoga ? 'Postura completada' : 'Serie completada'}
+        ${isYoga ? 'Postura completada' : `Completar Serie (${stravaState.currentWeight}kg × ${stravaState.currentReps})`}
       </button>
-      <button id="btn-skip-exercise" class="btn btn-secondary" style="font-size:0.9rem; padding:14px;">
+      <button id="btn-skip-exercise" class="btn btn-ghost" style="font-size:0.9rem; padding:12px;">
         <i data-lucide="skip-forward" style="width:18px;height:18px;"></i>
         ${isYoga ? 'Saltar Postura' : 'Saltar ejercicio'}
       </button>
@@ -1035,12 +1253,19 @@ function showFuerzaExercise() {
     document.getElementById("btn-skip-exercise").addEventListener("click", onSkipExercise);
   }
 
-
   showActions("fuerza");
 }
 
 function onSerieDone() {
   guided.totalSeries++;
+  
+  // Calculate Strava Volume (kg * reps)
+  const setVolume = Math.round(stravaState.currentWeight * stravaState.currentReps);
+  stravaState.sessionVolume += setVolume;
+
+  const volumeChip = document.getElementById("strava-total-volume-chip");
+  if (volumeChip) volumeChip.textContent = `${stravaState.sessionVolume} kg movidos`;
+
   playSetCompleteSound();
   const ex = guided.exercises[guided.exIndex];
 
@@ -1073,7 +1298,7 @@ function onSkipExercise() {
 }
 
 // ============================================================
-// REST TIMER
+// REST TIMER (STRAVA REST CONTROLS)
 // ============================================================
 function startRest() {
   guided.phase = "resting";
@@ -1084,6 +1309,10 @@ function startRest() {
   hide(elGuidedSetCounter);
   hide(elGuidedReps);
   elGuidedExName.textContent = isYoga ? "Cambio de Postura" : "Descansa";
+
+  // Show quick rest +/-15s buttons
+  const restCtrls = document.getElementById("strava-rest-quick-ctrls");
+  if (restCtrls) restCtrls.style.display = "flex";
 
   showActions("rest");
   show(elGuidedTimerWrap);
@@ -1106,7 +1335,7 @@ function onSkipRest() {
 }
 
 // ============================================================
-// CARRERA — phase display & progression
+// CARRERA — phase display & progression (RUNNA RUNNING)
 // ============================================================
 function showCarreraPhase() {
   if (guided.exIndex >= guided.exercises.length) { showDone(); return; }
@@ -1117,9 +1346,17 @@ function showCarreraPhase() {
 
   updateProgress();
 
+  // Show Running container, hide Strength container
+  const strengthCont = document.getElementById("guided-strength-container");
+  const runningCont  = document.getElementById("guided-running-container");
+  const restCtrls    = document.getElementById("strava-rest-quick-ctrls");
+  if (strengthCont) strengthCont.style.display = "none";
+  if (runningCont)  runningCont.style.display  = "flex";
+  if (restCtrls)    restCtrls.style.display    = "none";
+
   const typeLabel = phase.type === "WARMUP" ? "CALENTAMIENTO"
     : phase.type === "COOLDOWN" ? "ENFRIAMIENTO"
-    : "CARRERA";
+    : "INTERVALO RUNNA";
   setPhaseLabel(typeLabel, "running");
 
   elGuidedExName.textContent = phase.name;
@@ -1130,6 +1367,10 @@ function showCarreraPhase() {
   hide(elGuidedReps);
   show(elGuidedTimerWrap);
   elGuidedTimerArc.className = "guided-timer-arc carrera-arc";
+
+  // Update Runna timeline and display
+  renderRunnaTimeline();
+  updateRunnaRunningDisplay(phase);
 
   updatePauseBtn(false);
   showActions("carrera");
@@ -1145,27 +1386,34 @@ function onPauseCarrera() {
     pauseTimer();
     guided.paused = true;
     updatePauseBtn(true);
+    speakRunnaCoach("Sesión pausada. Tómate un respiro.");
   } else {
     resumeTimer();
     guided.paused = false;
     updatePauseBtn(false);
+    speakRunnaCoach("Reanudando. ¡A por ello!");
   }
 }
 
 function updatePauseBtn(isPaused) {
   elBtnPauseCarrera.innerHTML = isPaused
     ? `<i data-lucide="play" style="width:18px;height:18px;"></i> Continuar`
-    : `<i data-lucide="pause" style="width:18px;height:18px;"></i> Pausar`;
+    : `<i data-lucide="pause" style="width:18px;height:18px;"></i> Pausar Intervalo`;
   lucide.createIcons();
 }
 
 // ============================================================
-// DONE SCREEN
+// DONE SCREEN (STRAVA & RUNNA SUMMARY)
 // ============================================================
 function showDone() {
   clearTimer();
   guided.phase = "done";
   playWorkoutCompleteSound();
+
+  if (_runnaNeedleInterval) {
+    clearInterval(_runnaNeedleInterval);
+    _runnaNeedleInterval = null;
+  }
 
   setPhaseLabel("¡COMPLETADO!", "done");
   updateProgress(true);
@@ -1173,16 +1421,33 @@ function showDone() {
   const elapsed = Math.round((new Date() - guided.startTime) / 1000);
   const mins    = Math.floor(elapsed / 60);
 
+  const strengthCont = document.getElementById("guided-strength-container");
+  const runningCont  = document.getElementById("guided-running-container");
+  const restCtrls    = document.getElementById("strava-rest-quick-ctrls");
+  if (strengthCont) strengthCont.style.display = "none";
+  if (runningCont)  runningCont.style.display  = "none";
+  if (restCtrls)    restCtrls.style.display    = "none";
+
   elGuidedExName.style.display = "none";
   hide(elGuidedSetCounter);
   hide(elGuidedReps);
   hide(elGuidedTimerWrap);
 
+  const workedMusclesList = Array.from(stravaState.workedMuscles)
+    .map(m => m.charAt(0).toUpperCase() + m.slice(1))
+    .join(", ");
+
   // Build done content inside main
   const mainEl = document.querySelector(".guided-main");
   mainEl.innerHTML = `
-    <div class="guided-done-emoji">💪</div>
-    <div class="guided-done-title">¡Sesión completada!</div>
+    <div class="guided-done-emoji">${guided.tipo === "Fuerza" ? "🏋️‍♂️" : "🏃"}</div>
+    <div class="guided-done-title" style="margin-bottom: 4px;">¡Sesión completada!</div>
+    <div style="margin-bottom: 16px;">
+      <span class="label-caps" style="color: ${guided.tipo === "Fuerza" ? "#FC5200" : "#00E676"}; font-size: 0.8rem; font-weight: 800;">
+        ${guided.tipo === "Fuerza" ? "STRAVA STRENGTH SUMMARY" : "RUNNA COACHING SUMMARY"}
+      </span>
+    </div>
+
     <div class="guided-done-stats">
       <div class="guided-done-stat">
         <div class="guided-done-stat-value">${mins} min</div>
@@ -1190,18 +1455,34 @@ function showDone() {
       </div>
       ${guided.tipo === "Fuerza" ? `
       <div class="guided-done-stat">
-        <div class="guided-done-stat-value">${guided.totalSeries}</div>
-        <div class="guided-done-stat-label">Series</div>
+        <div class="guided-done-stat-value" style="color: #FC5200;">${stravaState.sessionVolume} kg</div>
+        <div class="guided-done-stat-label">Volumen Total</div>
       </div>
       <div class="guided-done-stat">
-        <div class="guided-done-stat-value">${guided.exercises.length}</div>
-        <div class="guided-done-stat-label">Ejercicios</div>
+        <div class="guided-done-stat-value">${guided.totalSeries}</div>
+        <div class="guided-done-stat-label">Series</div>
       </div>` : `
       <div class="guided-done-stat">
-        <div class="guided-done-stat-value">${guided.exercises.length}</div>
-        <div class="guided-done-stat-label">Fases</div>
+        <div class="guided-done-stat-value" style="color: #00E676;">${guided.exercises.length}</div>
+        <div class="guided-done-stat-label">Intervalos</div>
+      </div>
+      <div class="guided-done-stat">
+        <div class="guided-done-stat-value">100%</div>
+        <div class="guided-done-stat-label">En Ritmo</div>
       </div>`}
-    </div>`;
+    </div>
+
+    ${guided.tipo === "Fuerza" && workedMusclesList ? `
+      <div style="background: rgba(252,82,0,0.1); border: 1px solid rgba(252,82,0,0.3); border-radius: var(--rounded-md); padding: 10px 14px; margin-top: 14px; max-width: 340px; text-align: center;">
+        <span class="label-caps" style="color: #FC5200; font-size: 0.72rem;">MÚSCULOS ENTRENADOS:</span>
+        <div class="body-sm" style="color: #FFF; font-weight: 700; margin-top: 4px;">${workedMusclesList}</div>
+      </div>
+    ` : ""}
+  `;
+
+  if (guided.tipo === "Carrera") {
+    speakRunnaCoach("¡Excelente entrenamiento! Has completado todas las fases con éxito.");
+  }
 
   showActions("done");
   lucide.createIcons();
@@ -1283,6 +1564,31 @@ function startCountdown(seconds, onDone) {
   guided.timerInterval = setInterval(() => {
     guided.timerRemaining--;
     updateTimerUI(guided.timerRemaining, guided.timerTotal);
+
+    // Update Runna HUD if in running phase
+    if (guided.phase === "running") {
+      const hudTime = document.getElementById("runna-hud-time");
+      if (hudTime) {
+        const m = Math.floor(guided.timerRemaining / 60);
+        const s = guided.timerRemaining % 60;
+        hudTime.textContent = `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+      }
+
+      const hudDist = document.getElementById("runna-hud-dist");
+      if (hudDist) {
+        const elapsedSecs = guided.timerTotal - guided.timerRemaining;
+        // Assume avg ~4:45/km = 285s/km -> ~0.0035 km/s
+        const estDist = (elapsedSecs / 285).toFixed(2);
+        hudDist.textContent = `${estDist} km`;
+      }
+
+      // Coaching triggers
+      if (guided.timerTotal > 30 && guided.timerRemaining === Math.floor(guided.timerTotal / 2)) {
+        speakRunnaCoach("Mitad de fase completada. ¡Mantén esa zancada!");
+      } else if (guided.timerRemaining === 10 && guided.timerTotal >= 20) {
+        speakRunnaCoach("10 segundos. ¡Fuerza hasta el final!");
+      }
+    }
     
     // Play warning count down sound on 3, 2, 1 seconds left
     if (guided.timerRemaining >= 1 && guided.timerRemaining <= 3) {
@@ -1305,13 +1611,20 @@ function pauseTimer() {
 }
 
 function resumeTimer() {
-  // Restart from where we paused — we need to re-bind onDone
-  // Re-call startCountdown is simplest; save the callback
   guided.timerRemaining = _pausedRemaining;
   updateTimerUI(_pausedRemaining, guided.timerTotal);
   guided.timerInterval = setInterval(() => {
     guided.timerRemaining--;
     updateTimerUI(guided.timerRemaining, guided.timerTotal);
+
+    if (guided.phase === "running") {
+      const hudTime = document.getElementById("runna-hud-time");
+      if (hudTime) {
+        const m = Math.floor(guided.timerRemaining / 60);
+        const s = guided.timerRemaining % 60;
+        hudTime.textContent = `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+      }
+    }
 
     // Play warning count down sound on 3, 2, 1 seconds left
     if (guided.timerRemaining >= 1 && guided.timerRemaining <= 3) {
