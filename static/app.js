@@ -175,6 +175,7 @@ const CIRCUMFERENCE = 2 * Math.PI * 54; // r=54
 document.addEventListener("DOMContentLoaded", () => {
   initApp();
   checkGarminStatus();
+  loadWeeklyPlanAndRaceGoal();
 
   // Selection events
   elBtnSelectFuerza.addEventListener("click", () => iniciarGeneracionEntrenamiento("Fuerza"));
@@ -2710,6 +2711,121 @@ async function sendWorkoutToGarminWatch() {
   } finally {
     showLoading(false);
   }
+}
+
+// ============================================================
+// WEEKLY GARMIN PLANNER & TARGET RACE GOAL
+// ============================================================
+async function loadWeeklyPlanAndRaceGoal() {
+  try {
+    const res = await fetch("/api/plan-semanal");
+    if (!res.ok) return;
+    const plan = await res.json();
+    renderWeeklyPlan(plan);
+  } catch (e) {
+    console.warn("Weekly plan load failed:", e);
+  }
+}
+
+function renderWeeklyPlan(plan) {
+  const m = plan.metrics || {};
+  const trendEl = document.getElementById("dashboard-trend-val");
+  const paceEl = document.getElementById("dashboard-pace-val");
+  const kmBadge = document.getElementById("weekly-plan-km-badge");
+  const listEl = document.getElementById("weekly-plan-list");
+  const banner = document.getElementById("race-goal-banner");
+  const titleEl = document.getElementById("race-goal-title");
+
+  if (trendEl) trendEl.textContent = m.tendencia_label || "En Ascenso";
+  if (paceEl) paceEl.textContent = m.ritmo_medio_garmin || "5:35 min/km";
+  if (kmBadge) kmBadge.textContent = `${plan.objetivo_km_carrera || 0} km obj.`;
+
+  const race = plan.carrera_objetivo;
+  if (race && race.activo && banner) {
+    banner.style.display = "block";
+    if (titleEl) titleEl.textContent = `Objetivo: ${race.nombre}`;
+    const bName = document.getElementById("race-banner-name");
+    const bDays = document.getElementById("race-banner-days");
+    const bPhase = document.getElementById("race-banner-phase");
+    if (bName) bName.textContent = `🏁 ${race.nombre} (${race.distancia_km} km)`;
+    if (bDays) {
+      const d = m.dias_para_carrera;
+      bDays.textContent = d !== null && d !== undefined ? (d >= 0 ? `Faltan ${d} días` : "Completada") : race.fecha;
+    }
+    if (bPhase) bPhase.textContent = `Fase actual: ${m.fase_actual}`;
+  } else if (banner) {
+    banner.style.display = "none";
+    if (titleEl) titleEl.textContent = m.fase_actual || "Tendencia Ascendente";
+  }
+
+  if (listEl && Array.isArray(plan.dias)) {
+    let html = "";
+    plan.dias.forEach(d => {
+      const isFuerza = d.tipo === "Fuerza";
+      const isCarrera = d.tipo === "Carrera" || d.tipo === "Carrera Objetivo";
+      const accent = isCarrera ? "#00E676" : isFuerza ? "#FC5200" : "var(--text-muted)";
+      const todayBorder = d.es_hoy ? `border: 1.5px solid ${accent}; background: rgba(255,255,255,0.04);` : "border: 1px solid var(--border-glass); background: var(--surface-dim);";
+      const clickable = (isFuerza || isCarrera) ? `onclick="iniciarGeneracionEntrenamiento('${isFuerza ? 'Fuerza' : 'Carrera'}')" style="cursor:pointer; ${todayBorder} border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; gap:4px;"` : `style="${todayBorder} border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; gap:4px;"`;
+
+      html += `
+        <div ${clickable}>
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span class="label-caps" style="color:${accent}; font-size:0.72rem;">${d.dia}${d.es_hoy ? " • HOY" : ""}</span>
+              ${d.opcional ? `<span class="label-caps" style="background:rgba(252,82,0,0.16); color:#FF8A50; padding:2px 6px; border-radius:4px; font-size:0.62rem;">OPCIONAL</span>` : ""}
+            </div>
+            ${d.completado ? `<span class="label-caps" style="color:#00AEEF; font-size:0.68rem;">✓ Garmin</span>` : (d.duracion_min > 0 ? `<span class="body-xs" style="color:var(--text-muted);">${d.duracion_min} min</span>` : "")}
+          </div>
+          <div style="font-weight:700; font-size:0.9rem; color:#F8FAFC;">${d.titulo}</div>
+          <div style="font-size:0.76rem; color:var(--text-secondary);">${d.detalle}</div>
+        </div>
+      `;
+    });
+    listEl.innerHTML = html;
+  }
+}
+
+function toggleRaceGoalForm() {
+  const form = document.getElementById("race-goal-form");
+  if (!form) return;
+  form.style.display = form.style.display === "none" ? "flex" : "none";
+}
+
+async function saveRaceGoal() {
+  const name = document.getElementById("race-input-name")?.value.trim();
+  const dateVal = document.getElementById("race-input-date")?.value;
+  const distVal = parseFloat(document.getElementById("race-input-dist")?.value || "10");
+  if (!name || !dateVal) {
+    showSuccessBanner("⚠️ Introduce el nombre y la fecha de tu próxima carrera.");
+    return;
+  }
+  try {
+    const res = await fetch("/api/carrera-objetivo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre: name, fecha: dateVal, distancia_km: distVal, activo: true })
+    });
+    const data = await res.json();
+    if (data.plan) renderWeeklyPlan(data.plan);
+    toggleRaceGoalForm();
+    showSuccessBanner(`🏁 Plan semanal adaptado para ${name}!`);
+  } catch (e) {
+    showSuccessBanner("⚠️ Error guardando carrera objetivo.");
+  }
+}
+
+async function clearRaceGoal() {
+  try {
+    const res = await fetch("/api/carrera-objetivo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre: "", fecha: "", distancia_km: 10, activo: false })
+    });
+    const data = await res.json();
+    if (data.plan) renderWeeklyPlan(data.plan);
+    toggleRaceGoalForm();
+    showSuccessBanner("📈 Plan en modo Tendencia Ascendente Continua.");
+  } catch (e) {}
 }
 
 

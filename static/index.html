@@ -103,7 +103,7 @@
               <!-- Dynamically populated from last workout -->
             </div>
 
-            <p id="rec-razon-text" class="body-md">Analizando tu historial en Intervals.icu...</p>
+            <p id="rec-razon-text" class="body-md">Analizando tu historial real en Garmin Connect...</p>
             <p id="rec-semanal-text" class="body-sm-muted"></p>
 
             <button id="btn-comenzar-hoy" class="btn btn-primary" style="display: none; margin-top: 10px; width: 100%; font-size: 1.05rem; padding: 14px 20px;">
@@ -132,6 +132,63 @@
           </div>
         </div>
 
+        <!-- Tendencia & Próxima Carrera Objetivo Card -->
+        <div id="race-goal-card" class="glass-card" style="border: 1px solid rgba(0, 230, 118, 0.22);">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <div>
+              <span class="label-caps" style="color: #00E676;">PROGRESIÓN Y OBJETIVO</span>
+              <h3 id="race-goal-title" class="headline-sm" style="margin-top:2px;">Tendencia Ascendente</h3>
+            </div>
+            <button type="button" class="strava-chip-btn" style="font-size:0.72rem; padding:5px 10px;" onclick="toggleRaceGoalForm()">🏁 Carrera</button>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <div class="p-stat-box">
+              <span class="label-caps">TENDENCIA (14D)</span>
+              <span id="dashboard-trend-val" class="p-stat-val" style="color:#00E676; font-size:0.95rem;">Calculando...</span>
+            </div>
+            <div class="p-stat-box">
+              <span class="label-caps">RITMO GARMIN</span>
+              <span id="dashboard-pace-val" class="p-stat-val" style="color:#00AEEF; font-size:0.95rem;">—</span>
+            </div>
+          </div>
+
+          <div id="race-goal-banner" style="display:none; background:rgba(0, 230, 118, 0.1); border:1px solid rgba(0, 230, 118, 0.3); border-radius:10px; padding:10px 12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <strong id="race-banner-name" style="color:#FFF; font-size:0.9rem;">🏁 —</strong>
+              <span id="race-banner-days" class="label-caps" style="color:#00E676;">—</span>
+            </div>
+            <span id="race-banner-phase" class="body-sm-muted" style="font-size:0.78rem; display:block; margin-top:2px;">—</span>
+          </div>
+
+          <div id="race-goal-form" style="display:none; flex-direction:column; gap:8px; padding-top:6px; border-top:1px solid var(--border-glass);">
+            <input type="text" id="race-input-name" placeholder="Nombre de la carrera (ej. 10K Valencia)" style="width:100%; padding:9px 12px; border-radius:8px; background:var(--surface-container-high); border:1px solid var(--border-glass); color:#FFF;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+              <input type="date" id="race-input-date" style="width:100%; padding:9px 10px; border-radius:8px; background:var(--surface-container-high); border:1px solid var(--border-glass); color:#FFF;">
+              <input type="number" id="race-input-dist" step="0.5" min="1" value="10" placeholder="Distancia (km)" style="width:100%; padding:9px 10px; border-radius:8px; background:var(--surface-container-high); border:1px solid var(--border-glass); color:#FFF;">
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="btn btn-primary" style="flex:1; padding:10px; font-size:0.85rem; background:#00E676; color:#000; border:none;" onclick="saveRaceGoal()">Adaptar Plan a Carrera</button>
+              <button type="button" class="btn btn-ghost" style="padding:10px 12px; font-size:0.85rem;" onclick="clearRaceGoal()">Quitar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Plan Semanal Inteligente Card -->
+        <div id="weekly-plan-card" class="glass-card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <span class="label-caps" style="color: #00AEEF;">PLAN SEMANAL GARMIN</span>
+              <h3 class="headline-sm" style="margin-top:2px;">Lunes – Domingo</h3>
+            </div>
+            <span id="weekly-plan-km-badge" class="label-caps" style="color:#00E676; background:rgba(0,230,118,0.12); padding:4px 10px; border-radius:999px;">0 km obj.</span>
+          </div>
+          <p class="body-sm-muted" style="font-size:0.8rem;">Basado en tu historial de Garmin. Las 1–2 sesiones de fuerza son <strong>opcionales</strong> si vas justo de tiempo.</p>
+          <div id="weekly-plan-list" style="display:flex; flex-direction:column; gap:8px;">
+            <!-- Injected dynamically -->
+          </div>
+        </div>
+
         <!-- Main Selection Container -->
         <div id="selection-card" class="workout-selector-wrap">
           <span id="selection-card-title" class="label-caps" style="text-align: center; display: block; margin-bottom: 8px;">¿QUÉ VAS A ENTRENAR HOY?</span>
@@ -142,8 +199,8 @@
                 <i data-lucide="dumbbell" style="width: 22px; height: 22px;"></i>
               </div>
               <div class="btn-text-wrap">
-                <span class="btn-main-title">Fuerza Full-Body</span>
-                <span class="btn-sub-info">Mancuernas 5kg + Cintas • Cuerpo Completo</span>
+                <span class="btn-main-title">Fuerza (Opcional • 25–35 min)</span>
+                <span class="btn-sub-info">Strava Strength • Pesas 5kg + Cintas</span>
               </div>
               <i data-lucide="chevron-right" class="arrow-icon"></i>
             </button>

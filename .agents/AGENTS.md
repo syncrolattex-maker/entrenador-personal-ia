@@ -1,4 +1,4 @@
-# AaronFit — Reglas y Visión del Proyecto (Entrenador Personal IA + Garmin & Strava)
+# AaronFit — Reglas y Visión del Proyecto (Entrenador Personal IA + Garmin Connect)
 
 Este archivo define las reglas de comportamiento, la visión del producto y las especificaciones atléticas exclusivas de **AaronFit** para guiar futuras actualizaciones.
 
@@ -6,7 +6,7 @@ Este archivo define las reglas de comportamiento, la visión del producto y las 
 
 ## 🎯 1. Visión del Producto
 
-**AaronFit** es una plataforma ultra-personalizada de entrenamiento personal y diagnóstico fisiológico diseñada a medida para **Aarón**. Analiza en tiempo real su historial real de **Garmin Connect** y **Strava**, integra métricas de recuperación (HRV, Body Battery, sueño, FC en reposo y carga semanal) y ejecuta sesiones guiadas con el **sistema de fuerza estilo Strava** y **sistema de carrera estilo Runna**.
+**AaronFit** es la aplicación de entrenamiento personal exclusiva de **Aarón**, conectada directamente con **Garmin Connect**. Su esencia es mantener a Aarón **en forma y siempre en tendencia hacia arriba** (progresión continua y sostenible sin sobreentrenamiento), planificando semanalmente sus entrenamientos a partir de sus datos reales de Garmin y adaptando el ciclo cuando tiene una **carrera objetivo** en el calendario.
 
 ---
 
@@ -16,29 +16,23 @@ Este archivo define las reglas de comportamiento, la visión del producto y las 
 * **Edad**: 43 años.
 * **Estatura**: 1,83 m.
 * **Peso**: 93 kg.
-* **Equipamiento Disponible**: Mancuernas de 5 kg y cintas/bandas elásticas de resistencia.
-* **Fuentes de Datos Reales**: Garmin Connect (`garminconnect` directo) y Strava.
+* **Equipamiento Disponible**: Mancuernas de 5 kg y cintas elásticas de resistencia.
+* **Reloj y Fuente de Datos Real**: Reloj **Garmin** conectado vía **Garmin Connect** (actividades de carrera, ciclismo en ruta, ritmos, FC, Efecto Aeróbico, HRV y Body Battery). No usa Apple Watch ni realiza Yoga.
 
 ---
 
 ## 🛡️ 3. Directrices Deportivas y Fisiológicas Obligatorias
 
-1. **Toma de Decisiones Basada en Historial Real (Garmin & Strava)**:
-   * Antes de prescribir la sesión del día, el motor y el Coach IA deben analizar los últimos entrenamientos reales registrados en Garmin Connect (tipo de sesión, duración, FC media/máx, ritmos, carga aeróbica y días de descanso).
-   * Integrar métricas diarias de Garmin (*Body Battery, HRV, sueño, FC en reposo y Training Readiness*) para modular automáticamente la intensidad.
+1. **Tendencia Siempre Ascendente (Progresión Sostenible)**:
+   * Analizar las últimas 2–4 semanas reales en **Garmin Connect** (volumen en km, tiempo activo, ritmos y FC).
+   * Planificar cada semana para mantener una progresión gradual al alza (+5% a +10% controlado cuando el cuerpo asimila, o descarga estratégica si hay fatiga acumulada).
 
-2. **Planificación de Fuerza (Sistema Strava Strength)**:
-   * Sesiones Full Body o divididas según fatiga previa, de 40-55 minutos de duración.
-   * Adaptadas al equipamiento real (**mancuernas de 5 kg y cintas elásticas**): énfasis en tiempo bajo tensión (tempo controlado), rango de 15 a 22 repeticiones, superseries y control estricto de descansos.
-   * Ejecución mediante el **Logger de Series Strava**: registro real de peso (kg) y reps por serie, volumen total acumulado ($\text{kg} \times \text{reps}$), descansos ajustables (`±15s`) y mapa anatómico de activación muscular.
+2. **Adaptación a Carreras Objetivo**:
+   * Cuando Aarón registre una **carrera objetivo** (nombre, fecha y distancia: 5K, 10K, Media Maratón, Maratón, Trail), el plan semanal debe adaptar automáticamente el volumen, los ritmos objetivo (sistema **Runna**) y la fase (*Base*, *Construcción*, *Específico* o *Taper* pre-carrera) para llegar en estado óptimo el día de la prueba.
 
-3. **Planificación de Carrera (Sistema Runna Running)**:
-   * Prescripción inteligente basada en el historial reciente de ritmos y FC en Garmin.
-   * **Prevención de Lesiones (93 kg / 43 años)**: Máximo 1-2 sesiones de calidad/intervalos a la semana; el resto rodajes aeróbicos controlados en Zona 2 para proteger articulaciones y construir base aeróbica.
-   * Ejecución guiada estilo **Runna**: timeline de fases, medidor de zonas de ritmo objetivo, avatar dinámico de cadencia y audio-coach por voz.
+3. **Planificación Semanal con Fuerza Opcional (1–2 días/semana)**:
+   * La prioridad de la semana son las sesiones cardiovasculares (**Carrera** estructurada estilo Runna y salidas complementarias de **Ciclismo** según su Garmin).
+   * Se incluyen **1 o 2 sesiones de Fuerza (Opcional)** a la semana (25–35 min, eficientes por falta de tiempo), ejecutadas con el **sistema Strava Strength** (series, peso/reps, volumen total, descansos ajustables y mapa muscular).
 
-4. **Yoga y Movilidad Regenerativa**:
-   * Sesiones de 20-25 minutos cuando se detecta fatiga acumulada o esfuerzo previo *"Agotador"*, usando posturas de `alexcumplido/yoga-api`.
-
-5. **Estado Fisiológico / Readiness Score (Dashboard)**:
-   * Calcular dinámicamente el "Estado Óptimo" (20% a 100%) combinando adherencia semanal, recuperación/descanso, variedad de estímulos y telemetría de Garmin Connect.
+4. **Envío Automático a Garmin Connect**:
+   * Las sesiones generadas se envían directamente a **Garmin Connect** (sin descargas manuales `.fit`).

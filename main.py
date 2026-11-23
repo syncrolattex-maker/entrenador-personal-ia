@@ -2106,6 +2106,297 @@ async def garmin_export_fit(workout: dict):
     )
 
 
+# ============================================================
+# PLANIFICADOR SEMANAL GARMIN + CARRERA OBJETIVO + TENDENCIA
+# ============================================================
+PLAN_STATE_FILE = (
+    "/tmp/aaron_plan_state.json"
+    if os.getenv("VERCEL")
+    else os.path.join(os.path.dirname(__file__), "data", "aaron_plan_state.json")
+)
+
+
+def _load_plan_state() -> dict:
+    try:
+        if os.path.exists(PLAN_STATE_FILE):
+            with open(PLAN_STATE_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"[PlanState] Read error: {e}")
+    return {"carrera_objetivo": None, "plan_semanal": None}
+
+
+def _save_plan_state(state_data: dict) -> None:
+    try:
+        os.makedirs(os.path.dirname(PLAN_STATE_FILE), exist_ok=True)
+        with open(PLAN_STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump(state_data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[PlanState] Write error: {e}")
+
+
+class CarreraObjetivoPayload(BaseModel):
+    nombre: str = ""
+    fecha: str = ""
+    distancia_km: float = 10.0
+    activo: bool = True
+
+
+def _calcular_fase_y_tendencia(history: List[dict], carrera_obj: Optional[dict]) -> dict:
+    from datetime import date, datetime, timedelta
+    today = date.today()
+    d14 = today - timedelta(days=14)
+    d28 = today - timedelta(days=28)
+
+    km_run_14 = 0.0
+    km_run_prev = 0.0
+    km_bike_14 = 0.0
+    min_14 = 0.0
+    min_prev = 0.0
+    paces_sec = []
+
+    for act in history:
+        f_str = act.get("fecha", "")
+        if not f_str:
+            continue
+        try:
+            dt = datetime.strptime(f_str[:10], "%Y-%m-%d").date()
+        except Exception:
+            continue
+
+        dur = float(act.get("duracion_minutos") or 0)
+        dist = float(act.get("distancia_km") or 0)
+        tipo = act.get("tipo", "")
+
+        if dt >= d14:
+            min_14 += dur
+            if tipo == "Carrera":
+                km_run_14 += dist
+                if dist > 0 and dur > 0:
+                    paces_sec.append((dur * 60.0) / dist)
+            elif tipo == "Ciclismo":
+                km_bike_14 += dist
+        elif dt >= d28:
+            min_prev += dur
+            if tipo == "Carrera":
+                km_run_prev += dist
+
+    avg_pace_str = "5:35 min/km"
+    if paces_sec:
+        avg_s = sum(paces_sec) / len(paces_sec)
+        avg_pace_str = f"{int(avg_s // 60)}:{int(avg_s % 60):02d} min/km"
+
+    if min_prev > 0:
+        pct = round(((min_14 - min_prev) / min_prev) * 100)
+    else:
+        pct = 12 if min_14 > 0 else 0
+
+    if pct >= 5:
+        tendencia_label = f"En Ascenso (+{pct}%)"
+    elif pct <= -15:
+        tendencia_label = f"Reactivando ({pct}%)"
+    else:
+        tendencia_label = f"Consolidando ({'+' if pct >= 0 else ''}{pct}%)"
+
+    fase = "Tendencia Ascendente Continua"
+    dias_restantes = None
+    if carrera_obj and carrera_obj.get("activo") and carrera_obj.get("fecha"):
+        try:
+            race_dt = datetime.strptime(carrera_obj["fecha"][:10], "%Y-%m-%d").date()
+            dias_restantes = (race_dt - today).days
+            if dias_restantes < 0:
+                fase = "Recuperación Post-Carrera"
+            elif dias_restantes <= 10:
+                fase = "Taper Pre-Carrera (Descarga)"
+            elif dias_restantes <= 28:
+                fase = "Pico Específico de Carrera"
+            else:
+                fase = "Construcción Progresiva"
+        except Exception:
+            pass
+
+    return {
+        "km_carrera_14d": round(km_run_14, 1),
+        "km_bici_14d": round(km_bike_14, 1),
+        "minutos_14d": round(min_14),
+        "ritmo_medio_garmin": avg_pace_str,
+        "tendencia_pct": pct,
+        "tendencia_label": tendencia_label,
+        "fase_actual": fase,
+        "dias_para_carrera": dias_restantes,
+    }
+
+
+def _construir_plan_semanal(history: List[dict], carrera_obj: Optional[dict]) -> dict:
+    from datetime import date, timedelta
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+    metrics = _calcular_fase_y_tendencia(history, carrera_obj)
+
+    # Map completed activities by date in current week
+    completed_by_date: dict = {}
+    for act in history:
+        f_str = (act.get("fecha") or "")[:10]
+        if f_str:
+            completed_by_date.setdefault(f_str, []).append(act)
+
+    fase = metrics["fase_actual"]
+    dias_carrera = metrics["dias_para_carrera"]
+    is_taper = dias_carrera is not None and 0 <= dias_carrera <= 10
+    is_peak = dias_carrera is not None and 11 <= dias_carrera <= 28
+
+    # Base weekly target km slightly upward from recent 14d/2 average (capped safely)
+    base_weekly_km = max(16.0, round((metrics["km_carrera_14d"] / 2.0) * 1.07, 1))
+    if is_taper:
+        base_weekly_km = round(base_weekly_km * 0.65, 1)
+
+    rodaje_km = max(6.0, round(base_weekly_km * 0.30, 1))
+    calidad_km = max(6.5, round(base_weekly_km * 0.32, 1))
+    larga_km = max(8.0, round(base_weekly_km * 0.38, 1))
+
+    # 7-day Monday-Sunday schedule: Cardio core + 2 Optional Strava Strength sessions
+    day_names = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    template = [
+        {
+            "dia_idx": 0,
+            "tipo": "Fuerza",
+            "titulo": "Fuerza Express (Opcional)",
+            "detalle": "25–30 min • Strava Strength (5 kg + cintas) si tienes hueco hoy.",
+            "opcional": True,
+            "duracion_min": 30,
+        },
+        {
+            "dia_idx": 1,
+            "tipo": "Carrera",
+            "titulo": f"Rodaje Base Z2 ({rodaje_km} km)",
+            "detalle": f"Ritmo cómodo ~5:35–5:50/km • Construcción aeróbica ascendente.",
+            "opcional": False,
+            "duracion_min": 40,
+        },
+        {
+            "dia_idx": 2,
+            "tipo": "Descanso",
+            "titulo": "Descanso / Movilidad",
+            "detalle": "Asimilación de carga y cuidado articular (93 kg).",
+            "opcional": False,
+            "duracion_min": 0,
+        },
+        {
+            "dia_idx": 3,
+            "tipo": "Carrera",
+            "titulo": (
+                f"Activación Pre-Carrera ({round(calidad_km * 0.7, 1)} km)"
+                if is_taper
+                else f"Calidad Runna / Tempo ({calidad_km} km)"
+            ),
+            "detalle": (
+                "Cambios de ritmo cortos para chispa sin fatiga."
+                if is_taper
+                else f"Intervalos progresivos estilo Runna {'específicos de carrera' if is_peak else 'para subir umbral'}."
+            ),
+            "opcional": False,
+            "duracion_min": 45 if not is_taper else 30,
+        },
+        {
+            "dia_idx": 4,
+            "tipo": "Fuerza",
+            "titulo": "Fuerza Core & Pierna (Opcional)",
+            "detalle": "25 min • Prevención de lesiones (opcional según agenda).",
+            "opcional": True,
+            "duracion_min": 25,
+        },
+        {
+            "dia_idx": 5,
+            "tipo": "Carrera",
+            "titulo": f"Tirada Larga Progresiva ({larga_km} km)",
+            "detalle": "Ritmo controlado Z2–Z3 • Base sólida o bici en ruta alternativa.",
+            "opcional": False,
+            "duracion_min": 55 if not is_taper else 35,
+        },
+        {
+            "dia_idx": 6,
+            "tipo": "Descanso",
+            "titulo": "Recuperación Semanal",
+            "detalle": "Descanso completo para consolidar la tendencia ascendente.",
+            "opcional": False,
+            "duracion_min": 0,
+        },
+    ]
+
+    dias = []
+    for item in template:
+        d_date = monday + timedelta(days=item["dia_idx"])
+        d_str = d_date.isoformat()
+        acts_today = completed_by_date.get(d_str, [])
+        is_race_day = (
+            carrera_obj
+            and carrera_obj.get("activo")
+            and carrera_obj.get("fecha", "")[:10] == d_str
+        )
+        entry = {
+            "dia": day_names[item["dia_idx"]],
+            "fecha": d_str,
+            "es_hoy": d_date == today,
+            "tipo": "Carrera Objetivo" if is_race_day else item["tipo"],
+            "titulo": f"🏁 {carrera_obj['nombre']} ({carrera_obj['distancia_km']} km)" if is_race_day else item["titulo"],
+            "detalle": "¡Día de competición! Disfruta todo el trabajo acumulado." if is_race_day else item["detalle"],
+            "opcional": False if is_race_day else item["opcional"],
+            "duracion_min": item["duracion_min"],
+            "completado": len(acts_today) > 0,
+            "garmin_actividades": [a.get("nombre") for a in acts_today],
+        }
+        dias.append(entry)
+
+    return {
+        "semana_inicio": monday.isoformat(),
+        "semana_fin": (monday + timedelta(days=6)).isoformat(),
+        "objetivo_km_carrera": base_weekly_km,
+        "metrics": metrics,
+        "carrera_objetivo": carrera_obj,
+        "dias": dias,
+    }
+
+
+@app.get("/api/carrera-objetivo")
+async def get_carrera_objetivo():
+    state_data = _load_plan_state()
+    history = await get_intervals_history()
+    carrera_obj = state_data.get("carrera_objetivo")
+    metrics = _calcular_fase_y_tendencia(history, carrera_obj)
+    return {
+        "carrera_objetivo": carrera_obj,
+        "metrics": metrics,
+    }
+
+
+@app.post("/api/carrera-objetivo")
+async def post_carrera_objetivo(payload: CarreraObjetivoPayload):
+    state_data = _load_plan_state()
+    if not payload.activo or not payload.nombre.strip() or not payload.fecha.strip():
+        state_data["carrera_objetivo"] = None
+    else:
+        state_data["carrera_objetivo"] = {
+            "nombre": payload.nombre.strip(),
+            "fecha": payload.fecha.strip()[:10],
+            "distancia_km": payload.distancia_km,
+            "activo": True,
+        }
+    _save_plan_state(state_data)
+    history = await get_intervals_history()
+    plan = _construir_plan_semanal(history, state_data.get("carrera_objetivo"))
+    state_data["plan_semanal"] = plan
+    _save_plan_state(state_data)
+    return {"status": "ok", "carrera_objetivo": state_data["carrera_objetivo"], "plan": plan}
+
+
+@app.get("/api/plan-semanal")
+async def get_plan_semanal():
+    state_data = _load_plan_state()
+    history = await get_intervals_history()
+    plan = _construir_plan_semanal(history, state_data.get("carrera_objetivo"))
+    return plan
+
+
 # Create static folder if it doesn't exist
 os.makedirs("static", exist_ok=True)
 
