@@ -1,30 +1,23 @@
-﻿# Fisiología y Ciclo de Asimilación
+# Perfil Fisiológico y Adaptación — Aarón
 
-Este documento compila el perfil biométrico de Verónica y sus ciclos biomecánicos de adaptación al entrenamiento.
+Este documento compila el perfil biométrico de **Aarón** y sus parámetros de adaptación al entrenamiento para el motor de decisiones basado en Garmin Connect y Strava.
 
 ---
 
-## 🧬 Perfil Biométrico y Antropométrico
-
-* **Nombre**: Verónica.
+## 🏋️‍♂️ Datos Base
+* **Nombre**: Aarón.
 * **Edad**: 43 años.
-* **Estatura**: 1,77 m.
-* **Peso**: 59 kg.
-* **Composición y Palanca**:
-  - Extremidades largas que proporcionan un amplio rango de movimiento articular y gran palanca biomecánica.
-  - Físico atlético, esbelto y tonificado con alta reactividad neuromuscular.
-* **Localización de Entrenamiento**:
-  - Alcàsser (Valencia) — Entornos de llanos agrícolas y pistas compactadas de tierra de la huerta valenciana.
-  - El terreno llano favorece cadencias estables en carrera y minimiza impactos excéntricos descontrolados.
+* **Estatura**: 1,83 m.
+* **Peso**: 93 kg.
+* **Equipamiento de Fuerza**: Mancuernas de 5 kg y cintas elásticas de resistencia.
+* **Fuentes de Telemetría**: Garmin Connect (`garminconnect`) y Strava.
 
 ---
 
-## 📈 Ciclo Semanal de Carga y Asimilación
-
-1. **Volumen Óptimo Objetivo**:
-   - 4 sesiones principales por semana (equilibrio: 2-3 Fuerza Full-Body, 1-2 Carrera, 1 Yoga/Flexibilidad).
-2. **Ventana de Supercompensación**:
-   - 24 a 48 horas de reposo relativo entre estímulos intensos de la misma naturaleza.
-   - Alternancia obligatoria: Tras Fuerza exigente, la siguiente sesión recomendada es Carrera suave en Zona 2 o Yoga de descompresión.
-3. **Métricas de Adherencia**:
-   - El *Readiness Score* pondera un 40% la adherencia semanal, 40% la recuperación/fatiga y 20% la variedad de estímulos.
+## ⚙️ Criterios de Prescripción Inteligente
+1. **Protección Articular en Carrera (1,83 m / 93 kg)**:
+   - Priorizar base aeróbica en Zona 2 y limitar las sesiones de intensidad/intervalos (estilo Runna) a un máximo de 1-2 por semana según HRV y Body Battery.
+2. **Fuerza con Carga Controlada (Sistema Strava Strength)**:
+   - Al trabajar con mancuernas de 5 kg y cintas elásticas, maximizar el estímulo mediante tempo controlado (3s excéntrica), rango de 15-22 repeticiones, superseries y control estricto de descansos.
+3. **Decisiones Dinámicas**:
+   - El Coach IA analiza los últimos entrenamientos reales registrados en Garmin Connect para decidir cada día entre Fuerza, Carrera, Yoga/Movilidad o Descanso.

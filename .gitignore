@@ -6,6 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+.garmin_tokens/
+*.garth
 
 # Python
 .venv/

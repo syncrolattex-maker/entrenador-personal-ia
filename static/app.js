@@ -174,6 +174,7 @@ const CIRCUMFERENCE = 2 * Math.PI * 54; // r=54
 // ============================================================
 document.addEventListener("DOMContentLoaded", () => {
   initApp();
+  checkGarminStatus();
 
   // Selection events
   elBtnSelectFuerza.addEventListener("click", () => iniciarGeneracionEntrenamiento("Fuerza"));
@@ -241,7 +242,7 @@ async function initApp() {
   if (elRecommendationBox) {
     elRecommendationBox.classList.add("loading-pulse");
     if (elRecTipoLabel) elRecTipoLabel.textContent = "...";
-    if (elRecRazonText) elRecRazonText.textContent = "Analizando tu actividad con la Coach Verónica...";
+    if (elRecRazonText) elRecRazonText.textContent = "Analizando tu historial con tu Coach IA...";
     if (elPercent) elPercent.innerHTML = `--<small>%</small>`;
     if (elRingArc) elRingArc.style.strokeDashoffset = 364; // empty ring while analyzing
     if (elBtnComenzarHoy) elBtnComenzarHoy.style.display = "none";
@@ -336,7 +337,7 @@ async function initApp() {
       let offRec = (day === 0) ? "Yoga" : (day % 2 === 0) ? "Carrera" : "Fuerza";
       renderRecommendation({
         recomendacion: offRec,
-        razon: `¡Hola Verónica! Te recomendamos para hoy una sesión de ${offRec}.`,
+        razon: `¡Hola Aarón! Te recomendamos para hoy una sesión de ${offRec}.`,
         explicacion_semanal: "Planificación activa."
       });
     }
@@ -351,12 +352,12 @@ async function initApp() {
       offlineRazon = "Hoy domingo te prescribimos una sesión de Yoga y estiramientos guiados para recuperar movilidad.";
     } else if (day === 2 || day === 4 || day === 6) {
       offlineRec = "Carrera";
-      offlineRazon = "Hoy te recomendamos una sesión de Carrera Aeróbica continua en Zona 2 por Alcàsser.";
+      offlineRazon = "Hoy te recomendamos una sesión de Carrera Aeróbica continua en Zona 2.";
     }
 
     renderRecommendation({
       recomendacion: offlineRec,
-      razon: `¡Hola Verónica! ${offlineRazon}`,
+      razon: `¡Hola Aarón! ${offlineRazon}`,
       explicacion_semanal: "Sesión adaptada."
     });
 
@@ -594,7 +595,7 @@ function renderRecommendation(rec) {
   if (lastRecDate !== todayStr || chatHistory.length === 0) {
     chatHistory.push({
       role: "model",
-      parts: `¡Hola Verónica! He analizado tu historial de entrenamientos en tu reloj. Para hoy te recomiendo una sesión de **${rec.recomendacion}**.\n\n${rec.razon}\n\n¿Quieres que adaptemos algo de los ejercicios o estás lista para empezar?`
+      parts: `¡Hola Aarón! He analizado tu historial de entrenamientos en tu reloj. Para hoy te recomiendo una sesión de **${rec.recomendacion}**.\n\n${rec.razon}\n\n¿Quieres que adaptemos algo de los ejercicios o estás listo para empezar?`
     });
     localStorage.setItem("last_rec_chat_date", todayStr);
     saveChat();
@@ -1871,7 +1872,7 @@ function showSuccessBanner(completado, synced = false) {
 function hideSuccessBanner() { elSuccessBanner.style.display = "none"; }
 
 // ============================================================
-// COACH CHAT LOGIC (VERÓNICA CHAT)
+// COACH CHAT LOGIC (AARÓN COACH CHAT)
 // ============================================================
 function renderChatMessages() {
   elChatMessages.innerHTML = "";
@@ -1946,10 +1947,10 @@ async function enviarMensajeChat() {
         localStorage.setItem("cached_workout_date", new Date().toDateString());
         
         renderWorkout(state.currentWorkout);
-        showSuccessBanner("✨ Tu Coach Verónica ha adaptado tu entrenamiento de hoy.");
+        showSuccessBanner("✨ Tu Coach IA ha adaptado tu entrenamiento de hoy.");
       }
     } else {
-      chatHistory.push({ role: "model", parts: "Disculpa Verónica, he tenido un problema al procesar tu mensaje. ¿Puedes repetirlo?" });
+      chatHistory.push({ role: "model", parts: "Disculpa Aarón, he tenido un problema al procesar tu mensaje. ¿Puedes repetirlo?" });
       renderChatMessages();
       saveChat();
     }
@@ -1958,7 +1959,7 @@ async function enviarMensajeChat() {
     const existingIndicator = document.getElementById("chat-typing-indicator");
     if (existingIndicator) existingIndicator.remove();
     
-    chatHistory.push({ role: "model", parts: "Verónica, parece que hay un problema de conexión a internet. ¿Lo intentamos de nuevo?" });
+    chatHistory.push({ role: "model", parts: "Aarón, parece que hay un problema de conexión a internet. ¿Lo intentamos de nuevo?" });
     renderChatMessages();
     saveChat();
   }
@@ -2482,6 +2483,126 @@ function closeExerciseVideoModal() {
   if (modal) modal.style.display = "none";
   const videoEl = document.getElementById("modal-exercise-video");
   if (videoEl) { videoEl.pause(); videoEl.src = ""; }
+}
+
+// ============================================================
+// GARMIN CONNECT DIRECT SYNC UI
+// ============================================================
+async function checkGarminStatus() {
+  try {
+    const res = await fetch("/api/garmin/status");
+    if (!res.ok) return;
+    const data = await res.json();
+    updateGarminUI(data.connected, data.profile);
+  } catch (e) {
+    console.warn("Garmin status check failed:", e);
+  }
+}
+
+function updateGarminUI(connected, profile) {
+  const badge = document.getElementById("garmin-status-badge");
+  const loginForm = document.getElementById("garmin-login-form");
+  const connectedPanel = document.getElementById("garmin-connected-panel");
+  const summaryText = document.getElementById("garmin-summary-text");
+
+  if (!badge || !loginForm || !connectedPanel) return;
+
+  if (connected) {
+    badge.textContent = "Conectado";
+    badge.style.background = "rgba(0, 174, 239, 0.18)";
+    badge.style.color = "#00AEEF";
+    loginForm.style.display = "none";
+    connectedPanel.style.display = "flex";
+    if (profile && profile.nombre && summaryText) {
+      const vo2 = profile.vo2max_carrera ? ` • VO2 Máx: ${profile.vo2max_carrera}` : "";
+      const peso = profile.peso_kg ? ` • Peso Garmin: ${profile.peso_kg} kg` : "";
+      summaryText.textContent = `Vinculado como ${profile.nombre}${peso}${vo2}. Tus entrenamientos y sueño se analizan automáticamente.`;
+    }
+  } else {
+    badge.textContent = "Desconectado";
+    badge.style.background = "rgba(255, 255, 255, 0.08)";
+    badge.style.color = "var(--text-secondary)";
+    loginForm.style.display = "flex";
+    connectedPanel.style.display = "none";
+  }
+}
+
+async function connectGarminAccount() {
+  const emailEl = document.getElementById("garmin-email-input");
+  const passEl = document.getElementById("garmin-password-input");
+  const btn = document.getElementById("btn-garmin-login");
+  const mfaBox = document.getElementById("garmin-mfa-box");
+  if (!emailEl || !passEl) return;
+
+  const email = emailEl.value.trim();
+  const password = passEl.value;
+  if (!email || !password) {
+    showSuccessBanner("⚠️ Introduce tu email y contraseña de Garmin Connect.");
+    return;
+  }
+
+  if (btn) btn.textContent = "Conectando...";
+  try {
+    const res = await fetch("/api/garmin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (data.status === "needs_mfa") {
+      if (mfaBox) mfaBox.style.display = "flex";
+      showSuccessBanner("🔐 Garmin requiere código 2FA. Introdúcelo debajo.");
+    } else if (data.status === "connected") {
+      showSuccessBanner("✅ ¡Garmin Connect vinculado correctamente!");
+      await checkGarminStatus();
+      await initApp();
+    } else {
+      showSuccessBanner(`⚠️ ${data.message || "Error al conectar con Garmin."}`);
+    }
+  } catch (e) {
+    showSuccessBanner("⚠️ Error de red conectando con Garmin.");
+  } finally {
+    if (btn) btn.textContent = "Conectar Garmin Connect";
+  }
+}
+
+async function submitGarminMfa() {
+  const mfaEl = document.getElementById("garmin-mfa-input");
+  if (!mfaEl || !mfaEl.value.trim()) return;
+
+  try {
+    const res = await fetch("/api/garmin/mfa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: mfaEl.value.trim() })
+    });
+    const data = await res.json();
+    if (data.status === "connected") {
+      showSuccessBanner("✅ ¡Garmin Connect verificado y vinculado!");
+      await checkGarminStatus();
+      await initApp();
+    } else {
+      showSuccessBanner(`⚠️ ${data.message || "Código 2FA inválido."}`);
+    }
+  } catch (e) {
+    showSuccessBanner("⚠️ Error verificando el código 2FA.");
+  }
+}
+
+async function syncGarminNow() {
+  try {
+    showSuccessBanner("🔄 Sincronizando actividades y telemetría de Garmin...");
+    const res = await fetch("/api/garmin/sync");
+    if (!res.ok) {
+      showSuccessBanner("⚠️ No se pudo sincronizar con Garmin.");
+      return;
+    }
+    const data = await res.json();
+    showSuccessBanner(`✅ Sincronizadas ${data.activities_count} actividades de Garmin Connect.`);
+    await initApp();
+  } catch (e) {
+    showSuccessBanner("⚠️ Error de conexión al sincronizar Garmin.");
+  }
 }
 
 

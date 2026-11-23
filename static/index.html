@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Verofit — Entrenador Personal IA</title>
+  <title>AaronFit — Entrenador Personal IA</title>
   
   <!-- PWA Metadata -->
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#F8FAFC">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Verofit">
+  <meta name="apple-mobile-web-app-title" content="AaronFit">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
   
@@ -32,14 +32,14 @@
         <div class="user-avatar-small">
           <span>⚡</span>
         </div>
-        <span class="app-brand-name">VEROFIT</span>
+        <span class="app-brand-name">AARONFIT</span>
         <span class="version-tag">v26</span>
       </div>
 
       <div class="topbar-right">
         <div class="athlete-pill">
           <span class="athlete-dot"></span>
-          <span class="label-caps" style="color: var(--on-surface);">VERÓNICA</span>
+          <span class="label-caps" style="color: var(--on-surface);">AARÓN</span>
         </div>
       </div>
     </header>
@@ -54,8 +54,8 @@
         
         <div class="greeting-header">
           <span class="label-caps">DASHBOARD</span>
-          <h1 class="greeting-title">Hola, Verónica</h1>
-          <p class="body-sm-muted">43 años • 1.77 m • 59 kg • Alcàsser (Valencia)</p>
+          <h1 class="greeting-title">Hola, Aarón</h1>
+          <p class="body-sm-muted">43 años • 1,83 m • 93 kg • Pesas 5 kg & Cintas</p>
         </div>
 
         <!-- Offline Banner -->
@@ -225,7 +225,7 @@
       <section id="tab-metrics" class="tab-view">
         <div class="greeting-header">
           <span class="label-caps">RENDIMIENTO REAL • INTERVALS.ICU</span>
-          <h1 class="greeting-title">Historial de Verónica</h1>
+          <h1 class="greeting-title">Historial de Aarón</h1>
           <p class="body-sm-muted">Actividades reales registradas por tu Apple Watch / Reloj</p>
         </div>
 
@@ -285,7 +285,7 @@
       <section id="tab-chat" class="tab-view">
         <div class="greeting-header">
           <span class="label-caps">INTELLIGENT COACHING</span>
-          <h1 class="greeting-title">Coach Verónica</h1>
+          <h1 class="greeting-title">Coach IA de Aarón</h1>
         </div>
 
         <div id="coach-chat-card" class="glass-card coach-chat-card-full">
@@ -295,7 +295,7 @@
               <span class="coach-status-dot"></span>
             </div>
             <div class="coach-info">
-              <h3 class="headline-sm">Coach Verónica IA</h3>
+              <h3 class="headline-sm">Coach Personal IA</h3>
               <span class="label-caps" style="color: var(--primary);">ACTIVA • RECONFIGURACIÓN EN TIEMPO REAL</span>
             </div>
           </div>
@@ -326,27 +326,57 @@
       <section id="tab-profile" class="tab-view">
         <div class="glass-card profile-header-card">
           <div class="profile-avatar-large">
-            <div class="avatar-img-circle">🏃‍♀️</div>
+            <div class="avatar-img-circle">🏋️‍♂️</div>
             <span class="level-badge">ATLETA</span>
           </div>
 
-          <h2 class="headline-md" style="font-size: 1.8rem; font-weight: 800; margin-top: 6px;">VERÓNICA</h2>
-          <p class="body-md-muted">Atleta de Alto Rendimiento • Alcàsser, Valencia</p>
-          <p class="label-caps" style="color: var(--text-muted); margin-top: 2px;">43 AÑOS • 1.77 M • 59 KG (CUERPO ATLÉTICO)</p>
+          <h2 class="headline-md" style="font-size: 1.8rem; font-weight: 800; margin-top: 6px;">AARÓN</h2>
+          <p class="body-md-muted">Entrenamiento Personalizado • Garmin & Strava</p>
+          <p class="label-caps" style="color: var(--text-muted); margin-top: 2px;">43 AÑOS • 1,83 M • 93 KG • PESAS 5 KG & CINTAS</p>
 
           <div class="profile-stats-grid">
             <div class="p-stat-box">
-              <span class="label-caps">RACHA</span>
-              <span class="p-stat-val lime">14 DÍAS</span>
+              <span class="label-caps">ESTATURA</span>
+              <span class="p-stat-val lime">1,83 M</span>
             </div>
             <div class="p-stat-box">
-              <span class="label-caps">PUNTOS</span>
-              <span class="p-stat-val lime">12.4K</span>
+              <span class="label-caps">PESO</span>
+              <span class="p-stat-val lime">93 KG</span>
             </div>
             <div class="p-stat-box">
-              <span class="label-caps">NIVEL</span>
-              <span class="p-stat-val lime">TOP 3%</span>
+              <span class="label-caps">EDAD</span>
+              <span class="p-stat-val lime">43 AÑOS</span>
             </div>
+          </div>
+        </div>
+
+        <!-- Garmin Connect Direct Integration Card -->
+        <div class="glass-card" id="garmin-connect-card" style="margin-bottom: 16px; border: 1px solid rgba(0, 174, 239, 0.3);">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+            <div>
+              <span class="label-caps" style="color:#00AEEF;">SINCRONIZACIÓN GARMIN CONNECT</span>
+              <h3 class="headline-sm" style="margin-top:2px;">Historial y Telemetría Real</h3>
+            </div>
+            <span id="garmin-status-badge" class="label-caps" style="padding:4px 10px; border-radius:999px; background:rgba(255,255,255,0.08); color:var(--text-secondary);">Desconectado</span>
+          </div>
+
+          <div id="garmin-login-form" style="display:flex; flex-direction:column; gap:10px;">
+            <input type="email" id="garmin-email-input" placeholder="Email de Garmin Connect" style="width:100%; padding:10px 12px; border-radius:8px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.12); color:#FFF;">
+            <input type="password" id="garmin-password-input" placeholder="Contraseña de Garmin Connect" style="width:100%; padding:10px 12px; border-radius:8px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.12); color:#FFF;">
+            <div id="garmin-mfa-box" style="display:none; flex-direction:column; gap:8px;">
+              <input type="text" id="garmin-mfa-input" placeholder="Código 2FA / MFA de Garmin" style="width:100%; padding:10px 12px; border-radius:8px; background:rgba(0,174,239,0.12); border:1px solid #00AEEF; color:#FFF;">
+              <button type="button" class="btn btn-primary" onclick="submitGarminMfa()">Verificar Código 2FA</button>
+            </div>
+            <button type="button" id="btn-garmin-login" class="btn btn-primary" style="background:#00AEEF; color:#000; border:none;" onclick="connectGarminAccount()">
+              Conectar Garmin Connect
+            </button>
+          </div>
+
+          <div id="garmin-connected-panel" style="display:none; flex-direction:column; gap:10px;">
+            <p id="garmin-summary-text" class="body-sm-muted">Garmin Connect conectado. Tus sesiones, HRV, Body Battery y sueño se analizan automáticamente.</p>
+            <button type="button" class="btn btn-ghost" style="border:1px solid rgba(0,174,239,0.35); color:#00AEEF;" onclick="syncGarminNow()">
+              🔄 Sincronizar Garmin Ahora
+            </button>
           </div>
         </div>
 

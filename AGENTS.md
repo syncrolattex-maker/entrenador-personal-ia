@@ -1,73 +1,44 @@
-# Verofit — Reglas y Visión del Proyecto (Estilo Garmin Connect)
+# AaronFit — Reglas y Visión del Proyecto (Entrenador Personal IA + Garmin & Strava)
 
-Este archivo define las reglas de comportamiento, la visión del producto y las especificaciones atléticas exclusivas de **Verofit** para guiar futuras actualizaciones.
+Este archivo define las reglas de comportamiento, la visión del producto y las especificaciones atléticas exclusivas de **AaronFit** para guiar futuras actualizaciones.
 
 ---
 
 ## 🎯 1. Visión del Producto
 
-**Verofit** pretende ser una versión ultra-personalizada y exclusiva de **Garmin Connect** diseñada a medida de una única atleta. Combina diagnóstico fisiológico avanzado, planificación de volumen semanal inteligente, reproducción de entrenamientos asistidos y sincronización con Apple Watch.
+**AaronFit** es una plataforma ultra-personalizada de entrenamiento personal y diagnóstico fisiológico diseñada a medida para **Aarón**. Analiza en tiempo real su historial real de **Garmin Connect** y **Strava**, integra métricas de recuperación (HRV, Body Battery, sueño, FC en reposo y carga semanal) y ejecuta sesiones guiadas con el **sistema de fuerza estilo Strava** y **sistema de carrera estilo Runna**.
 
 ---
 
-## 👩‍🔬 2. Perfil de la Atleta
+## 🏋️‍♂️ 2. Perfil del Atleta
 
-* **Nombre**: Verónica.
+* **Nombre**: Aarón.
 * **Edad**: 43 años.
-* **Estatura**: 1,77 m.
-* **Peso**: 59 kg.
-* **Perfil Antropométrico**: Extremidades largas, excelente palanca, cuerpo atlético y tonificado.
-* **Ubicación**: Alcàsser (Valencia) — Entrena en llanos agrícolas y pistas de tierra de la huerta.
-* **Equipamiento Disponible**: Mancuernas de 5 kg y bandas/cintas elásticas de resistencia.
+* **Estatura**: 1,83 m.
+* **Peso**: 93 kg.
+* **Equipamiento Disponible**: Mancuernas de 5 kg y cintas/bandas elásticas de resistencia.
+* **Fuentes de Datos Reales**: Garmin Connect (`garminconnect` directo) y Strava.
 
 ---
 
 ## 🛡️ 3. Directrices Deportivas y Fisiológicas Obligatorias
 
-1. **Planificación de Fuerza (Cuerpo Completo - Full Body)**:
-   * Las sesiones deben ser intensas, de 45-60 minutos de duración.
-   * Deben combinar empujes, tracciones y tren inferior, con un rango de 15 a 22 repeticiones (dado el límite de 5 kg del equipamiento).
-   * Se debe garantizar la **diversificación de rutinas** entre sesiones consecutivas para evitar monotonía.
+1. **Toma de Decisiones Basada en Historial Real (Garmin & Strava)**:
+   * Antes de prescribir la sesión del día, el motor y el Coach IA deben analizar los últimos entrenamientos reales registrados en Garmin Connect (tipo de sesión, duración, FC media/máx, ritmos, carga aeróbica y días de descanso).
+   * Integrar métricas diarias de Garmin (*Body Battery, HRV, sueño, FC en reposo y Training Readiness*) para modular automáticamente la intensidad.
 
-2. **Planificación de Carrera (Variada y Controlada)**:
-   * **Prevención de Lesiones**: Se permite **máximo una (1) sesión de calidad a la semana** (Fartlek, Series o Intervalos rápidos).
-   * **Rodajes de Zona 2**: Las demás sesiones de carrera semanales deben ser obligatoriamente de rodaje aeróbico suave continuo (35-45 minutos) a ritmo conversacional.
-   * **Adaptación Automática**: Si Verónica reporta cansancio *"Agotador"* o fatiga, las sesiones de calidad se reconvierten automáticamente en rodajes de recuperación suave.
-   * **Variedad Estructurada**: Los entrenamientos deben ser variados e incluir Fartleks en pirámide, rodamientos progresivos, progresiones rápidas finales e intervalos de VO2 máx.
+2. **Planificación de Fuerza (Sistema Strava Strength)**:
+   * Sesiones Full Body o divididas según fatiga previa, de 40-55 minutos de duración.
+   * Adaptadas al equipamiento real (**mancuernas de 5 kg y cintas elásticas**): énfasis en tiempo bajo tensión (tempo controlado), rango de 15 a 22 repeticiones, superseries y control estricto de descansos.
+   * Ejecución mediante el **Logger de Series Strava**: registro real de peso (kg) y reps por serie, volumen total acumulado ($\text{kg} \times \text{reps}$), descansos ajustables (`±15s`) y mapa anatómico de activación muscular.
 
-3. **Yoga y Flexibilidad**:
-   * Sesiones guiadas de 20-30 minutos que utilicen únicamente posturas presentes en la base de datos `alexcumplido/yoga-api` para garantizar que sus dibujos vectoriales (SVG) carguen correctamente.
-   * Mostrar los dibujos sobre un lienzo claro de alto contraste para que los trazos negros del SVG sean perfectamente legibles en el tema oscuro.
+3. **Planificación de Carrera (Sistema Runna Running)**:
+   * Prescripción inteligente basada en el historial reciente de ritmos y FC en Garmin.
+   * **Prevención de Lesiones (93 kg / 43 años)**: Máximo 1-2 sesiones de calidad/intervalos a la semana; el resto rodajes aeróbicos controlados en Zona 2 para proteger articulaciones y construir base aeróbica.
+   * Ejecución guiada estilo **Runna**: timeline de fases, medidor de zonas de ritmo objetivo, avatar dinámico de cadencia y audio-coach por voz.
 
-4. **Estado Fisiológico / Readiness Score (Dashboard)**:
-   * Calcular dinámicamente el "Estado Óptimo" (de 20% a 100%) basándose en:
-     * **Adherencia Semanal (40%)**: Ratio de sesiones completadas frente al objetivo de 4 sesiones semanales.
-     * **Recuperación y Fatiga (40%)**: Ventana de días de reposo (1 día es óptimo) ajustado por fatiga subjetiva previa.
-     * **Variedad de Estímulo (20%)**: Alternancia correcta de disciplinas (Fuerza, Carrera, Yoga).
+4. **Yoga y Movilidad Regenerativa**:
+   * Sesiones de 20-25 minutos cuando se detecta fatiga acumulada o esfuerzo previo *"Agotador"*, usando posturas de `alexcumplido/yoga-api`.
 
-5. **Sincronización Tecnológica**:
-   * Sincronizar entrenamientos estructurados con Intervals.icu ➔ Watchletic en el Apple Watch.
-
----
-
-## ⚡ 4. Operativa Diaria con la LLM Wiki viva en Antigravity
-
-1. **Cuando añadas un log o feedback de sesión**:
-   * Pega el feedback o guarda el JSON exportado en `/raw/sessions/` (ej: `/raw/sessions/2026-09-17_entreno.json`) y ejecuta en el chat:
-     ```text
-     /ingest-session raw/sessions/2026-09-17_entreno.json
-     ```
-   * Antigravity creará el plan, mostrará los diffs en los archivos Markdown afectados (por ejemplo, actualizando recomendaciones de descarga o molestias articulares) y solo tendrás que aceptar los cambios.
-
-2. **Para planificar o programar en la app**:
-   * Consulta directa de alta fidelidad:
-     ```text
-     /query-wiki ¿Qué estrategia de series y descansos nos ha funcionado mejor cuando reporta fatiga por ciclo menstrual?
-     ```
-
-3. **Mantenimiento mensual**:
-   * Saneamiento y coherencia del árbol de notas:
-     ```text
-     /lint-wiki
-     ```
-   * Audita enlaces rotos `[[...]]`, contradicciones y dependencias conceptuales.
+5. **Estado Fisiológico / Readiness Score (Dashboard)**:
+   * Calcular dinámicamente el "Estado Óptimo" (20% a 100%) combinando adherencia semanal, recuperación/descanso, variedad de estímulos y telemetría de Garmin Connect.

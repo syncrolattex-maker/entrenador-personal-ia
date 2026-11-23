@@ -10,6 +10,7 @@ import requests
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+import garmin_client
 
 load_dotenv()
 
@@ -165,9 +166,30 @@ class GeminiChatResponse(BaseModel):
 
 async def get_intervals_history() -> List[dict]:
     """
-    Fetches the last 14 days of real activities from Intervals.icu API.
-    Used by Gemini to decide and adapt the workout of the day.
+    Fetches the last 14-30 days of real activities from Garmin Connect (if connected)
+    or Intervals.icu API. Used by Gemini to decide and adapt the workout of the day.
     """
+    if garmin_client.is_garmin_connected():
+        garmin_acts = garmin_client.get_garmin_history(limit=30)
+        if garmin_acts:
+            return [
+                {
+                    "tipo": a["tipo"],
+                    "raw_tipo": a.get("tipo_garmin", a["tipo"]),
+                    "nombre": a["nombre"],
+                    "fecha": a["fecha"],
+                    "duracion_minutos": float(a.get("duracion_min") or 0),
+                    "frecuencia_cardiaca_media": a.get("frecuencia_cardiaca_media"),
+                    "frecuencia_cardiaca_max": a.get("frecuencia_cardiaca_max"),
+                    "calorias_activas": a.get("calorias"),
+                    "distancia_km": a.get("distancia_km"),
+                    "ritmo_medio": a.get("ritmo_medio"),
+                    "efecto_aerobico": a.get("efecto_aerobico"),
+                    "fuente": "Garmin Connect",
+                }
+                for a in garmin_acts
+            ]
+
     api_key = os.getenv("INTERVALS_API_KEY")
     athlete_id = os.getenv("INTERVALS_ATHLETE_ID", "").strip()
     
@@ -376,7 +398,7 @@ def get_wiki_context() -> str:
     if not context_parts:
         return ""
 
-    return "=== BASE DE CONOCIMIENTO VIVA DE VERÓNICA (LLM WIKI) ===\n" + "\n\n".join(context_parts)
+    return "=== BASE DE CONOCIMIENTO VIVA DE AARÓN (LLM WIKI) ===\n" + "\n\n".join(context_parts)
 
 
 
@@ -495,7 +517,7 @@ async def _edb_fetch_exercise_detail(exercise_id: str) -> dict:
 async def _edb_search_exercise(nombre: str) -> dict:
     """
     Searches ExerciseDB for a strength exercise matching the given name.
-    Prioritizes DUMBBELL and BODY WEIGHT equipment (Verónica's gear).
+    Prioritizes DUMBBELL and BODY WEIGHT equipment (Aarón's gear: 5 kg dumbbells & bands).
     Returns a dict with: exercise_id, gif_url, video_url, target_muscle,
     secondary_muscles, instructions, tips.
     """
@@ -611,7 +633,7 @@ async def generar_rutina_mock(tipo: str, mensaje_warning: str = None, modo_resca
     if modo_rescate:
         explicacion = (
             "🔋 Modo Rescate (Día Gris): Sesión ultra-suave de movilidad y relajación de 10 minutos. "
-            "Hoy lo único importante es mantener el hábito sin ninguna exigencia ni culpa. ¡Orgullosas de ti, Verónica!\n\n"
+            "Hoy lo único importante es mantener el hábito sin ninguna exigencia ni culpa. ¡Buen trabajo, Aarón!\n\n"
             "🥗 Consejo de nutrición post-entreno: Una infusión tibia de manzanilla o té verde junto con 1/2 tostada integral con aguacate o mantequilla de almendras (opción vegetal muy ligera de ~150 kcal) para reponer minerales y calmar el sistema nervioso."
         )
         ejercicios = [
@@ -633,7 +655,7 @@ async def generar_rutina_mock(tipo: str, mensaje_warning: str = None, modo_resca
         if last_workout.get("esfuerzo_subjetivo") == "agotador" or (last_workout.get("frecuencia_cardiaca_media") or 0) > 170:
             is_fatigued = True
 
-    explicacion = f"Sesión de {tipo} diseñada con periodización variada y retadora para Verónica."
+    explicacion = f"Sesión de {tipo} diseñada con periodización variada y retadora para Aarón."
     
     if tipo == "Fuerza":
         # 4 Diverse Full-Body Templates to guarantee complete daily variety
@@ -807,15 +829,15 @@ async def registrar_en_intervals(payload: ActividadCompletadaPayload) -> bool:
 
     if payload.tipo == "Fuerza":
         activity_type = "WeightTraining"
-        name = "💪 Fuerza — Verofit AI"
+        name = "💪 Fuerza — AaronFit AI"
     elif payload.tipo == "Yoga":
         activity_type = "Yoga"
-        name = "🧘‍♀️ Yoga — Verofit AI"
+        name = "🧘‍♂️ Yoga — AaronFit AI"
     else:
         activity_type = "Run"
-        name = "🏃 Carrera — Verofit AI"
+        name = "🏃 Carrera — AaronFit AI"
 
-    description_lines = ["Sesión generada y guiada por Verofit — Entrenador Personal IA."]
+    description_lines = ["Sesión generada y guiada por AaronFit — Entrenador Personal IA."]
 
 
     if payload.esfuerzo_subjetivo:
@@ -1386,7 +1408,7 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict, wko5_data:
     ctl_val = wko5_data.get("ctl_fitness", 0.0)
     atl_val = wko5_data.get("atl_fatiga", 0.0)
 
-    # ── Intelligent Decision Tree for Verónica (43a, 1.77m, 59kg, Alcàsser) ──
+    # ── Intelligent Decision Tree for Aarón (43a, 1.83m, 93kg) ──
     rec_tipo = "Fuerza"
     razon = ""
     explicacion_semanal = f"Esta semana (Lunes-Domingo): {fuerza_count_7d}/3 Fuerza • {carrera_count_7d}/2 Carrera • {yoga_count_7d} Yoga."
@@ -1394,58 +1416,58 @@ async def generar_analisis_plan_b(real_history: List[dict], db: dict, wko5_data:
     # WKO5 High Fatigue Rule Override (TSB < -15)
     if tsb_val < -15.0 and days_inactive <= 1:
         rec_tipo = "Yoga"
-        razon = f"¡Hola Verónica! Según la telemetría WKO5 (TSB = {tsb_val}, Fatiga ATL = {atl_val}), tus reservas de recuperación están comprometidas. Forzamos una sesión regenerativa de Yoga y Flexibilidad para proteger tus articulaciones."
+        razon = f"¡Hola Aarón! Según la telemetría (TSB = {tsb_val}, Fatiga ATL = {atl_val}), tus reservas de recuperación están comprometidas. Forzamos una sesión regenerativa de Yoga y Movilidad para proteger tus articulaciones."
 
     # CASE 1: Trained TODAY (days_inactive == 0)
     elif days_inactive == 0:
         rec_tipo = "Descanso"
         if last_type == "Carrera":
-            razon = "¡Objetivo cumplido hoy, Verónica! Ya has completado tu entrenamiento de Carrera. Para evitar sobrecargas articulares y asimilar el estímulo, el resto del día es de reposo y asimilación. Si te apetece soltar piernas, puedes hacer un Yoga suave opcional."
+            razon = "¡Objetivo cumplido hoy, Aarón! Ya has completado tu entrenamiento de Carrera. Para evitar sobrecargas articulares y asimilar el estímulo, el resto del día es de reposo y asimilación. Si te apetece soltar piernas, puedes hacer un Yoga suave opcional."
         elif last_type == "Fuerza":
-            razon = "¡Excelente sesión hoy, Verónica! Tu bloque de Fuerza Full-Body ya está completado. Toca reposo y nutrición para que la musculatura repare y supercompense."
+            razon = "¡Excelente sesión hoy, Aarón! Tu bloque de Fuerza ya está completado. Toca reposo y nutrición para que la musculatura repare y supercompense."
         else:
-            razon = "¡Sesión de Yoga completada hoy, Verónica! Tu cuerpo está en un estado óptimo de regeneración física y mental. Disfruta del reposo."
+            razon = "¡Sesión de Yoga completada hoy, Aarón! Tu cuerpo está en un estado óptimo de regeneración física y mental. Disfruta del reposo."
 
     # CASE 2: High Subjective Fatigue or High HR from last workout
     elif last_effort == "agotador" or (last_hr > 170 and days_inactive <= 1):
         rec_tipo = "Yoga"
-        razon = "¡Hola Verónica! Detectamos que tu última sesión requirió un esfuerzo agotador. Para evitar sobrecargas articulares y favorecer la supercompensación muscular, hoy Verofit te prescribe una sesión de Yoga y Flexibilidad."
+        razon = "¡Hola Aarón! Detectamos que tu última sesión requirió un esfuerzo muy exigente. Para evitar sobrecargas articulares y favorecer la supercompensación muscular, hoy te prescribo una sesión de Yoga y Movilidad."
 
     # CASE 3: Trained YESTERDAY (days_inactive == 1)
     elif days_inactive == 1:
         if last_type == "Fuerza":
             rec_tipo = "Carrera"
-            razon = "¡Hola Verónica! Tras el bloque de Fuerza Full-Body de ayer, hoy alternamos con Carrera Aeróbica continua en Zona 2 (35-45 min a ritmo conversacional) para oxigenar la musculatura."
+            razon = "¡Hola Aarón! Tras el bloque de Fuerza de ayer, hoy alternamos con Carrera estilo Runna (Zona 2 o intervalos controlados según tu historial) para potenciar tu base aeróbica."
         elif last_type == "Carrera":
             rec_tipo = "Fuerza"
-            razon = "¡Hola Verónica! Tras la sesión de Carrera de ayer, hoy cambiamos el estímulo hacia Fuerza Full-Body con mancuernas de 5kg y cintas para tonificar la densidad muscular."
+            razon = "¡Hola Aarón! Tras la sesión de Carrera de ayer, hoy cambiamos el estímulo hacia Fuerza estilo Strava con tus mancuernas de 5 kg y cintas elásticas para mantener densidad muscular y control articular."
         else: # Yoga yesterday
             if fuerza_count_7d <= carrera_count_7d:
                 rec_tipo = "Fuerza"
-                razon = "¡Hola Verónica! Tras tu descanso activo de ayer con Yoga, hoy volvemos a la carga con Fuerza Full-Body de 45 minutos."
+                razon = "¡Hola Aarón! Tras tu descarga activa de ayer con Yoga, hoy volvemos a la carga con Fuerza estilo Strava de 45 minutos."
             else:
                 rec_tipo = "Carrera"
-                razon = "¡Hola Verónica! Tras la sesión de Yoga de ayer, hoy prescribimos un bloque de Carrera Aeróbica suave en Zona 2 por la huerta de Alcàsser."
+                razon = "¡Hola Aarón! Tras la sesión de Yoga de ayer, hoy prescribimos un bloque de Carrera Aeróbica en Zona 2 guiado estilo Runna."
 
     # CASE 4: Inactive 2 or more days (days_inactive >= 2)
     else:
         if fuerza_count_7d < carrera_count_7d:
             rec_tipo = "Fuerza"
-            razon = f"¡Hola Verónica! Llevas {days_inactive} días de reposo y esta semana necesitas compensar la carga de Fuerza. Hoy te prescribimos un entrenamiento de Fuerza Full-Body (45-60 min)."
+            razon = f"¡Hola Aarón! Llevas {days_inactive} días de reposo y esta semana necesitas compensar la carga de Fuerza. Hoy te prescribimos un entrenamiento de Fuerza estilo Strava (45-55 min) con pesas de 5 kg y cintas."
         elif carrera_count_7d < fuerza_count_7d:
             rec_tipo = "Carrera"
-            razon = f"¡Hola Verónica! Llevas {days_inactive} días sin entrenar. Para reactivar tu sistema cardiovascular sin impacto excesivo, hoy Verofit te recomienda Carrera Aeróbica en Zona 2."
+            razon = f"¡Hola Aarón! Llevas {days_inactive} días sin entrenar. Para reactivar tu sistema cardiovascular sin impacto excesivo, hoy te recomiendo Carrera Aeróbica en Zona 2."
         else:
             # Counts are tied -> Day-of-Week Schedule Rotation!
             if weekday in [0, 2, 4]:  # Mon, Wed, Fri
                 rec_tipo = "Fuerza"
-                razon = f"¡Hola Verónica! Feliz {weekday_names[weekday]}. Para mantener la masa muscular y el tono físico, hoy te recomendamos una sesión de Fuerza Full-Body con pesas de 5kg y cintas."
+                razon = f"¡Hola Aarón! Feliz {weekday_names[weekday]}. Para mantener la masa muscular y el tono físico, hoy te recomendamos una sesión de Fuerza estilo Strava con pesas de 5 kg y cintas elásticas."
             elif weekday in [1, 3, 5]:  # Tue, Thu, Sat
                 rec_tipo = "Carrera"
-                razon = f"¡Hola Verónica! Feliz {weekday_names[weekday]}. Hoy toca trabajo cardiovascular: Carrera Aeróbica continua en Zona 2 (35-45 min) por Alcàsser."
+                razon = f"¡Hola Aarón! Feliz {weekday_names[weekday]}. Hoy toca trabajo cardiovascular: Carrera estructurada guiada estilo Runna."
             else:  # Sunday (6)
                 rec_tipo = "Yoga"
-                razon = "¡Hola Verónica! Es domingo, el día ideal para descargar tensiones articulares. Hoy te prescribimos una sesión guiada de Yoga y Flexibilidad de 25 minutos."
+                razon = "¡Hola Aarón! Es domingo, el día ideal para descargar tensiones articulares. Hoy te prescribimos una sesión guiada de Yoga y Movilidad de 25 minutos."
 
     # Calculate dynamic readiness/load score (0-100%) incorporating WKO5 TSB Form
     weekly_total = fuerza_count_7d + carrera_count_7d + yoga_count_7d
@@ -1529,8 +1551,8 @@ async def get_ejercicio_bodyparts():
 @app.get("/recomendacion-hoy")
 async def get_recomendacion_hoy():
     """
-    Generates today's personalized recommendation for Verónica (43, 1.77m, 59kg, Alcàsser)
-    evaluating her actual activity history from Intervals.icu via Gemini AI or Plan B engine.
+    Generates today's personalized recommendation for Aarón (43, 1.83m, 93kg)
+    evaluating his actual activity history from Garmin Connect / Intervals.icu via Gemini AI or Plan B engine.
     """
     global cached_recommendation_data
     from datetime import date, datetime
@@ -1545,6 +1567,7 @@ async def get_recomendacion_hoy():
         estado_atleta = await calcular_estado_atleta()
         rec_data = await generar_analisis_plan_b(real_history, db, wko5_data=wko5_data)
         wiki_context = get_wiki_context()
+        garmin_wellness = garmin_client.get_garmin_wellness() if garmin_client.is_garmin_connected() else {}
 
         # Try Gemini AI if API key is available
         api_key = os.getenv("GEMINI_API_KEY")
@@ -1555,18 +1578,19 @@ async def get_recomendacion_hoy():
                 weekday_str = weekday_names[datetime.now().weekday()]
                 
                 system_instruction = (
-                    "Eres la Coach IA de **Verofit**, entrenadora personal de **Verónica** (43 años, 1.77m, 59kg, Alcàsser).\n"
-                    "Tu misión es motivarla y explicarle la recomendación de hoy basándote en su estado fisiológico y en su base de conocimiento viva.\n"
+                    "Eres el Coach IA de **AaronFit**, entrenador personal de **Aarón** (43 años, 1.83m, 93kg, mancuernas de 5 kg y cintas elásticas).\n"
+                    "Tu misión es analizar sus últimos entrenamientos reales de Garmin/Strava y explicarle la recomendación de hoy basándote en su estado fisiológico.\n"
                     f"{wiki_context}\n\n"
-                    "TELEMETRÍA FISIOLÓGICA WKO5:\n"
+                    "TELEMETRÍA FISIOLÓGICA:\n"
                     f"- CTL (Fitness): {wko5_data.get('ctl_fitness')}\n"
                     f"- ATL (Fatiga): {wko5_data.get('atl_fatiga')}\n"
-                    f"- TSB (Forma): {wko5_data.get('tsb_forma')}\n\n"
+                    f"- TSB (Forma): {wko5_data.get('tsb_forma')}\n"
+                    f"- Garmin Wellness hoy: {json.dumps(garmin_wellness, ensure_ascii=False)}\n\n"
                     "REGLA DE COHERENCIA ATLÉTICA:\n"
-                    f"El motor de prescripción deportiva de Verofit ha determinado que hoy le corresponde: '{rec_data['recomendacion']}'.\n"
+                    f"El motor de prescripción deportiva ha determinado que hoy le corresponde: '{rec_data['recomendacion']}'.\n"
                     f"Razón técnica: {rec_data['razon']}.\n"
                     "Mantén dicha disciplina ('recomendacion': '" + rec_data['recomendacion'] + "') para evitar contradicciones o cambios erráticos entre refrescos, "
-                    "y redacta una razón ('razon') motivadora, fresca, comprensiva y profesional, dirigida a Verónica.\n"
+                    "y redacta una razón ('razon') motivadora, técnica y profesional, dirigida a Aarón.\n"
                     "Devuelve también 'explicacion_semanal' resumiendo el volumen semanal."
                 )
                 
@@ -1608,7 +1632,7 @@ async def get_recomendacion_hoy():
 async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
     """
     Generates a detailed workout routine (exercises for Strength, or phases for Running)
-    adapted in volume and intensity based on the Intervals.icu history, WKO5 metrics, or modo_rescate for Verónica.
+    adapted in volume and intensity based on Garmin/Strava history, WKO5 metrics, or modo_rescate for Aarón.
     """
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
@@ -1626,36 +1650,36 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
         tsb_val = wko5_data.get("tsb_forma", 0.0)
 
         system_instruction = (
-            "Eres la Coach IA de **Verofit**, la aplicación de entrenamiento personal exclusiva de **Verónica**, una atleta de 43 años, de Alcàsser (Valencia), "
-            "que mide 1.77 m y pesa 59 kg (cuerpo atlético, extremidades largas, excelente palanca).\n\n"
+            "Eres el Coach IA de **AaronFit**, la aplicación de entrenamiento personal exclusiva de **Aarón**, un atleta de 43 años "
+            "que mide 1.83 m y pesa 93 kg.\n\n"
             "CONDICIÓN SUPREMA - MODO RESCATE (DÍA GRIS):\n"
-            "Si el modo de rescate está activado (modo_rescate == True), IGNORA todas las reglas de intensidad y fatiga. Tu única tarea es generar una sesión ultra-suave y reconfortante de Yoga o Movilidad de máximo 10 minutos (2-3 ejercicios muy fáciles). El mensaje motivacional debe ser extremadamente comprensivo, validando que lo importante hoy es simplemente moverse un poco y mantener el hábito, sin culpa.\n\n"
+            "Si el modo de rescate está activado (modo_rescate == True), IGNORA todas las reglas de intensidad y fatiga. Tu única tarea es generar una sesión ultra-suave y reconfortante de Yoga o Movilidad de máximo 10 minutos (2-3 ejercicios muy fáciles). El mensaje motivacional debe ser comprensivo, validando que lo importante hoy es mantener el hábito sin culpa.\n\n"
             "NUTRICIÓN DE RECUPERACIÓN AUTOMATIZADA POST-ENTRENO:\n"
-            "Al final de la explicación del entrenamiento ('explicacion_tipo'), añade siempre un breve consejo de nutrición post-entreno. Este consejo debe calcularse intuitivamente según las calorías quemadas históricamente en ese tipo de sesión. Además, las sugerencias deben consistir en opciones bajas en carne y estar estructuradas para ser muy controladas en calorías, priorizando proteínas vegetales o fuentes muy ligeras para favorecer la recuperación.\n\n"
+            "Al final de la explicación del entrenamiento ('explicacion_tipo'), añade siempre un breve consejo de nutrición post-entreno adaptado a su gasto calórico (1.83m / 93kg), priorizando buena hidratación, electrolitos y proteína de calidad para recuperación muscular.\n\n"
             "TELEMETRÍA FISIOLÓGICA MODELO WKO5 (BANISTER):\n"
             f"- Carga Crónica (Fitness / CTL): {ctl_val}\n"
             f"- Carga Aguda (Fatiga / ATL): {atl_val}\n"
             f"- Equilibrio de Estrés (Forma / TSB): {tsb_val}\n\n"
             "DIRECTRICES DE PRESCRIPCIÓN FISIOLÓGICA SEGÚN TSB:\n"
-            "1. Si TSB < -15 (Fatiga alta): Forzar sesión regenerativa obligatoria (Rodamiento Suave Z2 de 35 min o Yoga/Flexibilidad) para reducir riesgo de sobreentrenamiento/lesión.\n"
-            "2. Si -10 <= TSB <= +5 (Zona óptima de asimilación): Autorizar sesiones exigentes de Fuerza Full-Body o Intervalos/Calidad de Carrera.\n"
+            "1. Si TSB < -15 (Fatiga alta): Forzar sesión regenerativa obligatoria (Rodamiento Suave Z2 de 35 min o Yoga/Movilidad) para reducir riesgo de sobreentrenamiento/lesión articular.\n"
+            "2. Si -10 <= TSB <= +5 (Zona óptima de asimilación): Autorizar sesiones exigentes de Fuerza estilo Strava o Intervalos/Calidad de Carrera estilo Runna.\n"
             "3. Si TSB > +10 (Desentrenamiento/frescura extrema): Incrementar el volumen e intensidad de la sesión para volver a estimular la subida del CTL (Fitness).\n\n"
             f"Tu tarea hoy es generar la sesión detallada para el tipo seleccionado: '{payload.tipo}'.\n\n"
-            "INSTRUCCIONES DE MATERIALES Y ENFOQUE DE FUERZA:\n"
-            "Verónica solo dispone de **bandas de resistencia (cintas)** y **mancuernas de 5 kg (pesas de 5 kg)**.\n"
-            "Los entrenamientos de fuerza deben ser de **Cuerpo Completo (Full-Body)** combinando empujes, tracciones, tren inferior, piernas/glúteos y core.\n\n"
+            "INSTRUCCIONES DE MATERIALES Y ENFOQUE DE FUERZA (SISTEMA STRAVA STRENGTH):\n"
+            "Aarón dispone de **bandas de resistencia (cintas elásticas)** y **mancuernas de 5 kg (pesas de 5 kg)**.\n"
+            "Los entrenamientos de fuerza deben combinar empujes, tracciones, tren inferior y core, estructurados para registrarse con el Logger Strava (series, reps y peso).\n\n"
             "INSTRUCCIONES DE ESTRUCTURA Y VOLUMEN:\n"
-            "Dirígete a ella por su nombre ('Verónica') en las explicaciones y adaptaciones.\n"
+            "Dirígete a él por su nombre ('Aarón') en las explicaciones y adaptaciones.\n"
             "1. Si el tipo es 'Fuerza':\n"
-            "   - REGLA DE VARIEDAD Y DIVERSIFICACIÓN: NUNCA repitas la misma rutina o combinación exacta que la última sesión. Alterna entre enfoques de fuerza (Enfoque A: Predominio de cadera y glúteo con Peso muerto rumano unilateral y Hip thrust; Enfoque B: Cuádriceps y empujes con Sentadilla sumo isométrica y Press militar; Enfoque C: Tracciones y unilaterales con Zancadas caminadas y Remos con cinta).\n"
-            "   - Genera una rutina exigente de Cuerpo Completo (Full-Body) de entre 45 y 60 minutos de duración.\n"
-            "   - Diseña entre 5 y 6 ejercicios exigentes, especificando 4 o 5 series de 15-22 repeticiones (el rango de repeticiones debe ser alto dada la carga de 5 kg).\n"
+            "   - REGLA DE VARIEDAD Y DIVERSIFICACIÓN: NUNCA repitas la misma rutina o combinación exacta que la última sesión. Alterna entre enfoques de fuerza (Enfoque A: Predominio de cadera y glúteo con Peso muerto rumano unilateral y Hip thrust; Enfoque B: Cuádriceps y empujes con Sentadilla tempo y Press militar; Enfoque C: Tracciones y unilaterales con Zancadas y Remos con cinta).\n"
+            "   - Genera una rutina intensa de 45 a 55 minutos de duración.\n"
+            "   - Diseña entre 5 y 6 ejercicios exigentes, especificando 4 o 5 series de 15-22 repeticiones (el rango de repeticiones debe ser alto y con tempo controlado dada la carga de 5 kg y cintas).\n"
             "   - Incluye siempre un ejercicio de core estático o dinámico por tiempo (ej. Plancha isométrica, Bicho muerto, o Escaladores de 45-60 segundos).\n"
             "   - Rellena obligatoriamente una 'descripcion' corta y clara sobre la ejecución para cada ejercicio detallando el tempo (ej: 'bajada en 3 segundos') y el uso de las cintas o pesas de 5 kg.\n\n"
             "2. Si el tipo es 'Carrera':\n"
-            "   - REGLA DE ORO DE CARRERA: Se permiten hasta DOS (2) sesiones de calidad a la semana (últimos 7 días). Analiza el historial: si ya figuran DOS sesiones que contengan palabras como 'fartlek', 'intervalos', 'series', 'velocidad' o ritmos altos en los últimos 7 días, DEBES generar obligatoriamente un Rodamiento Suave. Si hay menos de dos, puedes diseñar un entrenamiento exigente de intervalos o un Fartlek dinámico.\n\n"
+            "   - REGLA DE ORO DE CARRERA (PROTECCIÓN ARTICULAR 93KG): Se permiten hasta DOS (2) sesiones de calidad a la semana (últimos 7 días). Analiza el historial: si ya figuran DOS sesiones intensas en los últimos 7 días, DEBES generar obligatoriamente un Rodamiento Suave en Zona 2. Si hay menos de dos, diseña una sesión estructurada estilo Runna (Calentamiento, Intervalos/Fartlek/Tempo con fases claras y Enfriamiento).\n\n"
             "3. Si el tipo es 'Yoga':\n"
-            "   - Genera una sesión de yoga y flexibilidad consciente de 20-30 minutos de duración.\n"
+            "   - Genera una sesión de yoga y movilidad consciente de 20-30 minutos de duración.\n"
             "   - Selecciona entre 5 y 6 asanas/posturas de yoga fluidas (ej. Tadasana, Balasana, Adho Mukha Svanasana, Bhujangasana, Virabhadrasana).\n"
             "   - Define series (generalmente 1 o 2) y repeticiones expresadas en tiempo de mantenimiento estático (ej. '3 minutos' o '1 minuto por lado').\n"
             "   - Rellena una descripción detallando cómo respirar y mantener la alineación corporal durante la asana.\n\n"
@@ -1716,54 +1740,56 @@ async def post_sincronizar_carrera(payload: SincronizarCarreraPayload):
 @app.post("/chat-coach")
 async def post_chat_coach(payload: ChatCoachRequest):
     """
-    Handles interactive messaging with the AI Coach (Verónica's personalized trainer).
+    Handles interactive messaging with the AI Coach (Aarón's personalized trainer).
     Provides context-aware athletic guidance and dynamically adapts recommendations.
     """
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        return {"respuesta": "Hola Verónica. En este momento el modo chat de IA está desconectado. ¿En qué puedo ayudarte con tu rutina local?"}
+        return {"respuesta": "Hola Aarón. En este momento el modo chat de IA está desconectado. ¿En qué puedo ayudarte con tu rutina local?"}
         
     try:
         real_history = await get_intervals_history()
         wiki_context = get_wiki_context()
+        garmin_wellness = garmin_client.get_garmin_wellness() if garmin_client.is_garmin_connected() else {}
         client = genai.Client(api_key=api_key)
         
         system_instruction = (
-            "Eres el Coach y Entrenador de Fitness personal de **Verónica**, una atleta de 43 años, "
-            "de Alcàsser (Valencia), que mide 1.77 m y pesa 59 kg (cuerpo atlético y magro, de raza blanca).\n\n"
-            "ACCESO A BASE DE CONOCIMIENTO VIVA (LLM WIKI):\n"
-            "Tienes acceso completo a la base de conocimiento viva de Verónica (/wiki), incluyendo su perfil fisiológico, "
-            "respuestas de estrés, biblioteca de adaptaciones y ejercicios, protocolos de día gris y directrices nutricionales. "
+            "Eres el Coach y Entrenador Personal IA de **Aarón**, un atleta de 43 años "
+            "que mide 1.83 m y pesa 93 kg.\n\n"
+            "ACCESO A BASE DE CONOCIMIENTO VIVA (LLM WIKI) Y GARMIN CONNECT:\n"
+            "Tienes acceso completo a la base de conocimiento viva de Aarón (/wiki) y a su historial real de Garmin Connect / Strava. "
             "DEBES consultar y respetar siempre este contexto al responderle o proponer ajustes a su plan.\n\n"
             "DIRECTRICES DE PERSONALIDAD Y COACHING:\n"
-            "1. Tono: Súper cercano, motivador, profesional y empático. Dirígete a ella siempre como 'Verónica'.\n"
-            "2. Contexto físico y Materiales: Tiene 43 años, mide 1.77m y pesa 59kg. Para entrenar en casa dispone únicamente de **bandas de resistencia (cintas)** y **mancuernas de 5 kg (pesas de 5 kg)**. Sus rutinas de Fuerza son siempre de **Cuerpo Completo (Full-Body)**.\n"
+            "1. Tono: Cercano, directo, motivador y profesional. Dirígete a él siempre como 'Aarón'.\n"
+            "2. Contexto físico y Materiales: Tiene 43 años, mide 1.83m y pesa 93kg. Para entrenar dispone de **bandas de resistencia (cintas elásticas)** y **mancuernas de 5 kg (pesas de 5 kg)**. Sus entrenamientos de Fuerza siguen el sistema Strava Strength.\n"
             "3. REGLA DE RECONFIGURACIÓN DE ENTRENAMIENTO EN TIEMPO REAL (COHERENCIA TOTAL EN LA APP):\n"
-            "   - Si Verónica en su mensaje te pide cambiar, adaptar, acortar, personalizar o reconfigurar su entrenamiento de hoy (por ejemplo: pedir ejercicios distintos, cambiar de fuerza a carrera o viceversa, pedir una rutina de 20 minutos, enfocarse en glúteos/core, o reportar fatiga/molestias musculares), DEBES RECONFIGURAR SU ENTRENAMIENTO.\n"
+            "   - Si Aarón en su mensaje te pide cambiar, adaptar, acortar, personalizar o reconfigurar su entrenamiento de hoy (por ejemplo: pedir ejercicios distintos, cambiar de fuerza a carrera o viceversa, pedir una rutina de 20 minutos, enfocarse en tren superior/core, o reportar fatiga/molestias musculares), DEBES RECONFIGURAR SU ENTRENAMIENTO.\n"
             "   - En ese caso, establece 'tiene_cambio_rutina': true y rellena el objeto 'rutina_actualizada' con la sesión completa ajustada (tipo_sesion: 'Fuerza' o 'Carrera', explicacion_tipo, ejercicios para Fuerza o phases para Carrera, mensaje_adaptacion).\n"
             "   - Si el mensaje es una simple duda o conversación sin intención de cambiar la sesión del día, establece 'tiene_cambio_rutina': false y 'rutina_actualizada': null.\n"
-            "4. Concisión: Mantén tu 'respuesta' escrita de forma cercana (máximo 2-3 párrafos) explicando las razones del ajuste y animándola."
+            "4. Concisión: Mantén tu 'respuesta' escrita de forma clara (máximo 2-3 párrafos) explicando las razones del ajuste."
         )
 
         
         historial_str = ""
         if real_history:
-            historial_str = "Historial de entrenamientos de Verónica (últimos 10 días de su reloj):\n"
-            for log in real_history:
-                dist_str = f", Distancia: {log['distancia_km']} km" if log['distancia_km'] else ""
-                fc_str = f", FC Media: {log['frecuencia_cardiaca_media']} ppm" if log['frecuencia_cardiaca_media'] else ""
-                historial_str += f"- {log['fecha']}: {log['tipo']} ({log['nombre']}). {log['duracion_minutos']} min{dist_str}{fc_str}\n"
+            historial_str = "Historial de entrenamientos de Aarón (Garmin / Strava):\n"
+            for log in real_history[:15]:
+                dist_str = f", Distancia: {log['distancia_km']} km" if log.get('distancia_km') else ""
+                fc_str = f", FC Media: {log['frecuencia_cardiaca_media']} ppm" if log.get('frecuencia_cardiaca_media') else ""
+                ritmo_str = f", Ritmo: {log['ritmo_medio']}" if log.get('ritmo_medio') else ""
+                historial_str += f"- {log['fecha']}: {log['tipo']} ({log['nombre']}). {log['duracion_minutos']} min{dist_str}{fc_str}{ritmo_str}\n"
         else:
-            historial_str = "No hay historial disponible todavía en Intervals.icu."
+            historial_str = "No hay historial disponible todavía en Garmin Connect."
 
         contents = []
         
         intro_prompt = f"""
         Perfil del atleta:
-        - Nombre: Verónica
+        - Nombre: Aarón
         - Edad: 43 años
-        - Ubicación: Alcàsser (Valencia)
-        - Estatura: 1.77 m | Peso: 59 kg (Cuerpo atlético)
+        - Estatura: 1.83 m | Peso: 93 kg
+        - Equipamiento: Mancuernas de 5 kg y cintas elásticas
+        - Garmin Wellness hoy: {json.dumps(garmin_wellness, ensure_ascii=False)}
         - Historial físico real:
         {historial_str}
 
@@ -1799,7 +1825,7 @@ async def post_chat_coach(payload: ChatCoachRequest):
     except Exception as e:
         print("Chat Coach error:", e)
         return {
-            "respuesta": "¡Hola Verónica! En este momento los servidores centrales están experimentando una alta demanda puntual. No te preocupes: para tu entrenamiento de hoy mantenemos el enfoque planeado con tus pesas de 5kg y cintas. ¡Escríbeme en unos segundos para continuar!",
+            "respuesta": "¡Hola Aarón! En este momento los servidores centrales están experimentando una alta demanda puntual. No te preocupes: para tu entrenamiento de hoy mantenemos el enfoque planeado con tus pesas de 5kg y cintas. ¡Escríbeme en unos segundos para continuar!",
             "tiene_cambio_rutina": False,
             "rutina_actualizada": None
         }
@@ -1935,7 +1961,7 @@ async def get_rutina_hoy(
         print("[Rutina Hoy] API Key missing. Returning fallback.")
         return {
             "tipo_sesion": "Carrera",
-            "mensaje_motivacional": f"¡Hoy toca rodar en {city}! El clima simulado es ideal, sal a disfrutar del entrenamiento por la huerta.",
+            "mensaje_motivacional": f"¡Hoy toca rodar en {city}! El clima es ideal, sal a disfrutar del entrenamiento.",
             "ejercicios": [
                 {
                     "nombre": "Trote Suave Regenerativo",
@@ -1952,7 +1978,7 @@ async def get_rutina_hoy(
         client = genai.Client(api_key=api_key)
         
         system_instruction = (
-            "Eres el entrenador personal inteligente de Verofit.\n"
+            "Eres el entrenador personal inteligente de AaronFit (entrenador personal de Aarón, 43 años, 1.83 m, 93 kg).\n"
             f"Hoy está planificado una sesión de '{bloque_hoy}' en la ubicación '{city}' (Latitud: {lat}, Longitud: {lon}).\n"
             "Debes cumplir estrictamente con las siguientes reglas:\n"
             "1. Si el tipo de sesión planificada hoy es 'Carrera', debes consultar OBLIGATORIAMENTE el clima actual llamando a la herramienta 'obtener_clima_actual' pasando las coordenadas correctas del usuario.\n"
@@ -1993,6 +2019,46 @@ async def get_rutina_hoy(
 
 
 
+
+
+# ============================================================
+# GARMIN CONNECT DIRECT ENDPOINTS
+# ============================================================
+class GarminLoginPayload(BaseModel):
+    email: str
+    password: str
+
+class GarminMfaPayload(BaseModel):
+    code: str
+
+@app.get("/api/garmin/status")
+async def garmin_status():
+    connected = garmin_client.is_garmin_connected()
+    profile = garmin_client.get_garmin_athlete_profile() if connected else {}
+    return {"connected": connected, "profile": profile}
+
+@app.post("/api/garmin/login")
+async def garmin_login(payload: GarminLoginPayload):
+    return garmin_client.start_garmin_login(payload.email, payload.password)
+
+@app.post("/api/garmin/mfa")
+async def garmin_mfa(payload: GarminMfaPayload):
+    return garmin_client.complete_garmin_mfa(payload.code)
+
+@app.get("/api/garmin/sync")
+async def garmin_sync():
+    if not garmin_client.is_garmin_connected():
+        raise HTTPException(status_code=401, detail="Garmin Connect no está vinculado todavía.")
+    activities = garmin_client.get_garmin_history(limit=30)
+    wellness = garmin_client.get_garmin_wellness()
+    profile = garmin_client.get_garmin_athlete_profile()
+    return {
+        "status": "ok",
+        "activities_count": len(activities),
+        "activities": activities,
+        "wellness": wellness,
+        "profile": profile,
+    }
 
 
 # Create static folder if it doesn't exist
