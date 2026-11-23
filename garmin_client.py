@@ -361,3 +361,163 @@ def get_garmin_athlete_profile() -> Dict[str, Any]:
         print(f"[Garmin] User profile fetch error: {e}")
 
     return profile
+
+
+def workout_to_fit_steps(workout: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Converts an AaronFit Fuerza or Carrera workout dict into Garmin FIT step dicts."""
+    tipo = workout.get("tipo_sesion", "Carrera")
+    steps: List[Dict[str, Any]] = []
+
+    if tipo == "Carrera":
+        for p in workout.get("phases", []):
+            dur_s = int(p.get("duration_seconds") or 300)
+            steps.append({
+                "name": p.get("name", "Fase Carrera")[:30],
+                "duration_type": 0,          # time
+                "duration_value": dur_s * 1000,
+                "target_type": 2,            # open
+                "target_low": 0,
+                "target_high": 0,
+            })
+    else:
+        for ex in workout.get("ejercicios", []):
+            series = int(ex.get("series") or 3)
+            reps_raw = str(ex.get("repeticiones") or "15")
+            digits = "".join(c for c in reps_raw if c.isdigit())
+            reps_num = int(digits) if digits else 15
+            is_time = "seg" in reps_raw.lower() or "min" in reps_raw.lower()
+            for s_idx in range(series):
+                steps.append({
+                    "name": f"{ex.get('nombre', 'Ejercicio')[:24]} S{s_idx + 1}",
+                    "duration_type": 0 if is_time else 29,  # 0=time, 29=reps
+                    "duration_value": (reps_num * 1000) if is_time else reps_num,
+                    "target_type": 2,
+                    "target_low": 0,
+                    "target_high": 0,
+                })
+                if s_idx < series - 1:
+                    steps.append({
+                        "name": "Descanso",
+                        "duration_type": 0,
+                        "duration_value": 45000,
+                        "target_type": 2,
+                        "target_low": 0,
+                        "target_high": 0,
+                    })
+
+    if not steps:
+        steps.append({"name": "Entrenamiento AaronFit", "duration_type": 5, "duration_value": 0, "target_type": 2})
+    return steps
+
+
+def _build_garmin_connect_workout_json(workout: Dict[str, Any]) -> Dict[str, Any]:
+    """Builds Garmin Connect workout JSON payload for garminconnect upload_workout."""
+    tipo = workout.get("tipo_sesion", "Carrera")
+    is_run = tipo == "Carrera"
+    sport_key = "running" if is_run else "strength_training"
+    sport_id = 1 if is_run else 5
+
+    workout_steps = []
+    order = 1
+
+    if is_run:
+        for p in workout.get("phases", []):
+            p_type = (p.get("type") or "INTERVAL").upper()
+            step_type_id = 1 if p_type == "WARMUP" else 2 if p_type == "COOLDOWN" else 3
+            step_type_key = "warmup" if p_type == "WARMUP" else "cooldown" if p_type == "COOLDOWN" else "interval"
+            workout_steps.append({
+                "type": "ExecutableStepDTO",
+                "stepOrder": order,
+                "stepType": {"stepTypeId": step_type_id, "stepTypeKey": step_type_key},
+                "endCondition": {"conditionTypeId": 2, "conditionTypeKey": "time"},
+                "endConditionValue": float(p.get("duration_seconds") or 300),
+                "targetType": {"workoutTargetTypeId": 1, "workoutTargetTypeKey": "no.target"},
+                "description": p.get("name", "Fase"),
+            })
+            order += 1
+    else:
+        for ex in workout.get("ejercicios", []):
+            series = int(ex.get("series") or 3)
+            reps_raw = str(ex.get("repeticiones") or "15")
+            digits = "".join(c for c in reps_raw if c.isdigit())
+            reps_num = int(digits) if digits else 15
+            is_time = "seg" in reps_raw.lower()
+            workout_steps.append({
+                "type": "RepeatGroupDTO",
+                "stepOrder": order,
+                "numberOfIterations": series,
+                "smartRepeat": False,
+                "stepType": {"stepTypeId": 6, "stepTypeKey": "repeat"},
+                "workoutSteps": [
+                    {
+                        "type": "ExecutableStepDTO",
+                        "stepOrder": 1,
+                        "stepType": {"stepTypeId": 3, "stepTypeKey": "interval"},
+                        "endCondition": {
+                            "conditionTypeId": 2 if is_time else 10,
+                            "conditionTypeKey": "time" if is_time else "reps",
+                        },
+                        "endConditionValue": float(reps_num),
+                        "description": ex.get("nombre", "Ejercicio"),
+                    },
+                    {
+                        "type": "ExecutableStepDTO",
+                        "stepOrder": 2,
+                        "stepType": {"stepTypeId": 4, "stepTypeKey": "rest"},
+                        "endCondition": {"conditionTypeId": 2, "conditionTypeKey": "time"},
+                        "endConditionValue": 45.0,
+                        "description": "Descanso",
+                    },
+                ],
+            })
+            order += 1
+
+    return {
+        "workoutName": f"AaronFit — {tipo} ({date.today().isoformat()})",
+        "sportType": {"sportTypeId": sport_id, "sportTypeKey": sport_key},
+        "workoutSegments": [
+            {
+                "segmentOrder": 1,
+                "sportType": {"sportTypeId": sport_id, "sportTypeKey": sport_key},
+                "workoutSteps": workout_steps,
+            }
+        ],
+    }
+
+
+def send_workout_to_garmin_watch(workout: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Uploads and schedules the workout to Garmin Connect and pushes it to the watch
+    when an OAuth session is active. Otherwise returns fit_ready so the user gets
+    a native Garmin .FIT file.
+    """
+    client = get_garmin_client()
+    if client:
+        try:
+            payload = _build_garmin_connect_workout_json(workout)
+            uploaded = client.upload_workout(payload)
+            workout_id = uploaded.get("workoutId") if isinstance(uploaded, dict) else None
+            if workout_id:
+                today_str = date.today().isoformat()
+                try:
+                    client.schedule_workout(workout_id, today_str)
+                except Exception as sched_err:
+                    print(f"[Garmin] Schedule workout warning: {sched_err}")
+                try:
+                    client.send_scheduled_workouts_to_devices()
+                except Exception as push_err:
+                    print(f"[Garmin] Push to device warning: {push_err}")
+                return {
+                    "status": "sent",
+                    "method": "garmin_direct",
+                    "workout_id": workout_id,
+                    "message": "¡Entrenamiento enviado y programado en tu reloj Garmin!",
+                }
+        except Exception as e:
+            print(f"[Garmin] Direct workout upload failed: {e}")
+
+    return {
+        "status": "fit_ready",
+        "method": "fit_download",
+        "message": "Archivo .FIT nativo de Garmin generado. Impórtalo en Garmin Connect o cópialo a tu reloj.",
+    }

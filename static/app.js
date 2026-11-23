@@ -679,6 +679,10 @@ function renderWorkout(workout) {
         <i data-lucide="play" style="width: 20px; height: 20px;"></i>
         Comenzar Sesión Guiada
       </button>
+      <button id="btn-send-garmin-fuerza" class="btn btn-ghost" style="border: 1px solid rgba(0, 174, 239, 0.4); color: #00AEEF; font-weight: 700;" onclick="sendWorkoutToGarminWatch()">
+        <i data-lucide="watch" style="width: 18px; height: 18px;"></i>
+        Enviar al Reloj Garmin (.FIT)
+      </button>
       <button id="btn-volver" class="btn btn-secondary">
         Atrás
       </button>
@@ -732,6 +736,10 @@ function renderWorkout(workout) {
       <button id="btn-empezar-carrera" class="btn btn-primary guided-action-btn carrera" style="background: linear-gradient(135deg, #00E676 0%, #00B0FF 100%); color: #000; border: none;">
         <i data-lucide="play" style="width: 20px; height: 20px;"></i>
         Comenzar Carrera (Runna)
+      </button>
+      <button id="btn-send-garmin-carrera" class="btn btn-ghost" style="border: 1px solid rgba(0, 174, 239, 0.4); color: #00AEEF; font-weight: 700;" onclick="sendWorkoutToGarminWatch()">
+        <i data-lucide="watch" style="width: 18px; height: 18px;"></i>
+        Enviar al Reloj Garmin (.FIT)
       </button>
       <button id="btn-volver" class="btn btn-secondary">
         Atrás
@@ -2597,6 +2605,56 @@ async function syncGarminNow() {
     await initApp();
   } catch (e) {
     showSuccessBanner("⚠️ Error de conexión al sincronizar Garmin.");
+  }
+}
+
+async function sendWorkoutToGarminWatch() {
+  if (!state.currentWorkout) return;
+  showLoading(true, "Preparando entrenamiento para tu reloj Garmin...");
+  try {
+    const res = await fetch("/api/garmin/send-workout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state.currentWorkout)
+    });
+    const data = await res.json();
+    if (data.status === "sent") {
+      showSuccessBanner(`⌚ ${data.message}`);
+    } else {
+      await downloadGarminFit();
+    }
+  } catch (e) {
+    await downloadGarminFit();
+  } finally {
+    showLoading(false);
+  }
+}
+
+async function downloadGarminFit() {
+  if (!state.currentWorkout) return;
+  try {
+    const res = await fetch("/api/garmin/export-fit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state.currentWorkout)
+    });
+    if (!res.ok) {
+      showSuccessBanner("⚠️ No se pudo generar el archivo .FIT de Garmin.");
+      return;
+    }
+    const blob = await res.blob();
+    const tipo = (state.currentWorkout.tipo_sesion || "workout").toLowerCase();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `aaronfit_${tipo}.fit`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    showSuccessBanner("⌚ Archivo .FIT de Garmin descargado. Ábrelo o impórtalo en Garmin Connect.");
+  } catch (e) {
+    showSuccessBanner("⚠️ Error descargando el archivo .FIT.");
   }
 }
 

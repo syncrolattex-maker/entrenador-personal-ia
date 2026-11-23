@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -11,6 +12,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 import garmin_client
+import fit_encoder
 
 load_dotenv()
 
@@ -2059,6 +2061,34 @@ async def garmin_sync():
         "wellness": wellness,
         "profile": profile,
     }
+
+
+@app.post("/api/garmin/send-workout")
+async def garmin_send_workout(workout: dict):
+    """
+    Sends a generated workout (Fuerza or Carrera) directly to the user's Garmin watch
+    if an OAuth session is active, or prepares a native Garmin .FIT download.
+    """
+    res = garmin_client.send_workout_to_garmin_watch(workout)
+    return res
+
+
+@app.post("/api/garmin/export-fit")
+async def garmin_export_fit(workout: dict):
+    """Encodes a generated workout (Fuerza or Carrera) as a native binary Garmin .FIT file."""
+    tipo = workout.get("tipo_sesion", "Carrera")
+    steps = garmin_client.workout_to_fit_steps(workout)
+    fit_bytes = fit_encoder.build_garmin_fit_workout(
+        workout_name=f"AaronFit {tipo}",
+        sport_type=tipo,
+        steps=steps,
+    )
+    filename = f"aaronfit_{tipo.lower()}.fit"
+    return Response(
+        content=fit_bytes,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # Create static folder if it doesn't exist
