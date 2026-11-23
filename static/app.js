@@ -681,7 +681,7 @@ function renderWorkout(workout) {
       </button>
       <button id="btn-send-garmin-fuerza" class="btn btn-ghost" style="border: 1px solid rgba(0, 174, 239, 0.4); color: #00AEEF; font-weight: 700;" onclick="sendWorkoutToGarminWatch()">
         <i data-lucide="watch" style="width: 18px; height: 18px;"></i>
-        Enviar al Reloj Garmin (.FIT)
+        ${workout.enviado_al_reloj ? '✅ Enviado a Garmin Connect' : '⌚ Enviar a Garmin Connect'}
       </button>
       <button id="btn-volver" class="btn btn-secondary">
         Atrás
@@ -698,9 +698,9 @@ function renderWorkout(workout) {
     let watchBadge = "";
     if (workout.enviado_al_reloj) {
       watchBadge = `
-        <div style="background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;font-size:0.75rem;font-weight:700;padding:6px 12px;border-radius:8px;display:inline-flex;align-items:center;gap:6px;margin-bottom:12px;">
+        <div style="background:rgba(0, 174, 239, 0.16);border:1px solid rgba(0, 174, 239, 0.4);color:#56CCF2;font-size:0.75rem;font-weight:700;padding:6px 12px;border-radius:8px;display:inline-flex;align-items:center;gap:6px;margin-bottom:12px;">
           <i data-lucide="check-circle" style="width:14px;height:14px;"></i>
-          SINCRONIZADO CON APPLE WATCH (VÍA INTERVALS.ICU)
+          ENVIADO AUTOMÁTICAMENTE A GARMIN CONNECT
         </div>`;
     }
 
@@ -739,7 +739,7 @@ function renderWorkout(workout) {
       </button>
       <button id="btn-send-garmin-carrera" class="btn btn-ghost" style="border: 1px solid rgba(0, 174, 239, 0.4); color: #00AEEF; font-weight: 700;" onclick="sendWorkoutToGarminWatch()">
         <i data-lucide="watch" style="width: 18px; height: 18px;"></i>
-        Enviar al Reloj Garmin (.FIT)
+        ${workout.enviado_al_reloj ? '✅ Enviado a Garmin Connect' : '⌚ Enviar a Garmin Connect'}
       </button>
       <button id="btn-volver" class="btn btn-secondary">
         Atrás
@@ -2068,9 +2068,45 @@ function renderMetricsTab(history, coachText) {
   if (elMetricCarreraCount) elMetricCarreraCount.innerHTML = `${carreraCount}<small> / ${targetCarrera} ses</small>`;
   if (elMetricCarreraBar) elMetricCarreraBar.style.width = `${Math.min(100, Math.round((carreraCount / targetCarrera) * 100))}%`;
 
+  // Compute 14-day Garmin Run & Bike distance totals
+  const runKmEl = document.getElementById("metric-garmin-run-km");
+  const bikeKmEl = document.getElementById("metric-garmin-bike-km");
+  const hrvEl = document.getElementById("metric-garmin-hrv");
+  if (history && history.length > 0) {
+    const cutoff14d = new Date();
+    cutoff14d.setDate(cutoff14d.getDate() - 14);
+    let runKm14 = 0;
+    let bikeKm14 = 0;
+    history.forEach(act => {
+      const dt = act.fecha ? new Date(act.fecha) : null;
+      if (dt && dt >= cutoff14d && act.distancia_km) {
+        if (act.tipo === "Carrera") runKm14 += Number(act.distancia_km);
+        if (act.tipo === "Ciclismo") bikeKm14 += Number(act.distancia_km);
+      }
+    });
+    if (runKmEl) runKmEl.textContent = `${runKm14.toFixed(1)} km`;
+    if (bikeKmEl) bikeKmEl.textContent = `${bikeKm14.toFixed(1)} km`;
+  }
+
+  // Fetch Garmin wellness (HRV / Body Battery) silently
+  if (hrvEl) {
+    fetch("/api/garmin/sync")
+      .then(r => r.ok ? r.json() : null)
+      .then(g => {
+        if (!g || !g.wellness) return;
+        const hrv = g.wellness.hrv_ultima_noche;
+        const bb = g.wellness.body_battery_actual ?? g.wellness.body_battery_charged;
+        if (hrv && bb) hrvEl.textContent = `${hrv} / ${bb}%`;
+        else if (hrv) hrvEl.textContent = `${hrv} ms`;
+        else if (bb) hrvEl.textContent = `${bb}%`;
+        else hrvEl.textContent = "Sync OK";
+      })
+      .catch(() => {});
+  }
+
   if (elMetricsHistoryList) {
     if (!history || history.length === 0) {
-      elMetricsHistoryList.innerHTML = `<p class="body-sm-muted" style="text-align:center; padding: 20px 0;">No hay actividades registradas en Intervals.icu en los últimos 14 días.</p>`;
+      elMetricsHistoryList.innerHTML = `<p class="body-sm-muted" style="text-align:center; padding: 20px 0;">No hay actividades sincronizadas en Garmin Connect todavía.</p>`;
       return;
     }
 
@@ -2081,8 +2117,10 @@ function renderMetricsTab(history, coachText) {
       const tagClass = isFuerza ? "lime" : "cyan";
       
       let statsPills = `<span class="stat-chip">⏱️ ${Math.round(act.duracion_minutos)} min</span>`;
-      if (act.frecuencia_cardiaca_media) statsPills += `<span class="stat-chip">❤️ ${Math.round(act.frecuencia_cardiaca_media)} ppm</span>`;
       if (act.distancia_km) statsPills += `<span class="stat-chip">📏 ${act.distancia_km} km</span>`;
+      if (act.ritmo_medio) statsPills += `<span class="stat-chip">⚡ ${act.ritmo_medio}</span>`;
+      if (act.frecuencia_cardiaca_media) statsPills += `<span class="stat-chip">❤️ ${Math.round(act.frecuencia_cardiaca_media)} ppm</span>`;
+      if (act.efecto_aerobico) statsPills += `<span class="stat-chip">🫁 TE ${Number(act.efecto_aerobico).toFixed(1)}</span>`;
       if (act.calorias_activas) statsPills += `<span class="stat-chip">🔥 ${Math.round(act.calorias_activas)} kcal</span>`;
       
       html += `
@@ -2651,7 +2689,7 @@ async function syncGarminNow() {
 
 async function sendWorkoutToGarminWatch() {
   if (!state.currentWorkout) return;
-  showLoading(true, "Preparando entrenamiento para tu reloj Garmin...");
+  showLoading(true, "Enviando entrenamiento a Garmin Connect...");
   try {
     const res = await fetch("/api/garmin/send-workout", {
       method: "POST",
@@ -2660,42 +2698,17 @@ async function sendWorkoutToGarminWatch() {
     });
     const data = await res.json();
     if (data.status === "sent") {
+      state.currentWorkout.enviado_al_reloj = true;
       showSuccessBanner(`⌚ ${data.message}`);
+      renderWorkout(state.currentWorkout);
     } else {
-      await downloadGarminFit();
+      showSuccessBanner(`🔐 ${data.message}`);
+      switchTab("tab-profile");
     }
   } catch (e) {
-    await downloadGarminFit();
+    showSuccessBanner("⚠️ Error enviando el entrenamiento a Garmin Connect.");
   } finally {
     showLoading(false);
-  }
-}
-
-async function downloadGarminFit() {
-  if (!state.currentWorkout) return;
-  try {
-    const res = await fetch("/api/garmin/export-fit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(state.currentWorkout)
-    });
-    if (!res.ok) {
-      showSuccessBanner("⚠️ No se pudo generar el archivo .FIT de Garmin.");
-      return;
-    }
-    const blob = await res.blob();
-    const tipo = (state.currentWorkout.tipo_sesion || "workout").toLowerCase();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `aaronfit_${tipo}.fit`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
-    showSuccessBanner("⌚ Archivo .FIT de Garmin descargado. Ábrelo o impórtalo en Garmin Connect.");
-  } catch (e) {
-    showSuccessBanner("⚠️ Error descargando el archivo .FIT.");
   }
 }
 

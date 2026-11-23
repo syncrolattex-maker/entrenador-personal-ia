@@ -1638,7 +1638,12 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
     """
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        return await generar_rutina_mock(payload.tipo, "Modo local offline.", modo_rescate=payload.modo_rescate)
+        mock_res = await generar_rutina_mock(payload.tipo, "Modo local offline.", modo_rescate=payload.modo_rescate)
+        garmin_push = garmin_client.send_workout_to_garmin_watch(mock_res)
+        mock_res["enviado_al_reloj"] = garmin_push.get("status") == "sent"
+        mock_res["garmin_sync_status"] = garmin_push.get("status")
+        mock_res["garmin_sync_msg"] = garmin_push.get("message")
+        return mock_res
         
     try:
         real_history = await get_intervals_history()
@@ -1710,7 +1715,7 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
 
         {wiki_context}
         
-        Genera la sesión adaptada y detallada de {payload.tipo} para Verónica ajustada a su nivel TSB actual, respetando los aprendizajes y directrices de su Wiki (o la sesión de rescate de 10 min si modo_rescate es True).
+        Genera la sesión adaptada y detallada de {payload.tipo} para Aarón ajustada a su nivel TSB actual, respetando los aprendizajes y directrices de su Wiki (o la sesión de rescate de 10 min si modo_rescate es True).
         """
         
         workout = await generate_gemini_content_with_retry(
@@ -1720,11 +1725,21 @@ async def post_generar_entrenamiento(payload: GenerarEntrenamientoPayload):
             response_schema=RutinaResponse,
             temperature=0.85
         )
-        return await enrich_routine_data(workout)
+        enriched = await enrich_routine_data(workout)
+        garmin_push = garmin_client.send_workout_to_garmin_watch(enriched)
+        enriched["enviado_al_reloj"] = garmin_push.get("status") == "sent"
+        enriched["garmin_sync_status"] = garmin_push.get("status")
+        enriched["garmin_sync_msg"] = garmin_push.get("message")
+        return enriched
         
     except Exception as e:
         print("Gemini generation error:", e)
-        return await generar_rutina_mock(payload.tipo, "Modo de respaldo activo por alta demanda de red.", modo_rescate=payload.modo_rescate)
+        fallback = await generar_rutina_mock(payload.tipo, "Modo de respaldo activo por alta demanda de red.", modo_rescate=payload.modo_rescate)
+        garmin_push = garmin_client.send_workout_to_garmin_watch(fallback)
+        fallback["enviado_al_reloj"] = garmin_push.get("status") == "sent"
+        fallback["garmin_sync_status"] = garmin_push.get("status")
+        fallback["garmin_sync_msg"] = garmin_push.get("message")
+        return fallback
 
 
 @app.post("/sincronizar-carrera")

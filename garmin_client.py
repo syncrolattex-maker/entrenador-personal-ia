@@ -517,7 +517,7 @@ def send_workout_to_garmin_watch(workout: Dict[str, Any]) -> Dict[str, Any]:
             print(f"[Garmin] Direct workout upload failed: {e}")
 
     return {
-        "status": "fit_ready",
-        "method": "fit_download",
-        "message": "Archivo .FIT nativo de Garmin generado. Impórtalo en Garmin Connect o cópialo a tu reloj.",
+        "status": "needs_garmin_login",
+        "method": "garmin_oauth_required",
+        "message": "Para enviar sesiones automáticamente al reloj Garmin, vincula tu email y contraseña en Perfil → Garmin Connect (la clave GCDC_ es de solo lectura).",
     }

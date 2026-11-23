@@ -213,9 +213,31 @@
       <!-- ================================================================= -->
       <section id="tab-metrics" class="tab-view">
         <div class="greeting-header">
-          <span class="label-caps">RENDIMIENTO REAL • INTERVALS.ICU</span>
-          <h1 class="greeting-title">Historial de Aarón</h1>
-          <p class="body-sm-muted">Actividades reales registradas por tu reloj Garmin</p>
+          <span class="label-caps" style="color: #00AEEF;">RENDIMIENTO REAL • GARMIN CONNECT</span>
+          <h1 class="greeting-title">Métricas de Aarón</h1>
+          <p class="body-sm-muted">Actividades, ritmos y carga real sincronizada desde tu Garmin</p>
+        </div>
+
+        <!-- Garmin Live Wellness & Summary Card -->
+        <div id="garmin-wellness-card" class="glass-card" style="border: 1px solid rgba(0, 174, 239, 0.25);">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span class="label-caps" style="color: #00AEEF;">TELEMETRÍA GARMIN</span>
+            <button type="button" class="strava-chip-btn" style="font-size:0.7rem; padding:4px 10px;" onclick="syncGarminNow()">🔄 Sincronizar</button>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; text-align:center;">
+            <div class="p-stat-box">
+              <span class="label-caps">KM CARRERA (14D)</span>
+              <span id="metric-garmin-run-km" class="p-stat-val cyan">0 km</span>
+            </div>
+            <div class="p-stat-box">
+              <span class="label-caps">KM BICI (14D)</span>
+              <span id="metric-garmin-bike-km" class="p-stat-val lime">0 km</span>
+            </div>
+            <div class="p-stat-box">
+              <span class="label-caps">HRV / BATT</span>
+              <span id="metric-garmin-hrv" class="p-stat-val" style="color:#00AEEF;">—</span>
+            </div>
+          </div>
         </div>
 
         <!-- Real Balance Progress: Fuerza -->
@@ -248,9 +270,9 @@
           <span id="metric-carrera-sub" class="label-caps" style="color: var(--text-muted); margin-top: 4px;">META SEMANAL: 1 A 2 SESIONES</span>
         </div>
 
-        <!-- Real Activity Timeline List from Intervals.icu -->
+        <!-- Real Activity Timeline List from Garmin Connect -->
         <div class="metrics-history-wrap">
-          <span class="label-caps" style="display: block; margin-bottom: 10px;">REGISTRO DE SESIONES REALES (ÚLTIMOS 14 DÍAS)</span>
+          <span class="label-caps" style="display: block; margin-bottom: 10px;">HISTORIAL REAL DE GARMIN CONNECT</span>
           <div id="metrics-history-list" class="metrics-history-list"></div>
         </div>
 
@@ -729,7 +751,7 @@
         </div>
         <button id="btn-guardar-sesion" class="btn btn-primary guided-action-btn" disabled>
           <i data-lucide="save" style="width:20px;height:20px;"></i>
-          Guardar en Intervals.icu
+          Guardar Sesión
         </button>
       </div>
     </div>
