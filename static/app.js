@@ -519,29 +519,8 @@ function renderRecommendation(rec) {
     }
   }
 
-  // Populate Stride 04 · Home Dark Hero Card
-  const heroBadge = document.getElementById("stride-hero-badge");
-  const heroTitle = document.getElementById("stride-hero-title");
-  const heroSub = document.getElementById("stride-hero-subtitle");
-  const heroPlayBtn = document.getElementById("stride-hero-play-btn");
-  if (heroTitle && heroSub) {
-    if (rec.recomendacion === "Carrera") {
-      if (heroBadge) heroBadge.textContent = "Hoy · Carrera Runna";
-      heroTitle.textContent = "Carrera Estructurada";
-      heroSub.textContent = "Progresión aeróbica y ritmos objetivo · Listo para Garmin";
-      if (heroPlayBtn) heroPlayBtn.onclick = () => iniciarGeneracionEntrenamiento("Carrera");
-    } else if (rec.recomendacion === "Fuerza") {
-      if (heroBadge) heroBadge.textContent = "Hoy · Fuerza Opcional";
-      heroTitle.textContent = "Fuerza Strava (25–35 min)";
-      heroSub.textContent = "Mancuernas 5 kg y cintas elásticas · Full-Body";
-      if (heroPlayBtn) heroPlayBtn.onclick = () => iniciarGeneracionEntrenamiento("Fuerza");
-    } else {
-      if (heroBadge) heroBadge.textContent = "Hoy · Recuperación";
-      heroTitle.textContent = "Día de Descanso";
-      heroSub.textContent = "Asimilación muscular activa · Pulsa para movilidad 10 min";
-      if (heroPlayBtn) heroPlayBtn.onclick = () => iniciarGeneracionEntrenamiento("Fuerza", true);
-    }
-  }
+  // Hero Card (#stride-hero-card) is populated deterministically by loadWeeklyPlan()
+  // so it always reflects the active weekly plan without AI recommendation overrides.
 
   // Update dynamic readiness score (Weekly Load Balance Score)
   const elPercent = document.getElementById("daily-goal-percent");
