@@ -17,7 +17,7 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=93">
+  <link rel="stylesheet" href="/style.css?v=94">
 
   <!-- Icons & Fonts (Geist & JetBrains Mono - Stride UI Kit) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -88,6 +88,7 @@
         <div id="stride-week-strip" class="stride-week-strip" aria-label="Calendario semanal">
           <!-- Populated dynamically by JS -->
         </div>
+        <div id="stride-week-day-panel" class="stride-week-day-panel" style="display: none;"></div>
 
         <!-- Offline Banner -->
         <div id="offline-notification" class="offline-banner" style="display: none;">
@@ -302,9 +303,10 @@
           <div class="glass-card summit-fitness-full" id="summit-fitness-card">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
               <h2 class="headline-sm" style="margin:0;">Fitness & Freshness (90 días)</h2>
-              <span id="fitness-legend" class="body-xs tabular-num" style="color:var(--text-secondary);">CTL • ATL • TSB</span>
+              <span id="fitness-legend" class="body-xs tabular-num" style="color:var(--text-secondary);">Forma (CTL) • Fatiga (ATL) • Frescura (TSB)</span>
             </div>
-            <div id="summit-fitness-svg-wrap" style="width:100%; height:160px;"></div>
+            <div id="summit-fitness-svg-wrap" style="width:100%; height:175px;"></div>
+            <div id="fitness-plain-summary" class="fitness-plain-summary"></div>
           </div>
 
           <!-- Training Log (Calendario de burbujas 12 semanas) -->
@@ -424,7 +426,10 @@
 
         <!-- Real Activity Timeline List from Garmin Connect -->
         <div class="metrics-history-wrap">
-          <h2 class="headline-sm" style="margin-bottom: 10px;">Historial real de Garmin Connect</h2>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:8px;">
+            <h2 class="headline-sm" style="margin:0;">Últimas actividades de Garmin Connect</h2>
+            <span class="body-xs">5 más recientes</span>
+          </div>
           <div id="metrics-history-list" class="metrics-history-list"></div>
         </div>
 
@@ -458,6 +463,7 @@
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
             <h2 class="headline-sm" style="margin:0;">Calendario Semanal (Lunes – Domingo)</h2>
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <button type="button" id="btn-sync-week-garmin" class="btn btn-primary" style="font-size:0.74rem; padding:5px 11px;" onclick="syncWeeklyPlanToGarmin()">📅 Enviar semana a Garmin</button>
               <button type="button" id="btnDiaGris" class="strava-chip-btn" style="font-size:0.74rem; padding:4px 10px;" aria-label="Generar rutina suave de 10 minutos">🔋 Día Gris (10 min)</button>
               <span id="training-plan-badge" class="pill-tag orange">BASE / MANTENIMIENTO</span>
             </div>
@@ -1259,6 +1265,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=93"></script>
+  <script src="/app.js?v=94"></script>
 </body>
 </html>

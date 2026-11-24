@@ -2940,3 +2940,133 @@ body {
     gap: 6px;
   }
 }
+
+/* ==========================================================================
+   HOME WEEK STRIP INLINE PANEL, SUMMIT CALENDAR LOG & FITNESS EXPLAINER
+   ========================================================================== */
+.stride-day-col.is-selected .stride-day-num {
+  background: #FF5500;
+  color: #FFFFFF;
+  font-weight: 700;
+}
+
+.stride-week-day-panel {
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 18px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fitness-plain-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.fitness-explain-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .fitness-explain-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fitness-explain-box {
+  background: #F4F4F6;
+  border-radius: 12px;
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.fitness-diagnosis-pill {
+  background: #121215;
+  color: #FFFFFF;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+/* 12-Week Calendar Grid */
+.summit-calendar-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.summit-cal-head,
+.summit-cal-row {
+  display: grid;
+  grid-template-columns: 48px repeat(7, 1fr);
+  gap: 4px;
+  align-items: center;
+}
+
+.summit-cal-head {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-align: center;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #E5E5EA;
+}
+
+.summit-cal-week-lbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.summit-cal-cell {
+  min-height: 36px;
+  border-radius: 8px;
+  background: #F4F4F6;
+  padding: 3px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  position: relative;
+}
+
+.summit-cal-cell.is-today {
+  outline: 2px solid #111113;
+  background: #FFFFFF;
+}
+
+.summit-cal-cell.has-act {
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.summit-cal-daynum {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.summit-cal-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #FFFFFF;
+  border-radius: 999px;
+  padding: 1px 5px;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}

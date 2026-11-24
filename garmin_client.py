@@ -585,6 +585,7 @@ def _build_garmin_connect_workout_json(workout: Dict[str, Any]) -> Dict[str, Any
                             "conditionTypeKey": "time" if is_time else "reps",
                         },
                         "endConditionValue": float(reps_num),
+                        "targetType": {"workoutTargetTypeId": 1, "workoutTargetTypeKey": "no.target"},
                         "description": ex.get("nombre", "Ejercicio"),
                     },
                     {
@@ -593,6 +594,7 @@ def _build_garmin_connect_workout_json(workout: Dict[str, Any]) -> Dict[str, Any
                         "stepType": {"stepTypeId": 4, "stepTypeKey": "rest"},
                         "endCondition": {"conditionTypeId": 2, "conditionTypeKey": "time"},
                         "endConditionValue": float(ex.get("descanso_seg") or 45),
+                        "targetType": {"workoutTargetTypeId": 1, "workoutTargetTypeKey": "no.target"},
                         "description": "Descanso",
                     },
                 ],
@@ -645,8 +647,18 @@ def send_workout_to_garmin_watch(workout: Dict[str, Any]) -> Dict[str, Any]:
                     "scheduled_date": target_date,
                     "message": f"¡Entrenamiento enviado y programado en tu reloj Garmin ({target_date})!",
                 }
+            return {
+                "status": "error",
+                "method": "garmin_direct",
+                "message": f"Garmin Connect no devolvió workoutId al subir la sesión ({uploaded}).",
+            }
         except Exception as e:
             print(f"[Garmin] Direct workout upload failed: {e}")
+            return {
+                "status": "error",
+                "method": "garmin_direct",
+                "message": f"Error al subir/programar en Garmin Connect: {str(e)}",
+            }
 
     return {
         "status": "needs_garmin_login",

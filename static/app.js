@@ -2085,6 +2085,58 @@ function _buildWorkoutFromPlannedDay(d) {
   };
 }
 
+let _selectedHomeWeekIdx = null;
+
+function toggleHomeWeekDay(idx) {
+  const panel = document.getElementById("stride-week-day-panel");
+  if (!panel || !_latestWeeklyPlan || !_latestWeeklyPlan.dias || !_latestWeeklyPlan.dias[idx]) return;
+
+  _selectedHomeWeekIdx = _selectedHomeWeekIdx === idx ? null : idx;
+  document.querySelectorAll("#stride-week-strip .stride-day-col").forEach((el, i) => {
+    el.classList.toggle("is-selected", i === _selectedHomeWeekIdx);
+  });
+
+  if (_selectedHomeWeekIdx === null) {
+    panel.style.display = "none";
+    return;
+  }
+
+  const d = _latestWeeklyPlan.dias[idx];
+  const isRest = d.tipo === "Descanso";
+  const distInfo = d.distancia_km > 0 ? `${d.distancia_km} km` : (d.duracion_min > 0 ? `${d.duracion_min} min` : "Descanso");
+
+  let preview = "";
+  if (Array.isArray(d.phases) && d.phases.length > 0) {
+    preview = d.phases.map(p => `${p.name} (${Math.max(1, Math.round((p.duration_seconds || 0) / 60))}')`).join(" → ");
+  } else if (Array.isArray(d.ejercicios) && d.ejercicios.length > 0) {
+    preview = d.ejercicios.map(ex => `${ex.nombre} ${ex.series}×${ex.repeticiones}`).join(" · ");
+  }
+
+  panel.style.display = "flex";
+  panel.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+      <div>
+        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+          <strong style="font-size:0.86rem; color:var(--primary-text);">${d.dia}${d.es_hoy ? " • HOY" : ""}</strong>
+          <span class="body-xs tabular-num">${d.fecha}</span>
+          <span class="pill-tag">${d.tipo}</span>
+          ${d.completado ? `<span class="pill-tag" style="background:rgba(21,128,61,0.12); color:#15803D;">✓ Completado</span>` : d.garmin_scheduled ? `<span class="pill-tag" style="background:rgba(21,128,61,0.10); color:#15803D;">📅 Garmin</span>` : ""}
+        </div>
+        <div style="font-weight:800; font-size:1rem; color:var(--on-surface); margin-top:4px;">${d.titulo}</div>
+        <div class="body-xs" style="margin-top:2px;">${distInfo}${d.zona_objetivo ? ` • ${d.zona_objetivo}` : ""} — ${d.detalle}</div>
+      </div>
+      <button type="button" class="strava-chip-btn" style="padding:4px 9px; font-size:0.74rem;" onclick="toggleHomeWeekDay(${idx})" aria-label="Cerrar">✕</button>
+    </div>
+    ${preview ? `<div class="body-xs" style="padding:7px 10px; background:#F4F4F6; border-radius:10px; color:var(--text-primary);">${preview}</div>` : ""}
+    ${!isRest ? `
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" class="btn btn-primary" style="padding:8px 14px; font-size:0.82rem;" onclick="startPlannedWorkout(${idx})">Ver desglose / Iniciar</button>
+        <button type="button" class="btn btn-ghost" style="padding:8px 12px; font-size:0.82rem;" onclick="sendPlannedDayToGarmin(${idx})">⌚ Enviar a Garmin</button>
+      </div>
+    ` : ""}
+  `;
+}
+
 function renderTrainingTab(plan) {
   if (!plan) return;
   _latestWeeklyPlan = plan;
@@ -2432,6 +2484,27 @@ async function toggleCancelPlannedDay(fecha, cancel = true) {
     if (data.plan) renderWeeklyPlan(data.plan);
     showSuccessBanner(cancel ? "Entrenamiento cancelado en el plan semanal." : "Entrenamiento reactivado.");
   } catch (e) {}
+}
+
+async function syncWeeklyPlanToGarmin() {
+  const btn = document.getElementById("btn-sync-week-garmin");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "⏳ Enviando a Garmin...";
+  }
+  try {
+    const res = await fetch("/api/training/sync-garmin-calendar", { method: "POST" });
+    const data = await res.json();
+    if (data.plan) renderWeeklyPlan(data.plan);
+    showSuccessBanner(data.message || "Sincronización completada.");
+  } catch (e) {
+    showSuccessBanner("❌ Error conectando con Garmin Connect.");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "📅 Enviar semana a Garmin";
+    }
+  }
 }
 
 async function sendPlannedDayToGarmin(dayIdx) {
@@ -3358,7 +3431,7 @@ function renderWeeklyPlan(plan) {
     });
     listEl.innerHTML = html;
 
-    // 1. Render Stride Weekly Calendar Strip (L M X J V S D)
+    // 1. Render Stride Weekly Calendar Strip (L M X J V S D) with inline expandable day panel
     const weekStripEl = document.getElementById("stride-week-strip");
     if (weekStripEl) {
       const dayLetters = ["L", "M", "X", "J", "V", "S", "D"];
@@ -3368,11 +3441,11 @@ function renderWeeklyPlan(plan) {
         const cls = [
           "stride-day-col",
           d.es_hoy ? "is-today" : "",
+          _selectedHomeWeekIdx === idx ? "is-selected" : "",
           d.completado ? "is-done" : (d.tipo !== "Descanso" ? "is-planned" : "")
         ].filter(Boolean).join(" ");
-        const actionAttr = d.tipo !== "Descanso" ? `onclick="startPlannedWorkout(${idx})"` : `onclick="switchTab('tab-training')"`;
         return `
-          <button type="button" class="${cls}" ${actionAttr} aria-label="${d.dia} ${dayNum}: ${d.titulo}">
+          <button type="button" class="${cls}" onclick="toggleHomeWeekDay(${idx})" aria-label="${d.dia} ${dayNum}: ${d.titulo}">
             <span class="stride-day-letter">${letter}</span>
             <span class="stride-day-num">${dayNum}</span>
             <span class="stride-day-dot"></span>
@@ -3616,60 +3689,123 @@ function renderTrainingLogBubbles(sportFilter) {
   if (!grid || !_summitData || !_summitData.training_log) return;
 
   const days = _summitData.training_log;
-  // Group into 12 columns (weeks) of 7 days
-  let html = "";
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+  let html = `
+    <div class="summit-calendar-grid">
+      <div class="summit-cal-head">
+        <span>SEM</span>
+        <span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span>
+      </div>
+  `;
+
   for (let w = 0; w < 12; w++) {
-    html += `<div class="summit-week-col">`;
+    const weekStart = days[w * 7];
+    let weekLbl = `S${w + 1}`;
+    if (weekStart && weekStart.date) {
+      const parts = weekStart.date.split("-");
+      const mIdx = parseInt(parts[1], 10) - 1;
+      weekLbl = `${parseInt(parts[2], 10)} ${months[mIdx] || ""}`;
+    }
+
+    html += `<div class="summit-cal-row"><span class="summit-cal-week-lbl">${weekLbl}</span>`;
     for (let d = 0; d < 7; d++) {
       const item = days[w * 7 + d];
-      if (!item) { html += `<div class="summit-bubble-cell"></div>`; continue; }
+      if (!item) { html += `<div class="summit-cal-cell"></div>`; continue; }
       const filtered = sportFilter === "Todo"
         ? item.entries
         : item.entries.filter(e => e.sport_type === sportFilter);
-      const totalMin = filtered.reduce((s, e) => s + (e.min || 0), 0);
+      const totalMin = Math.round(filtered.reduce((s, e) => s + (e.min || 0), 0));
       const mainSport = filtered[0]?.sport_type || "";
-      const color = mainSport === "Carrera" ? "#16A34A" : mainSport === "Ciclismo" ? "#0077CC" : mainSport === "Fuerza" ? "#FC5200" : "transparent";
-      const size = totalMin > 0 ? Math.min(20, Math.max(7, Math.round(totalMin / 5))) : 0;
+      const color = mainSport === "Carrera" ? "#15803D" : mainSport === "Ciclismo" ? "#0077CC" : mainSport === "Fuerza" ? "#C83E00" : "transparent";
+      const dayNum = parseInt((item.date || "").split("-")[2] || "0", 10) || "";
+      const isToday = item.date === todayIso;
 
-      html += `<div class="summit-bubble-cell" title="${item.date}: ${totalMin} min">
-        ${size > 0 ? `<div class="summit-bubble-dot" style="width:${size}px; height:${size}px; background:${color};"></div>` : ""}
-      </div>`;
+      html += `
+        <div class="summit-cal-cell ${totalMin > 0 ? "has-act" : ""} ${isToday ? "is-today" : ""}" title="${item.date}: ${totalMin} min">
+          <span class="summit-cal-daynum">${dayNum}</span>
+          ${totalMin > 0 ? `<span class="summit-cal-badge" style="background:${color};">${totalMin}'</span>` : ""}
+        </div>
+      `;
     }
     html += `</div>`;
   }
+  html += `</div>`;
   grid.innerHTML = html;
 }
 
 function renderFitnessFreshnessChart(curve) {
   const wrap = document.getElementById("summit-fitness-svg-wrap");
+  const summaryEl = document.getElementById("fitness-plain-summary");
   if (!wrap || curve.length === 0) return;
 
-  const W = 360, H = 120, pad = 10;
+  const W = 440, H = 155, padL = 32, padR = 10, padT = 12, padB = 22;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
   const allVals = curve.flatMap(p => [p.ctl, p.atl, p.tsb]);
   const minV = Math.min(...allVals, -15);
   const maxV = Math.max(...allVals, 35);
   const range = (maxV - minV) || 1;
 
   const toPath = (key) => curve.map((pt, i) => {
-    const x = pad + (i / (curve.length - 1)) * (W - pad * 2);
-    const y = H - pad - ((pt[key] - minV) / range) * (H - pad * 2);
+    const x = padL + (i / Math.max(1, curve.length - 1)) * plotW;
+    const y = padT + plotH - ((pt[key] - minV) / range) * plotH;
     return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
 
-  const zeroY = H - pad - ((0 - minV) / range) * (H - pad * 2);
+  const zeroY = padT + plotH - ((0 - minV) / range) * plotH;
+  const midV = Math.round((minV + maxV) / 2);
   const last = curve[curve.length - 1];
 
   wrap.innerHTML = `
     <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:100%;">
-      <line x1="${pad}" y1="${zeroY.toFixed(1)}" x2="${W - pad}" y2="${zeroY.toFixed(1)}" stroke="#E5E5EA" stroke-dasharray="3 3"/>
-      <path d="${toPath('atl')}" fill="none" stroke="#FC5200" stroke-width="1.8" opacity="0.9"/>
-      <path d="${toPath('ctl')}" fill="none" stroke="#0077CC" stroke-width="2.2"/>
-      <path d="${toPath('tsb')}" fill="none" stroke="#16A34A" stroke-width="1.6" stroke-dasharray="2 2"/>
+      <line x1="${padL}" y1="${padT}" x2="${W - padR}" y2="${padT}" stroke="#E5E5EA" stroke-dasharray="3 3"/>
+      <line x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${W - padR}" y2="${zeroY.toFixed(1)}" stroke="#CBD5E1" stroke-dasharray="4 3"/>
+      <line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" stroke="#E5E5EA"/>
+      <text x="${padL - 5}" y="${padT + 4}" text-anchor="end" font-size="9.5" fill="#5B5B66">${Math.round(maxV)}</text>
+      <text x="${padL - 5}" y="${zeroY + 3}" text-anchor="end" font-size="9.5" fill="#5B5B66">0</text>
+      <text x="${padL - 5}" y="${padT + plotH}" text-anchor="end" font-size="9.5" fill="#5B5B66">${Math.round(minV)}</text>
+      <text x="${padL}" y="${H - 5}" text-anchor="start" font-size="9.5" fill="#5B5B66">Hace 90 días</text>
+      <text x="${padL + plotW / 2}" y="${H - 5}" text-anchor="middle" font-size="9.5" fill="#5B5B66">Hace 45 días</text>
+      <text x="${W - padR}" y="${H - 5}" text-anchor="end" font-size="9.5" fill="#5B5B66">Hoy</text>
+      <path d="${toPath('atl')}" fill="none" stroke="#FC5200" stroke-width="1.9" opacity="0.9"/>
+      <path d="${toPath('ctl')}" fill="none" stroke="#0077CC" stroke-width="2.4"/>
+      <path d="${toPath('tsb')}" fill="none" stroke="#16A34A" stroke-width="1.8" stroke-dasharray="3 2"/>
     </svg>
   `;
   const legend = document.getElementById("fitness-legend");
   if (legend && last) {
-    legend.innerHTML = `<span style="color:#0077CC;">CTL ${last.ctl}</span> • <span style="color:#FC5200;">ATL ${last.atl}</span> • <span style="color:#16A34A;">TSB ${last.tsb}</span>`;
+    legend.innerHTML = `<span style="color:#0077CC; font-weight:700;">Forma ${last.ctl}</span> • <span style="color:#C23B00; font-weight:700;">Fatiga ${last.atl}</span> • <span style="color:#15803D; font-weight:700;">Frescura ${last.tsb}</span>`;
+  }
+
+  if (summaryEl && last) {
+    const tsb = Number(last.tsb || 0);
+    const diag = tsb >= 5
+      ? "Descansado y fresco: momento óptimo para series exigentes o competición."
+      : tsb >= -10
+        ? "Equilibrio ideal: estás asimilando bien la carga semanal sin sobreentrenarte."
+        : "Fatiga acumulada alta: prioriza rodajes suaves en Z2 o descanso para recuperar frescura.";
+
+    summaryEl.innerHTML = `
+      <div class="fitness-explain-grid">
+        <div class="fitness-explain-box">
+          <span style="font-size:11px; font-weight:700; color:#0077CC;">● FORMA (CTL): ${last.ctl}</span>
+          <span class="body-xs">Tu condición física base acumulada en los últimos 42 días.</span>
+        </div>
+        <div class="fitness-explain-box">
+          <span style="font-size:11px; font-weight:700; color:#C23B00;">● FATIGA (ATL): ${last.atl}</span>
+          <span class="body-xs">El cansancio y carga reciente de tus últimos 7 días.</span>
+        </div>
+        <div class="fitness-explain-box">
+          <span style="font-size:11px; font-weight:700; color:#15803D;">● FRESCURA (TSB): ${last.tsb > 0 ? `+${last.tsb}` : last.tsb}</span>
+          <span class="body-xs">Diferencia entre Forma y Fatiga (+ descansado / − con carga).</span>
+        </div>
+      </div>
+      <div class="fitness-diagnosis-pill">
+        <strong style="color:#FF7A33;">Lectura actual:</strong> ${diag}
+      </div>
+    `;
   }
 }
 
@@ -3828,22 +3964,24 @@ async function loadActivitiesFeed(limit = _feedLimit) {
         </article>
       `;
 
-      listHtml += `
-        <div class="history-card-item" onclick="openActivityDetail('${a.external_id}')" style="cursor:pointer; border-left: 3px solid ${badgeColor};">
-          <div class="history-card-header">
-            <span class="label-caps tabular-num">${a.start_date}</span>
-            <span class="pill-tag" style="background:${badgeBg}; color:${badgeColor};">${a.sport_type}</span>
+      if (idx < 5) {
+        listHtml += `
+          <div class="history-card-item" onclick="openActivityDetail('${a.external_id}')" style="cursor:pointer; border-left: 3px solid ${badgeColor};">
+            <div class="history-card-header">
+              <span class="label-caps tabular-num">${a.start_date}</span>
+              <span class="pill-tag" style="background:${badgeBg}; color:${badgeColor};">${a.sport_type}</span>
+            </div>
+            <div class="history-title-row">
+              <span class="headline-sm">${a.name}</span>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:6px;">
+              <div><span class="body-xs" style="color:var(--text-muted); display:block;">DISTANCIA</span><strong class="tabular-num">${distVal}</strong></div>
+              <div><span class="body-xs" style="color:var(--text-muted); display:block;">${isBici ? 'VELOCIDAD' : 'RITMO'}</span><strong class="tabular-num">${paceOrSpeed}</strong></div>
+              <div><span class="body-xs" style="color:var(--text-muted); display:block;">DESNIVEL</span><strong class="tabular-num">${elevVal}</strong></div>
+            </div>
           </div>
-          <div class="history-title-row">
-            <span class="headline-sm">${a.name}</span>
-          </div>
-          <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:6px;">
-            <div><span class="body-xs" style="color:var(--text-muted); display:block;">DISTANCIA</span><strong class="tabular-num">${distVal}</strong></div>
-            <div><span class="body-xs" style="color:var(--text-muted); display:block;">${isBici ? 'VELOCIDAD' : 'RITMO'}</span><strong class="tabular-num">${paceOrSpeed}</strong></div>
-            <div><span class="body-xs" style="color:var(--text-muted); display:block;">DESNIVEL</span><strong class="tabular-num">${elevVal}</strong></div>
-          </div>
-        </div>
-      `;
+        `;
+      }
     });
 
     const loadMoreBtn = acts.length >= limit
@@ -3851,7 +3989,7 @@ async function loadActivitiesFeed(limit = _feedLimit) {
       : "";
 
     if (feedEl) feedEl.innerHTML = feedHtml + loadMoreBtn;
-    if (listEl) listEl.innerHTML = listHtml + loadMoreBtn;
+    if (listEl) listEl.innerHTML = listHtml;
 
     // Render interactive Leaflet Voyager maps for activities with GPS polylines
     _feedMapInstances.forEach(m => { try { m.remove(); } catch (e) {} });

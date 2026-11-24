@@ -1970,11 +1970,27 @@ async def garmin_status():
 
 @app.post("/api/garmin/login")
 async def garmin_login(payload: GarminLoginPayload):
-    return garmin_client.start_garmin_login(payload.email, payload.password)
+    res = garmin_client.start_garmin_login(payload.email, payload.password)
+    if isinstance(res, dict) and res.get("status") == "connected":
+        try:
+            state_data = _load_plan_state()
+            history = await get_intervals_history()
+            _get_or_create_locked_weekly_plan(history, state_data.get("carrera_objetivo"), force_rebuild=False)
+        except Exception as e:
+            print(f"[Garmin] Auto-sync after login warning: {e}")
+    return res
 
 @app.post("/api/garmin/mfa")
 async def garmin_mfa(payload: GarminMfaPayload):
-    return garmin_client.complete_garmin_mfa(payload.code)
+    res = garmin_client.complete_garmin_mfa(payload.code)
+    if isinstance(res, dict) and res.get("status") == "connected":
+        try:
+            state_data = _load_plan_state()
+            history = await get_intervals_history()
+            _get_or_create_locked_weekly_plan(history, state_data.get("carrera_objetivo"), force_rebuild=False)
+        except Exception as e:
+            print(f"[Garmin] Auto-sync after MFA warning: {e}")
+    return res
 
 @app.get("/api/garmin/sync")
 async def garmin_sync():
@@ -2646,6 +2662,55 @@ async def get_plan_semanal():
     history = await get_intervals_history()
     plan = _get_or_create_locked_weekly_plan(history, state_data.get("carrera_objetivo"), force_rebuild=False)
     return plan
+
+
+@app.post("/api/training/sync-garmin-calendar")
+async def post_sync_weekly_to_garmin():
+    if not garmin_client.has_garmin_write_session():
+        return {
+            "status": "needs_garmin_login",
+            "message": "Para programar automáticamente en el calendario de Garmin Connect, vincula tu email y contraseña en Perfil → Garmin Connect (la clave GCDC_ es solo lectura).",
+            "scheduled_count": 0,
+        }
+    state_data = _load_plan_state()
+    history = await get_intervals_history()
+    plan = _get_or_create_locked_weekly_plan(history, state_data.get("carrera_objetivo"), force_rebuild=False)
+
+    errors = []
+    scheduled_count = 0
+    for d in plan.get("dias", []):
+        if d.get("tipo") == "Descanso" or d.get("cancelado") or d.get("completado"):
+            continue
+        if d.get("garmin_workout_id"):
+            scheduled_count += 1
+            continue
+        w_payload = {
+            "tipo_sesion": d.get("tipo"),
+            "fecha": d.get("fecha"),
+            "titulo": d.get("titulo"),
+            "phases": d.get("phases", []),
+            "ejercicios": d.get("ejercicios", []),
+        }
+        res = garmin_client.send_workout_to_garmin_watch(w_payload)
+        if isinstance(res, dict) and res.get("status") == "sent" and res.get("workout_id"):
+            d["garmin_workout_id"] = res["workout_id"]
+            d["garmin_scheduled"] = True
+            scheduled_count += 1
+        else:
+            errors.append(f"{d.get('dia')} ({d.get('fecha')}): {res.get('message', 'Error desconocido')}")
+
+    database.set_setting("locked_weekly_plan", json.dumps(plan, ensure_ascii=False))
+    return {
+        "status": "ok" if not errors else "partial",
+        "scheduled_count": scheduled_count,
+        "errors": errors,
+        "plan": plan,
+        "message": (
+            f"✅ {scheduled_count} sesiones programadas en el calendario de Garmin Connect."
+            if not errors
+            else f"⚠️ {scheduled_count} programadas, con avisos: {'; '.join(errors[:2])}"
+        ),
+    }
 
 
 class TrainingGoalsPayload(BaseModel):
