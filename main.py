@@ -2412,6 +2412,7 @@ def _construir_plan_semanal(history: List[dict], carrera_obj: Optional[dict]) ->
         "semana_inicio": monday.isoformat(),
         "semana_fin": (monday + timedelta(days=6)).isoformat(),
         "plan_type": plan_type,
+        "locked": True,
         "objetivo_km_carrera": base_weekly_km,
         "goals": {
             "plan_type": plan_type,
@@ -2437,6 +2438,116 @@ def _construir_plan_semanal(history: List[dict], carrera_obj: Optional[dict]) ->
     }
 
 
+def _refresh_locked_plan_progress(plan: dict, history: List[dict]) -> dict:
+    """Actualiza únicamente el estado de cumplimiento y cancelación sobre un plan semanal inamovible."""
+    from datetime import date, timedelta
+    today = date.today()
+    today_str = today.isoformat()
+    monday_str = plan.get("semana_inicio") or (today - timedelta(days=today.weekday())).isoformat()
+
+    try:
+        raw_cancelled = database.get_setting("cancelled_plan_dates")
+        cancelled_dates = set(json.loads(raw_cancelled)) if raw_cancelled else set()
+    except Exception:
+        cancelled_dates = set()
+
+    completed_by_date: dict = {}
+    week_run_km = 0.0
+    week_bike_km = 0.0
+    week_strength_sessions = 0
+    for act in history:
+        f_str = (act.get("fecha") or "")[:10]
+        if f_str:
+            completed_by_date.setdefault(f_str, []).append(act)
+            if f_str >= monday_str:
+                tipo_a = act.get("tipo", "")
+                if tipo_a == "Carrera":
+                    week_run_km += float(act.get("distancia_km") or 0)
+                elif tipo_a == "Ciclismo":
+                    week_bike_km += float(act.get("distancia_km") or 0)
+                elif tipo_a == "Fuerza":
+                    week_strength_sessions += 1
+
+    week_end_str = plan.get("semana_fin") or today_str
+    week_acts = [a for a in history if monday_str <= (a.get("fecha") or "")[:10] <= week_end_str]
+    used_week_ids: set = set()
+
+    for entry in plan.get("dias", []):
+        d_str = entry.get("fecha", "")
+        entry["es_hoy"] = (d_str == today_str)
+        entry["cancelado"] = (d_str in cancelled_dates)
+        planned_tipo = entry.get("tipo", "")
+        acts_day = completed_by_date.get(d_str, [])
+
+        matched_off_day = None
+        if not acts_day and planned_tipo != "Descanso":
+            for wa in week_acts:
+                wa_id = str(wa.get("id") or f"{wa.get('fecha')}_{wa.get('nombre')}")
+                if wa_id not in used_week_ids and wa.get("tipo") == planned_tipo:
+                    matched_off_day = wa
+                    used_week_ids.add(wa_id)
+                    break
+
+        entry["completado"] = (len(acts_day) > 0) or (matched_off_day is not None)
+        entry["completado_en_semana"] = (matched_off_day is not None)
+        garmin_names = [f"{a.get('nombre')} ({a.get('tipo')})" for a in acts_day]
+        if matched_off_day:
+            garmin_names.append(f"{matched_off_day.get('nombre')} ({matched_off_day.get('fecha')})")
+        entry["garmin_actividades"] = garmin_names
+
+    goals = plan.get("goals") or {}
+    base_weekly_km = float(goals.get("goal_run_km") or plan.get("objetivo_km_carrera") or 20.0)
+    goal_bike_km = float(goals.get("goal_bike_km") or 35.0)
+    goal_strength_sessions = int(float(goals.get("goal_strength_sessions") or 2))
+
+    run_pct = min(100, round((week_run_km / base_weekly_km) * 100)) if base_weekly_km > 0 else 100
+    bike_pct = min(100, round((week_bike_km / goal_bike_km) * 100)) if goal_bike_km > 0 else 100
+    str_pct = min(100, round((week_strength_sessions / goal_strength_sessions) * 100)) if goal_strength_sessions > 0 else 100
+    overall_pct = round((run_pct * 0.55) + (bike_pct * 0.25) + (str_pct * 0.20))
+    if overall_pct >= 90:
+        comp_label = "Objetivo semanal cumplido"
+    elif overall_pct >= 50:
+        comp_label = "En progreso hacia el objetivo"
+    else:
+        comp_label = "Semana iniciada · Pendiente de carga"
+
+    plan["week_progress"] = {
+        "run_km": round(week_run_km, 1),
+        "bike_km": round(week_bike_km, 1),
+        "strength_sessions": week_strength_sessions,
+    }
+    plan["weekly_compliance"] = {
+        "run_pct": run_pct,
+        "bike_pct": bike_pct,
+        "strength_pct": str_pct,
+        "overall_pct": overall_pct,
+        "status_label": comp_label,
+    }
+    plan["locked"] = True
+    return plan
+
+
+def _get_or_create_locked_weekly_plan(history: List[dict], carrera_obj: Optional[dict], force_rebuild: bool = False) -> dict:
+    """Devuelve el plan semanal inamovible de la semana actual (L-D); solo genera uno nuevo al cambiar de semana o al editar objetivos."""
+    from datetime import date, timedelta
+    today = date.today()
+    monday_str = (today - timedelta(days=today.weekday())).isoformat()
+
+    if not force_rebuild:
+        raw_locked = database.get_setting("locked_weekly_plan")
+        if raw_locked:
+            try:
+                locked_plan = json.loads(raw_locked)
+                if locked_plan.get("semana_inicio") == monday_str and len(locked_plan.get("dias", [])) == 7:
+                    return _refresh_locked_plan_progress(locked_plan, history)
+            except Exception:
+                pass
+
+    plan = _construir_plan_semanal(history, carrera_obj)
+    database.set_setting("locked_weekly_plan", json.dumps(plan, ensure_ascii=False))
+    return plan
+
+
 class CancelPlanDayPayload(BaseModel):
     fecha: str
     cancel: bool = True
@@ -2457,7 +2568,7 @@ async def post_cancel_plan_day(payload: CancelPlanDayPayload):
     database.set_setting("cancelled_plan_dates", json.dumps(sorted(dates)))
     state_data = _load_plan_state()
     history = await get_intervals_history()
-    plan = _construir_plan_semanal(history, state_data.get("carrera_objetivo"))
+    plan = _get_or_create_locked_weekly_plan(history, state_data.get("carrera_objetivo"), force_rebuild=False)
     return {"status": "ok", "plan": plan}
 
 
@@ -2487,7 +2598,7 @@ async def post_carrera_objetivo(payload: CarreraObjetivoPayload):
         }
     _save_plan_state(state_data)
     history = await get_intervals_history()
-    plan = _construir_plan_semanal(history, state_data.get("carrera_objetivo"))
+    plan = _get_or_create_locked_weekly_plan(history, state_data.get("carrera_objetivo"), force_rebuild=True)
     state_data["plan_semanal"] = plan
     _save_plan_state(state_data)
     return {"status": "ok", "carrera_objetivo": state_data["carrera_objetivo"], "plan": plan}
@@ -2497,7 +2608,7 @@ async def post_carrera_objetivo(payload: CarreraObjetivoPayload):
 async def get_plan_semanal():
     state_data = _load_plan_state()
     history = await get_intervals_history()
-    plan = _construir_plan_semanal(history, state_data.get("carrera_objetivo"))
+    plan = _get_or_create_locked_weekly_plan(history, state_data.get("carrera_objetivo"), force_rebuild=False)
     return plan
 
 
@@ -2520,7 +2631,7 @@ async def post_training_goals(payload: TrainingGoalsPayload):
 
     state_data = _load_plan_state()
     history = await get_intervals_history()
-    plan = _construir_plan_semanal(history, state_data.get("carrera_objetivo"))
+    plan = _get_or_create_locked_weekly_plan(history, state_data.get("carrera_objetivo"), force_rebuild=True)
     return {"status": "ok", "plan": plan}
 
 
