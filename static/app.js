@@ -3284,9 +3284,11 @@ async function connectGarminAccount() {
       if (mfaBox) mfaBox.style.display = "flex";
       showSuccessBanner("🔐 Garmin requiere código 2FA. Introdúcelo debajo.");
     } else if (data.status === "connected") {
-      showSuccessBanner("✅ ¡Garmin Connect vinculado correctamente!");
+      showSuccessBanner("✅ ¡Garmin Connect vinculado! Programando semana en tu calendario...");
       await checkGarminStatus();
       await initApp();
+      await syncWeeklyPlanToGarmin();
+      await loadWeeklyPlanAndRaceGoal();
     } else {
       showSuccessBanner(`⚠️ ${data.message || "Error al conectar con Garmin."}`);
     }
@@ -3309,9 +3311,11 @@ async function submitGarminMfa() {
     });
     const data = await res.json();
     if (data.status === "connected") {
-      showSuccessBanner("✅ ¡Garmin Connect verificado y vinculado!");
+      showSuccessBanner("✅ ¡Garmin Connect verificado! Programando semana en tu calendario...");
       await checkGarminStatus();
       await initApp();
+      await syncWeeklyPlanToGarmin();
+      await loadWeeklyPlanAndRaceGoal();
     } else {
       showSuccessBanner(`⚠️ ${data.message || "Código 2FA inválido."}`);
     }
