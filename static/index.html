@@ -17,7 +17,7 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=90">
+  <link rel="stylesheet" href="/style.css?v=91">
 
   <!-- Icons & Fonts (Geist & JetBrains Mono - Stride UI Kit) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -1242,7 +1242,23 @@
     </div>
   </div>
 
+  <!-- ===================== PLANNED WORKOUT DETAIL MODAL (STRIDE 09) ===================== -->
+  <div id="planned-workout-modal" class="guided-overlay detail-modal-overlay" style="display: none; z-index: 36000;">
+    <div class="guided-header" style="max-width: 680px; justify-content: space-between;">
+      <button type="button" class="guided-close-btn" onclick="closePlannedWorkoutModal()" aria-label="Volver">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div style="text-align:center;">
+        <span id="planned-modal-kicker" class="label-caps" style="color: var(--primary-text);">ENTRENAMIENTO PLANIFICADO</span>
+        <div id="planned-modal-date" class="body-xs tabular-num">—</div>
+      </div>
+      <div style="width:38px;"></div>
+    </div>
+
+    <div id="planned-modal-body" style="width:100%; max-width:680px; display:flex; flex-direction:column; gap:14px; padding-bottom:32px;"></div>
+  </div>
+
   <!-- App Logic script -->
-  <script src="/app.js?v=90"></script>
+  <script src="/app.js?v=91"></script>
 </body>
 </html>

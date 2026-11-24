@@ -2162,9 +2162,19 @@ function renderTrainingTab(plan) {
       ? `✓ Garmin (${d.garmin_actividades[0]})`
       : "✓ Garmin";
 
+    let breakdownPreview = "";
+    if (Array.isArray(d.phases) && d.phases.length > 0) {
+      breakdownPreview = d.phases.map(p => {
+        const mins = Math.max(1, Math.round((p.duration_seconds || 0) / 60));
+        return `${p.name} (${mins}')`;
+      }).join(" → ");
+    } else if (Array.isArray(d.ejercicios) && d.ejercicios.length > 0) {
+      breakdownPreview = d.ejercicios.map(ex => `${ex.nombre} ${ex.series}×${ex.repeticiones}`).join(" · ");
+    }
+
     return `
       <div class="training-day-card ${d.es_hoy && !isCancelled ? "is-today" : ""}" style="${isCancelled ? "opacity:0.65; background:#F4F4F6;" : ""}">
-        <div class="training-day-info">
+        <div class="training-day-info" style="${!isRest && !isCancelled ? "cursor:pointer;" : ""}" ${!isRest && !isCancelled ? `onclick="startPlannedWorkout(${idx})"` : ""}>
           <div class="training-day-head">
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
               <strong style="font-size:0.92rem; color:${d.es_hoy && !isCancelled ? "var(--primary-text)" : "var(--on-surface)"};">${d.dia}${d.es_hoy ? " • HOY" : ""}</strong>
@@ -2179,6 +2189,7 @@ function renderTrainingTab(plan) {
           </div>
           <div style="font-weight:800; font-size:0.96rem; color:var(--on-surface); margin-top:4px; ${isCancelled ? "text-decoration:line-through;" : ""}">${d.titulo}</div>
           <div class="body-xs" style="margin-top:2px;">${d.detalle}</div>
+          ${breakdownPreview && !isCancelled ? `<div class="body-xs" style="margin-top:6px; padding:6px 9px; background:#F4F4F6; border-radius:8px; color:var(--text-primary); font-weight:500;">${breakdownPreview}</div>` : ""}
         </div>
         ${hasActions ? `
           <div class="training-day-actions">
@@ -2247,14 +2258,153 @@ async function saveTrainingRaceGoal() {
   } catch (e) {}
 }
 
-function startPlannedWorkout(dayIdx) {
+function closePlannedWorkoutModal() {
+  const modal = document.getElementById("planned-workout-modal");
+  if (modal) modal.style.display = "none";
+}
+
+function startGuidedFromPlannedDay(dayIdx) {
   if (!_latestWeeklyPlan || !_latestWeeklyPlan.dias || !_latestWeeklyPlan.dias[dayIdx]) return;
   const d = _latestWeeklyPlan.dias[dayIdx];
   const w = _buildWorkoutFromPlannedDay(d);
   state.currentWorkout = w;
-  switchTab("tab-dashboard");
-  renderWorkout(w);
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  closePlannedWorkoutModal();
+  if (typeof startGuidedSession === "function") {
+    startGuidedSession();
+  }
+}
+
+function startPlannedWorkout(dayIdx) {
+  if (!_latestWeeklyPlan || !_latestWeeklyPlan.dias || !_latestWeeklyPlan.dias[dayIdx]) return;
+  const d = _latestWeeklyPlan.dias[dayIdx];
+  const modal = document.getElementById("planned-workout-modal");
+  const body = document.getElementById("planned-modal-body");
+  const kickerEl = document.getElementById("planned-modal-kicker");
+  const dateEl = document.getElementById("planned-modal-date");
+  if (!modal || !body) return;
+
+  state.currentWorkout = _buildWorkoutFromPlannedDay(d);
+  if (kickerEl) kickerEl.textContent = `${(d.tipo || "SESIÓN").toUpperCase()}${d.es_hoy ? " • HOY" : ""}`;
+  if (dateEl) dateEl.textContent = `${d.dia} · ${d.fecha}`;
+
+  const phases = Array.isArray(d.phases) ? d.phases : [];
+  const exercises = Array.isArray(d.ejercicios) ? d.ejercicios : [];
+  const totalSec = phases.reduce((acc, p) => acc + Number(p.duration_seconds || 0), 0);
+  const totalMins = d.duracion_min || Math.max(1, Math.round(totalSec / 60));
+
+  // Build proportional Stride interval bar SVG from phases
+  let profileSvg = "";
+  if (phases.length > 0) {
+    const safeTotal = Math.max(1, totalSec);
+    let xAcc = 0;
+    const bars = phases.map((p) => {
+      const dur = Math.max(1, Number(p.duration_seconds || 60));
+      const w = (dur / safeTotal) * 336;
+      const isWork = p.type === "WORK" || /interval|tempo|serie|fartlek|velocidad|ritmo|umbral/i.test(p.name || "");
+      const isWarmCool = p.type === "WARMUP" || p.type === "COOLDOWN" || p.type === "REST";
+      const h = isWork ? 28 : isWarmCool ? 12 : 20;
+      const y = 34 - h;
+      const fill = isWork ? "#FF5500" : isWarmCool ? "rgba(255,255,255,0.28)" : "rgba(255,85,0,0.65)";
+      const rect = `<rect x="${xAcc.toFixed(1)}" y="${y}" width="${Math.max(3, w - 2).toFixed(1)}" height="${h}" rx="3" fill="${fill}"/>`;
+      xAcc += w;
+      return rect;
+    }).join("");
+    profileSvg = `<svg viewBox="0 0 336 36" preserveAspectRatio="none" style="width:100%; height:36px;">${bars}</svg>`;
+  }
+
+  let breakdownHtml = "";
+  if (phases.length > 0) {
+    breakdownHtml = `
+      <h3 class="stride-section-title" style="margin:4px 0 0;">Desglose por fases (${phases.length})</h3>
+      <div class="stride-steps-card">
+        ${phases.map((p, i) => {
+          const sec = Number(p.duration_seconds || 0);
+          const m = Math.floor(sec / 60);
+          const s = sec % 60;
+          const isWork = p.type === "WORK" || /interval|tempo|serie|fartlek|velocidad|ritmo|umbral/i.test(p.name || "");
+          const typeLbl = p.type === "WARMUP" ? "Calentamiento" : p.type === "COOLDOWN" ? "Vuelta a la calma" : p.type === "REST" ? "Recuperación" : "Bloque principal";
+          return `
+            <div class="stride-step-row">
+              <span class="stride-step-bar ${isWork ? "work" : ""}"></span>
+              <div style="flex:1; min-width:0;">
+                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                  <strong style="font-size:0.92rem; color:var(--on-surface);">${i + 1}. ${p.name}</strong>
+                  ${isWork ? `<span class="stride-step-repeat-pill">CALIDAD</span>` : ""}
+                </div>
+                <span class="body-xs">${typeLbl}${p.target_zone ? ` · ${p.target_zone}` : ""}</span>
+              </div>
+              <strong class="tabular-num" style="font-size:0.9rem; color:var(--on-surface);">${m}:${String(s).padStart(2, "0")}</strong>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+  } else if (exercises.length > 0) {
+    breakdownHtml = `
+      <h3 class="stride-section-title" style="margin:4px 0 0;">Desglose de ejercicios (${exercises.length})</h3>
+      <div class="stride-steps-card">
+        ${exercises.map((ex, i) => `
+          <div class="stride-step-row">
+            <span class="stride-step-bar work"></span>
+            <div style="flex:1; min-width:0;">
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <strong style="font-size:0.92rem; color:var(--on-surface);">${i + 1}. ${ex.nombre}</strong>
+                <span class="stride-step-repeat-pill tabular-num">${ex.series} × ${ex.repeticiones}</span>
+              </div>
+              <span class="body-xs">${ex.target_muscle || "Full Body"} · ${ex.equipment || "Mancuernas 5 kg / Cintas"}${ex.descanso_seg ? ` · Descanso ${ex.descanso_seg}s` : ""}</span>
+              ${ex.descripcion ? `<div class="body-xs" style="margin-top:3px; color:var(--text-primary);">${ex.descripcion}</div>` : ""}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  } else {
+    breakdownHtml = `
+      <div class="glass-card" style="padding:14px;">
+        <p class="body-md" style="margin:0;">${d.detalle || "Día de descanso y asimilación muscular."}</p>
+      </div>
+    `;
+  }
+
+  const bigMetric = d.distancia_km > 0
+    ? `<span class="tabular-num" style="font-size:2.4rem; font-weight:800; line-height:1; letter-spacing:-0.04em;">${d.distancia_km}</span><span style="font-size:1rem; font-weight:500; color:rgba(255,255,255,0.72);">km</span>`
+    : `<span class="tabular-num" style="font-size:2.4rem; font-weight:800; line-height:1; letter-spacing:-0.04em;">${totalMins}</span><span style="font-size:1rem; font-weight:500; color:rgba(255,255,255,0.72);">min</span>`;
+
+  body.innerHTML = `
+    <div class="stride-workout-detail-hero">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <span style="font-size:0.72rem; font-weight:700; letter-spacing:0.06em; color:rgba(255,255,255,0.78); display:inline-flex; align-items:center; gap:6px;">
+          <span class="stride-dot-orange"></span> ${d.dia.toUpperCase()} · ${d.tipo.toUpperCase()}
+        </span>
+        ${d.completado ? `<span style="font-size:0.72rem; color:#4ADE80; font-weight:700;">✓ Completado en Garmin</span>` : ""}
+      </div>
+      <h2 style="margin:0; font-size:1.35rem; font-weight:700; letter-spacing:-0.02em; color:#FFFFFF;">${d.titulo}</h2>
+      <div style="display:flex; align-items:baseline; gap:6px;">${bigMetric}</div>
+      <div class="stride-detail-pills">
+        ${totalMins > 0 ? `<span class="stride-detail-pill tabular-num">${totalMins} min</span>` : ""}
+        ${d.zona_objetivo ? `<span class="stride-detail-pill">${d.zona_objetivo}</span>` : ""}
+        ${phases.length > 0 ? `<span class="stride-detail-pill">${phases.length} fases</span>` : ""}
+        ${exercises.length > 0 ? `<span class="stride-detail-pill">${exercises.length} ejercicios</span>` : ""}
+      </div>
+      ${profileSvg}
+    </div>
+
+    ${breakdownHtml}
+
+    <div style="display:flex; flex-direction:column; gap:8px; margin-top:4px;">
+      ${d.tipo !== "Descanso" ? `
+        <button type="button" class="btn btn-primary stride-btn-dark" style="width:100%; padding:13px;" onclick="startGuidedFromPlannedDay(${dayIdx})">
+          Comenzar Entrenamiento Guiado
+        </button>
+        <button type="button" class="btn btn-ghost" style="width:100%; border-radius:9999px;" onclick="sendPlannedDayToGarmin(${dayIdx})">
+          ⌚ Enviar a Garmin Connect
+        </button>
+      ` : ""}
+      <button type="button" class="btn btn-ghost" style="width:100%; border-radius:9999px;" onclick="closePlannedWorkoutModal()">Cerrar</button>
+    </div>
+  `;
+
+  modal.style.display = "flex";
 }
 
 async function toggleCancelPlannedDay(fecha, cancel = true) {
