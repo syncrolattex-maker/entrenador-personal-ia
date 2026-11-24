@@ -43,7 +43,7 @@ if (document.readyState === "loading") {
 }
 
 function checkCacheIntegrity() {
-  if (!document.getElementById("selection-card")) {
+  if (!document.getElementById("dashboard-activities-feed")) {
     console.warn("[Cache] Detected old HTML cache. Cleaning PWA cache and reloading...");
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.getRegistrations().then((registrations) => {
@@ -270,7 +270,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v85"; // Entrenos: cancel/restore, direct Garmin Connect push, weekly compliance check
+    const APP_VERSION = "v86"; // Fix checkCacheIntegrity element check after removing #selection-card
 
 
 
