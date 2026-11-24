@@ -176,14 +176,17 @@ document.addEventListener("DOMContentLoaded", () => {
   syncRouteFromLocation();
   window.addEventListener("popstate", syncRouteFromLocation);
 
-  // Selection events
-  elBtnSelectFuerza.addEventListener("click", () => iniciarGeneracionEntrenamiento("Fuerza"));
-  elBtnSelectCarrera.addEventListener("click", () => iniciarGeneracionEntrenamiento("Carrera"));
-  elBtnSelectDescanso.addEventListener("click", registrarDescansoHoy);
+  // Selection events (safe null checks)
+  if (elBtnSelectFuerza) elBtnSelectFuerza.addEventListener("click", () => iniciarGeneracionEntrenamiento("Fuerza"));
+  if (elBtnSelectCarrera) elBtnSelectCarrera.addEventListener("click", () => iniciarGeneracionEntrenamiento("Carrera"));
+  if (elBtnSelectDescanso) elBtnSelectDescanso.addEventListener("click", registrarDescansoHoy);
 
   const elBtnDiaGris = document.getElementById("btnDiaGris");
   if (elBtnDiaGris) {
-    elBtnDiaGris.addEventListener("click", () => iniciarGeneracionEntrenamiento("Fuerza", true));
+    elBtnDiaGris.addEventListener("click", () => {
+      switchTab("tab-dashboard");
+      iniciarGeneracionEntrenamiento("Fuerza", true);
+    });
   }
 
 
@@ -379,19 +382,22 @@ async function initApp() {
 
 
 function updateStatsBanner() {
-  elStatusUltimo.textContent    = state.db.ultimo_entreno || "Ninguno";
-  elStatusSiguiente.textContent = state.db.siguiente_bloque || "-";
+  if (!state.db) return;
+  if (elStatusUltimo) elStatusUltimo.textContent    = state.db.ultimo_entreno || "Ninguno";
+  if (elStatusSiguiente) elStatusSiguiente.textContent = state.db.siguiente_bloque || "-";
   const dias = state.db.dias_sin_entrenar || 0;
-  elStatusDias.textContent = dias === 0 ? "¡Al día!" : `${dias} ${dias === 1 ? "día" : "días"}`;
-  dias > 0 ? elStatusDias.classList.add("highlight") : elStatusDias.classList.remove("highlight");
+  if (elStatusDias) {
+    elStatusDias.textContent = dias === 0 ? "¡Al día!" : `${dias} ${dias === 1 ? "día" : "días"}`;
+    dias > 0 ? elStatusDias.classList.add("highlight") : elStatusDias.classList.remove("highlight");
+  }
 }
 
 function showLoading(on, text = "Cargando...") {
-  elLoadingState.style.display = on ? "flex" : "none";
-  elLoadingText.textContent = text;
+  if (elLoadingState) elLoadingState.style.display = on ? "flex" : "none";
+  if (elLoadingText) elLoadingText.textContent = text;
   if (on) {
-    elSelectionCard.style.display = "none";
-    elWorkoutCard.style.display = "none";
+    if (elSelectionCard) elSelectionCard.style.display = "none";
+    if (elWorkoutCard) elWorkoutCard.style.display = "none";
   }
 }
 
@@ -408,9 +414,9 @@ function showError(msg) {
 }
 
 function mostrarPantallaSeleccion() {
-  elSelectionCard.style.display = "flex";
-  elWorkoutCard.style.display = "none";
-  elLoadingState.style.display = "none";
+  if (elSelectionCard) elSelectionCard.style.display = "flex";
+  if (elWorkoutCard) elWorkoutCard.style.display = "none";
+  if (elLoadingState) elLoadingState.style.display = "none";
 }
 
 function renderRecommendation(rec) {
@@ -615,8 +621,8 @@ function renderRecommendation(rec) {
 // ============================================================
 function renderWorkout(workout) {
 
-  elSelectionCard.style.display = "none";
-  elWorkoutCard.style.display = "flex";
+  if (elSelectionCard) elSelectionCard.style.display = "none";
+  if (elWorkoutCard) elWorkoutCard.style.display = "flex";
 
   elWorkoutContent.innerHTML = "";
   elWorkoutNote.textContent = workout.mensaje || "";

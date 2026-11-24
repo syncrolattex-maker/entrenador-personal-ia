@@ -17,7 +17,7 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=78">
+  <link rel="stylesheet" href="/style.css?v=79">
 
   <!-- Icons & Fonts (Geist & JetBrains Mono - Stride UI Kit) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -134,147 +134,22 @@
             </div>
           </aside>
 
-          <!-- COLUMNA CENTRAL (Hoy + Feed principal de actividades Garmin) -->
+          <!-- COLUMNA CENTRAL (Dedicada exclusivamente al Feed de Actividades recientes desde el primer píxel) -->
           <div class="dash-col-center">
 
-            <!-- Stride 04 · Home Dark Atmospheric Hero Workout Card -->
-            <div id="stride-hero-card" class="stride-hero-card">
-              <div class="stride-hero-ember" aria-hidden="true"></div>
-              <!-- Route SVG glow track -->
-              <svg class="stride-hero-route-svg" viewBox="0 0 350 180" fill="none" aria-hidden="true">
-                <defs>
-                  <filter id="stride-route-glow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feGaussianBlur stdDeviation="4" result="blur"/>
-                    <feMerge>
-                      <feMergeNode in="blur"/>
-                      <feMergeNode in="SourceGraphic"/>
-                    </feMerge>
-                  </filter>
-                </defs>
-                <path d="M98 18 L145 24 L182 42 L248 36 L262 72 L244 106 L252 138 L190 144 L152 152 L116 146 L114 96 L94 64 Z"
-                      stroke="#FF5500" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"
-                      filter="url(#stride-route-glow)" opacity="0.88"/>
-              </svg>
-
-              <div class="stride-hero-top-row">
-                <span class="stride-time-pill">
-                  <span class="stride-dot-orange"></span>
-                  <span id="stride-hero-badge">Hoy · Coach Garmin</span>
-                </span>
-                <span class="stride-garmin-tag">Garmin Connect</span>
-              </div>
-
-              <div class="stride-hero-main-row">
-                <div class="stride-hero-text">
-                  <span class="stride-hero-kicker">ENTRENO DE HOY</span>
-                  <h2 id="stride-hero-title" class="stride-hero-title">Analizando...</h2>
-                  <p id="stride-hero-subtitle" class="stride-hero-subtitle">Sincronizando tu historial y forma...</p>
-                </div>
-                <button type="button" id="stride-hero-play-btn" class="stride-hero-play-btn" aria-label="Comenzar entreno de hoy">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="#111113" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+            <!-- Strava-style Garmin Activities Feed -->
+            <div id="dashboard-feed-wrap" class="dashboard-feed-wrap">
+              <div class="feed-section-header">
+                <h2 class="headline-sm" style="margin:0;">Actividades recientes</h2>
+                <button type="button" class="strava-chip-btn" style="font-size:0.74rem; padding:5px 11px; display:inline-flex; align-items:center; gap:5px;" onclick="syncGarminNow()">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                  <span>Sincronizar</span>
                 </button>
               </div>
-
-              <!-- Stride Interval Profile Wave -->
-              <svg class="stride-hero-wave-svg" viewBox="0 0 340 42" preserveAspectRatio="none" aria-hidden="true">
-                <defs>
-                  <linearGradient id="strideWaveGrad" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stop-color="#8A8A94"/>
-                    <stop offset="22%" stop-color="#FF5500"/>
-                    <stop offset="78%" stop-color="#FF5500"/>
-                    <stop offset="100%" stop-color="#8A8A94"/>
-                  </linearGradient>
-                </defs>
-                <path d="M0 32 L45 32 C55 32 58 10 68 10 L118 10 C128 10 130 32 140 32 C150 32 152 10 162 10 L212 10 C222 10 224 32 234 32 C244 32 246 10 256 10 L295 10 C305 10 308 32 318 32 L340 32"
-                      fill="none" stroke="url(#strideWaveGrad)" stroke-width="2.5" stroke-linecap="round"/>
-              </svg>
+              <div id="dashboard-activities-feed" class="activities-feed-list"></div>
             </div>
 
-            <!-- Stride 04 · Home "Up next" Section -->
-            <div id="stride-up-next-wrap" class="stride-up-next-wrap" style="display: none;">
-              <div class="stride-section-head">
-                <h2 class="stride-section-title">Próximos entrenos</h2>
-                <a href="/entrenamientos" class="stride-section-link" onclick="navigateTo(event, '/entrenamientos', 'tab-training')">Ver plan</a>
-              </div>
-              <div id="stride-up-next-card" class="stride-white-card stride-up-next-list">
-                <!-- Populated dynamically from /api/plan-semanal -->
-              </div>
-            </div>
-
-            <!-- Quick Activity Stats Banner -->
-            <div class="status-banner">
-              <div class="status-item">
-                <span class="label-caps">ÚLTIMO</span>
-                <span id="status-ultimo" class="status-val tabular-num">-</span>
-              </div>
-              <div class="status-item highlight-box">
-                <span class="label-caps">SIGUIENTE</span>
-                <span id="status-siguiente" class="status-val accent tabular-num">-</span>
-              </div>
-              <div class="status-item">
-                <span class="label-caps">REPOSO</span>
-                <span id="status-dias" class="status-val tabular-num">-</span>
-              </div>
-            </div>
-
-            <!-- Main Selection Container -->
-            <div id="selection-card" class="glass-card workout-selector-wrap">
-              <h2 id="selection-card-title" class="headline-sm" style="margin:0;">¿Qué vas a entrenar hoy?</h2>
-
-              <div class="selection-grid">
-                <button id="btn-select-fuerza" class="selection-btn">
-                  <div class="btn-icon-wrap figma-tile-green">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/></svg>
-                  </div>
-                  <div class="btn-text-wrap">
-                    <span class="btn-main-title">Fuerza (Opcional • 25–35 min)</span>
-                    <span class="btn-sub-info">Strava Strength • Pesas 5kg + Cintas</span>
-                  </div>
-                  <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </button>
-
-                <button id="btn-select-carrera" class="selection-btn">
-                  <div class="btn-icon-wrap figma-tile-amber">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 4v6l3.5 3.5"/><circle cx="12" cy="12" r="9"/></svg>
-                  </div>
-                  <div class="btn-text-wrap">
-                    <span class="btn-main-title">Salir a Correr</span>
-                    <span class="btn-sub-info">Runna Intervals • Zona 2 / Fartlek</span>
-                  </div>
-                  <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </button>
-
-                <button id="btn-select-bici" class="selection-btn" onclick="switchTab('tab-training')">
-                  <div class="btn-icon-wrap figma-tile-lavender">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>
-                  </div>
-                  <div class="btn-text-wrap">
-                    <span class="btn-main-title">Salir en Bici</span>
-                    <span class="btn-sub-info">Ciclismo en Ruta • Carga Multideporte</span>
-                  </div>
-                  <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </button>
-
-                <button id="btn-select-descanso" class="selection-btn">
-                  <div class="btn-icon-wrap figma-tile-coral">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>
-                  </div>
-                  <div class="btn-text-wrap">
-                    <span class="btn-main-title">Día de Descanso</span>
-                    <span class="btn-sub-info">Asimilación muscular y regeneración</span>
-                  </div>
-                  <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </button>
-              </div>
-
-              <!-- Botón de Rescate (Día Gris) -->
-              <button id="btnDiaGris" class="btn-rescate" aria-label="Generar rutina suave de 10 minutos">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/><path d="M6 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h1"/><path d="m11 7-3 5h4l-3 5"/><line x1="22" y1="11" x2="22" y2="13"/></svg>
-                <span>Cero energía hoy (Rutina 10 min)</span>
-              </button>
-            </div>
-
-            <!-- Routine Display Card -->
+            <!-- Routine Display Card (aparece al iniciar una sesión) -->
             <div id="workout-card" class="glass-card workout-display-card" style="display: none;">
               <div class="workout-display-header" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
                 <h2 class="headline-md" style="margin:0;">Rutina de Hoy</h2>
@@ -300,37 +175,6 @@
             <div id="loading-state" class="glass-card loading-state" style="display: none; align-items: center; justify-content: center; padding: 40px;">
               <div class="spinner"></div>
               <span id="loading-text" class="body-md" style="margin-top: 12px;">La Coach IA está diseñando tu rutina...</span>
-            </div>
-
-            <!-- Last Completed Workout Card (Real Sync from Garmin Connect) -->
-            <div id="last-workout-box" class="glass-card last-workout-card" style="display: none;">
-              <div class="last-workout-header">
-                <span class="label-caps">ÚLTIMO REGISTRO EN GARMIN</span>
-                <span id="last-workout-date" class="label-caps tabular-num"></span>
-              </div>
-
-              <div class="last-workout-body">
-                <div class="last-workout-title-row">
-                  <span id="last-workout-name" class="headline-sm">-</span>
-                  <span id="last-workout-tipo" class="pill-tag">-</span>
-                </div>
-                <div id="last-workout-stats" class="last-workout-stats">
-                  <!-- Injected dynamically -->
-                </div>
-                <p id="last-workout-desc" class="body-sm-muted" style="display: none; border-top: 1px solid var(--border-glass); padding-top: 6px; margin-top: 4px;"></p>
-              </div>
-            </div>
-
-            <!-- Strava-style Garmin Activities Feed -->
-            <div id="dashboard-feed-wrap" class="dashboard-feed-wrap">
-              <div class="feed-section-header">
-                <h2 class="headline-sm" style="margin:0;">Actividades recientes</h2>
-                <button type="button" class="strava-chip-btn" style="font-size:0.74rem; padding:5px 11px; display:inline-flex; align-items:center; gap:5px;" onclick="syncGarminNow()">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                  <span>Sincronizar</span>
-                </button>
-              </div>
-              <div id="dashboard-activities-feed" class="activities-feed-list"></div>
             </div>
 
           </div>
@@ -676,7 +520,10 @@
         <div class="glass-card" id="training-calendar-card">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
             <h2 class="headline-sm" style="margin:0;">Calendario Semanal (Lunes – Domingo)</h2>
-            <span id="training-plan-badge" class="pill-tag orange">BASE / MANTENIMIENTO</span>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <button type="button" id="btnDiaGris" class="strava-chip-btn" style="font-size:0.74rem; padding:4px 10px;" aria-label="Generar rutina suave de 10 minutos">🔋 Día Gris (10 min)</button>
+              <span id="training-plan-badge" class="pill-tag orange">BASE / MANTENIMIENTO</span>
+            </div>
           </div>
           <div id="training-weekly-calendar" class="training-weekly-calendar">
             <div class="skeleton-shimmer" style="height:90px;"></div>
