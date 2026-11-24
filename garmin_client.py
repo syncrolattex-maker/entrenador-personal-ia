@@ -267,6 +267,15 @@ def get_garmin_history(limit: int = 30) -> List[dict]:
             s_pace = int(sec_per_km % 60)
             ritmo_str = f"{m_pace}:{s_pace:02d} min/km"
 
+        cad_val = act.get("averageRunningCadenceInStepsPerMinute") or act.get("averageBikingCadenceInRevPerMinute")
+        if cad_val and act.get("averageRunningCadenceInStepsPerMinute") and cad_val < 115:
+            cad_val = cad_val * 2
+        temp_val = act.get("averageTemperature")
+        if temp_val is None and act.get("minTemperature") is not None and act.get("maxTemperature") is not None:
+            temp_val = round((act.get("minTemperature") + act.get("maxTemperature")) / 2.0, 1)
+        elif temp_val is None:
+            temp_val = act.get("minTemperature") if act.get("minTemperature") is not None else act.get("maxTemperature")
+
         normalized.append({
             "id": str(act.get("activityId", "")),
             "fecha": fecha,
@@ -282,11 +291,11 @@ def get_garmin_history(limit: int = 30) -> List[dict]:
             "ritmo_medio": ritmo_str,
             "efecto_aerobico": act.get("aerobicTrainingEffect"),
             "efecto_anaerobico": act.get("anaerobicTrainingEffect"),
-            "cadencia_media": round(act.get("averageRunningCadenceInStepsPerMinute")) if act.get("averageRunningCadenceInStepsPerMinute") else None,
-            "avg_cadence": round(act.get("averageRunningCadenceInStepsPerMinute")) if act.get("averageRunningCadenceInStepsPerMinute") else None,
+            "cadencia_media": round(cad_val) if cad_val else None,
+            "avg_cadence": round(cad_val) if cad_val else None,
             "moving_duration_min": round((act.get("movingDuration") or duration_sec or 0) / 60.0, 2),
             "elapsed_duration_min": round((act.get("elapsedDuration") or duration_sec or 0) / 60.0, 2),
-            "avg_temp_c": act.get("averageTemperature"),
+            "avg_temp_c": temp_val,
             "device_name": act.get("deviceName") or "Garmin Connect",
             "avg_power_w": act.get("avgPower") or act.get("averagePower"),
             "fuente": "Garmin Connect",
@@ -645,15 +654,23 @@ def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
         if pt.get("lat") is not None and pt.get("lon") is not None
     ]
 
-    # 2. Metric descriptors map
+    # 2. Metric descriptors map (use explicit None checks so index 0 is never skipped)
     desc = {d["key"]: d["metricsIndex"] for d in data.get("metricDescriptors", []) if "key" in d}
-    idx_dist = desc.get("sumDistance")
-    idx_time = desc.get("sumElapsedDuration")
-    idx_hr = desc.get("directHeartRate")
-    idx_elev = desc.get("directElevation")
-    idx_spd = desc.get("directSpeed")
-    idx_cad = desc.get("directRunCadence") or desc.get("directBikeCadence")
-    idx_temp = desc.get("directAirTemperature") or desc.get("directTemperature")
+
+    def _first_idx(*keys):
+        for k in keys:
+            if k in desc and desc[k] is not None:
+                return desc[k]
+        return None
+
+    idx_dist = _first_idx("sumDistance")
+    idx_time = _first_idx("sumElapsedDuration", "sumDuration")
+    idx_hr = _first_idx("directHeartRate")
+    idx_elev = _first_idx("directElevation")
+    idx_spd = _first_idx("directSpeed")
+    idx_cad = _first_idx("directDoubleCadence", "directRunCadence", "directBikeCadence", "directCadence")
+    is_run_cad_single = ("directDoubleCadence" not in desc) and ("directRunCadence" in desc)
+    idx_temp = _first_idx("directAirTemperature", "directTemperature", "directBodyTemperature")
 
     rows = data.get("activityDetailMetrics") or []
     chart_dist, chart_elev, chart_hr, chart_pace, chart_time, chart_cad, chart_temp = [], [], [], [], [], [], []
@@ -710,6 +727,8 @@ def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
             pace_s = round(1000.0 / spd) if (spd and spd > 0.4) else None
             chart_pace.append(pace_s)
             chart_time.append(round(t_s, 1) if t_s is not None else None)
+            if cad is not None and is_run_cad_single and 0 < cad < 115:
+                cad = cad * 2
             chart_cad.append(round(cad) if cad is not None else None)
             chart_temp.append(round(temp, 1) if temp is not None else None)
 

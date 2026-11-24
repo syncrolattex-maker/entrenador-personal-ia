@@ -3711,6 +3711,137 @@ async function loadActivitiesFeed(limit = _feedLimit) {
 
 let _currentDetailActivity = null;
 let _detailStreamState = { pace: true, hr: true, cadence: false, temp: false };
+let _detailSelectedSplitIdx = null;
+let _detailMapCursorMarker = null;
+let _detailMapHighlightLayer = null;
+
+function _getSplitKmBounds(splits, idx) {
+  if (!splits || idx < 0 || idx >= splits.length) return [0, 0];
+  let acc = 0;
+  for (let i = 0; i < idx; i++) {
+    acc += splits[i].is_partial ? Number(splits[i].km || 0) : 1.0;
+  }
+  const len = splits[idx].is_partial ? Number(splits[idx].km || 0) : 1.0;
+  return [acc, acc + len];
+}
+
+function _fmtSecMS(sec) {
+  if (sec === null || sec === undefined || isNaN(sec)) return "—";
+  const s = Math.max(0, Math.round(sec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${String(r).padStart(2, "0")}`;
+}
+
+function _syncMapMarkerAtIndex(idx) {
+  const act = _currentDetailActivity;
+  if (!_detailMapInstance || !window.L || !act || !act.polyline || act.polyline.length < 2) return;
+  const cs = act.chart_series || {};
+  const n = Math.max(1, (cs.dist_km || []).length - 1);
+  const ratio = Math.min(1, Math.max(0, idx / n));
+  const polyIdx = Math.min(act.polyline.length - 1, Math.round(ratio * (act.polyline.length - 1)));
+  const pt = act.polyline[polyIdx];
+  if (!pt) return;
+  if (!_detailMapCursorMarker) {
+    _detailMapCursorMarker = L.circleMarker(pt, {
+      radius: 7,
+      color: "#FFFFFF",
+      weight: 3,
+      fillColor: "#FF5500",
+      fillOpacity: 1
+    }).addTo(_detailMapInstance);
+  } else {
+    _detailMapCursorMarker.setLatLng(pt);
+  }
+}
+
+function selectActivitySplit(idx) {
+  const act = _currentDetailActivity;
+  if (!act || !act.splits || !act.splits[idx]) return;
+  _detailSelectedSplitIdx = _detailSelectedSplitIdx === idx ? null : idx;
+
+  document.querySelectorAll("#detail-splits-list .detail-split-row").forEach((el) => {
+    const rowIdx = Number(el.getAttribute("data-split-idx"));
+    el.classList.toggle("active", rowIdx === _detailSelectedSplitIdx);
+  });
+
+  const inspector = document.getElementById("detail-split-inspector");
+  if (_detailSelectedSplitIdx === null) {
+    if (inspector) inspector.style.display = "none";
+    if (_detailMapHighlightLayer && _detailMapInstance) {
+      _detailMapInstance.removeLayer(_detailMapHighlightLayer);
+      _detailMapHighlightLayer = null;
+    }
+    renderStravaDetailChart(act.chart_series || {});
+    return;
+  }
+
+  const s = act.splits[idx];
+  const [startKm, endKm] = _getSplitKmBounds(act.splits, idx);
+  const cs = act.chart_series || {};
+  const dists = cs.dist_km || [];
+  const cads = cs.cadence || [];
+  const temps = cs.temp_c || [];
+
+  const inRange = (arr) => {
+    const vals = [];
+    for (let i = 0; i < dists.length; i++) {
+      const d = Number(dists[i]);
+      if (d >= startKm && d <= endKm && arr[i] !== null && arr[i] !== undefined) {
+        vals.push(Number(arr[i]));
+      }
+    }
+    return vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : null;
+  };
+
+  const avgCad = inRange(cads);
+  const avgTemp = inRange(temps);
+  const elevTxt = s.elev_diff !== undefined && s.elev_diff !== null ? `${s.elev_diff >= 0 ? "+" : ""}${Math.round(s.elev_diff)} m` : "—";
+  const splitTitle = s.is_partial ? `Último parcial (${s.km} km)` : `Parcial Km ${s.km}`;
+
+  if (inspector) {
+    inspector.style.display = "flex";
+    inspector.innerHTML = `
+      <div class="detail-split-inspector-head">
+        <div>
+          <span style="font-size:0.68rem; font-weight:700; letter-spacing:0.06em; color:#FF7A33; display:block;">DETALLE DEL PARCIAL</span>
+          <strong style="font-size:0.95rem; color:#FFFFFF;">${splitTitle}</strong>
+        </div>
+        <button type="button" class="strava-chip-btn" style="padding:3px 9px; font-size:0.72rem; background:rgba(255,255,255,0.12); color:#FFFFFF; border:none;" onclick="selectActivitySplit(${idx})">Cerrar</button>
+      </div>
+      <div class="detail-split-inspector-grid">
+        <div class="detail-split-metric"><span>Ritmo</span><strong>${s.pace_str || "—"}</strong></div>
+        <div class="detail-split-metric"><span>GAP</span><strong>${s.gap_str || "—"}</strong></div>
+        <div class="detail-split-metric"><span>FC Media</span><strong>${s.avg_hr ? `${s.avg_hr} ppm` : "—"}</strong></div>
+        <div class="detail-split-metric"><span>Desnivel</span><strong>${elevTxt}</strong></div>
+        <div class="detail-split-metric"><span>Cadencia</span><strong>${avgCad ? `${Math.round(avgCad)} ppm` : (act.avg_cadence ? `${act.avg_cadence} ppm` : "—")}</strong></div>
+        <div class="detail-split-metric"><span>Temp</span><strong>${avgTemp !== null ? `${avgTemp.toFixed(1)} °C` : (act.avg_temp_c !== null && act.avg_temp_c !== undefined ? `${Number(act.avg_temp_c).toFixed(1)} °C` : "—")}</strong></div>
+      </div>
+    `;
+  }
+
+  // Highlight km segment on Leaflet map
+  if (_detailMapInstance && window.L && act.polyline && act.polyline.length > 2) {
+    if (_detailMapHighlightLayer) {
+      _detailMapInstance.removeLayer(_detailMapHighlightLayer);
+      _detailMapHighlightLayer = null;
+    }
+    const totalKm = Math.max(0.1, Number(act.distance_km || (dists.length ? dists[dists.length - 1] : 1)));
+    const pStart = Math.max(0, Math.floor((startKm / totalKm) * (act.polyline.length - 1)));
+    const pEnd = Math.min(act.polyline.length - 1, Math.ceil((endKm / totalKm) * (act.polyline.length - 1)));
+    const segPts = act.polyline.slice(pStart, Math.max(pStart + 2, pEnd + 1));
+    if (segPts.length >= 2) {
+      _detailMapHighlightLayer = L.polyline(segPts, {
+        color: "#111113",
+        weight: 6,
+        opacity: 0.95
+      }).addTo(_detailMapInstance);
+      _detailMapInstance.fitBounds(_detailMapHighlightLayer.getBounds(), { padding: [36, 36], maxZoom: 16 });
+    }
+  }
+
+  renderStravaDetailChart(act.chart_series || {});
+}
 
 function _fmtDurationHMS(mins) {
   const totalSec = Math.max(0, Math.round(Number(mins || 0) * 60));
@@ -3764,9 +3895,11 @@ function renderStravaDetailChart(series) {
   const chartCard = document.getElementById("detail-chart-card");
   const chartSvg = document.getElementById("detail-chart-svg");
   const togglesEl = document.getElementById("detail-stream-toggles");
+  const tooltipEl = document.getElementById("detail-chart-tooltip");
   if (!chartSvg || !togglesEl) return;
 
   const cs = series || act.chart_series || {};
+  const dists = cs.dist_km || [];
   const elevs = (cs.elevation_m || []).filter(v => v !== null && v !== undefined);
   const paces = (cs.pace_sec || []).filter(v => v !== null && v !== undefined && v > 120 && v < 1200);
   const hrs = (cs.hr || []).filter(v => v !== null && v !== undefined);
@@ -3792,60 +3925,176 @@ function renderStravaDetailChart(series) {
     return `
       <div class="detail-toggle-row">
         <div>
-          <span class="body-xs" style="display:flex; align-items:center; gap:5px; font-weight:700; color:var(--text-secondary);">
+          <span class="body-xs" style="display:flex; align-items:center; gap:6px; font-weight:700; color:var(--text-secondary);">
             <span style="width:8px; height:8px; border-radius:50%; background:${s.color}; display:inline-block;"></span>
             ${s.label}
           </span>
-          <strong class="tabular-num" style="font-size:0.86rem; color:var(--on-surface);">${s.avg}</strong>
+          <strong class="tabular-num" style="font-size:0.9rem; color:var(--on-surface);">${s.avg}</strong>
         </div>
         <button type="button" class="detail-toggle-btn ${isOn ? "on" : ""}" onclick="toggleChartLayer('${s.key}')">${isOn ? "Sí" : "No"}</button>
       </div>
     `;
   }).join("");
 
-  if (!cs.dist_km || cs.dist_km.length < 4) {
+  if (!dists || dists.length < 4) {
     if (chartCard) chartCard.style.display = "flex";
     chartSvg.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center;" class="body-xs">Sin series temporales detalladas para esta actividad.</div>`;
     return;
   }
 
-  const W = 640, H = 170, pad = 10;
-  const buildPath = (rawArr, invert = false) => {
-    const pts = [];
+  const W = 680, H = 220;
+  const padL = 42, padR = 12, padT = 14, padB = 26;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const maxDist = Math.max(0.1, Number(dists[dists.length - 1] || act.distance_km || 1));
+
+  const buildCoords = (rawArr, invert = false) => {
     const valid = rawArr.filter(v => v !== null && v !== undefined);
-    if (valid.length < 3) return "";
+    if (valid.length < 3) return { path: "", coords: [] };
     const mn = Math.min(...valid), mx = Math.max(...valid), rng = (mx - mn) || 1;
+    const coords = new Array(rawArr.length).fill(null);
+    const pts = [];
     rawArr.forEach((v, i) => {
       if (v === null || v === undefined) return;
-      const x = pad + (i / Math.max(1, rawArr.length - 1)) * (W - pad * 2);
+      const x = padL + (i / Math.max(1, rawArr.length - 1)) * plotW;
       const norm = (v - mn) / rng;
-      const y = invert ? (pad + norm * (H - pad * 2)) : (H - pad - norm * (H - pad * 2));
+      const y = invert ? (padT + norm * plotH) : (padT + plotH - norm * plotH);
+      coords[i] = { x, y, v };
       pts.push(`${pts.length === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`);
     });
-    return pts.join(" ");
+    return { path: pts.join(" "), coords };
   };
 
-  let elevArea = "";
-  const elevLine = buildPath(cs.elevation_m || [], false);
-  if (elevLine) {
-    elevArea = `${elevLine} L${(W - pad).toFixed(1)},${(H - pad).toFixed(1)} L${pad.toFixed(1)},${(H - pad).toFixed(1)} Z`;
+  const elevRes = buildCoords(cs.elevation_m || [], false);
+  const elevLine = elevRes.path;
+  const elevArea = elevLine
+    ? `${elevLine} L${(padL + plotW).toFixed(1)},${(padT + plotH).toFixed(1)} L${padL.toFixed(1)},${(padT + plotH).toFixed(1)} Z`
+    : "";
+
+  // Y-axis elevation ticks & horizontal gridlines
+  const minElev = elevs.length ? Math.round(Math.min(...elevs)) : 0;
+  const maxElev = elevs.length ? Math.round(Math.max(...elevs)) : 100;
+  const midElev = Math.round((minElev + maxElev) / 2);
+  const yTicks = [
+    { y: padT, label: `${maxElev}m` },
+    { y: padT + plotH * 0.5, label: `${midElev}m` },
+    { y: padT + plotH, label: `${minElev}m` }
+  ];
+  const gridSvg = yTicks.map(t => `
+    <line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W - padR}" y2="${t.y.toFixed(1)}" stroke="#E5E5EA" stroke-dasharray="3 4" stroke-width="1"/>
+    <text x="${padL - 6}" y="${(t.y + 3).toFixed(1)}" text-anchor="end" font-size="10" fill="#5B5B66" font-family="Geist, sans-serif">${t.label}</text>
+  `).join("");
+
+  // X-axis distance ticks
+  const xTickCount = 4;
+  const xTicksSvg = Array.from({ length: xTickCount + 1 }, (_, i) => {
+    const frac = i / xTickCount;
+    const x = padL + frac * plotW;
+    const dLbl = `${(frac * maxDist).toFixed(1)} km`;
+    const anchor = i === 0 ? "start" : i === xTickCount ? "end" : "middle";
+    return `<text x="${x.toFixed(1)}" y="${H - 6}" text-anchor="${anchor}" font-size="10" fill="#5B5B66" font-family="Geist, sans-serif">${dLbl}</text>`;
+  }).join("");
+
+  // Optional selected split highlight band
+  let splitBandSvg = "";
+  if (_detailSelectedSplitIdx !== null && act.splits && act.splits[_detailSelectedSplitIdx]) {
+    const [sKm, eKm] = _getSplitKmBounds(act.splits, _detailSelectedSplitIdx);
+    const x1 = padL + Math.min(1, sKm / maxDist) * plotW;
+    const x2 = padL + Math.min(1, eKm / maxDist) * plotW;
+    splitBandSvg = `<rect x="${x1.toFixed(1)}" y="${padT}" width="${Math.max(4, x2 - x1).toFixed(1)}" height="${plotH}" fill="rgba(255, 85, 0, 0.14)" stroke="rgba(255, 85, 0, 0.45)" stroke-width="1"/>`;
   }
 
   const overlays = streamsMeta
     .filter(s => _detailStreamState[s.key])
     .map(s => {
-      const p = buildPath(s.data, s.invert);
-      return p ? `<path d="${p}" fill="none" stroke="${s.color}" stroke-width="2.2" stroke-linecap="round"/>` : "";
+      const res = buildCoords(s.data, s.invert);
+      return res.path ? `<path d="${res.path}" fill="none" stroke="${s.color}" stroke-width="2.2" stroke-linecap="round"/>` : "";
     })
     .join("");
 
   chartSvg.innerHTML = `
-    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%; height:100%; background:#FAFAFC; border:1px solid #E5E5EA; border-radius:6px;">
-      ${elevArea ? `<path d="${elevArea}" fill="#E5E5EA" opacity="0.7"/>` : ""}
-      ${elevLine ? `<path d="${elevLine}" fill="none" stroke="#9CA3AF" stroke-width="1.5"/>` : ""}
+    <svg id="detail-streams-svg-el" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%; height:100%; background:#FFFFFF; border:1px solid rgba(0,0,0,0.06); border-radius:16px; cursor:crosshair; display:block;">
+      <defs>
+        <linearGradient id="strideElevGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#111113" stop-opacity="0.16"/>
+          <stop offset="100%" stop-color="#111113" stop-opacity="0.02"/>
+        </linearGradient>
+      </defs>
+      ${gridSvg}
+      ${splitBandSvg}
+      ${elevArea ? `<path d="${elevArea}" fill="url(#strideElevGrad)"/>` : ""}
+      ${elevLine ? `<path d="${elevLine}" fill="none" stroke="#8A8A94" stroke-width="1.5"/>` : ""}
       ${overlays}
+      ${xTicksSvg}
+      <line id="detail-chart-crosshair" x1="0" y1="${padT}" x2="0" y2="${padT + plotH}" stroke="#111113" stroke-width="1.2" stroke-dasharray="3 2" style="display:none;"/>
+      <circle id="detail-chart-dot" cx="0" cy="0" r="4.5" fill="#FF5500" stroke="#FFFFFF" stroke-width="2" style="display:none;"/>
     </svg>
   `;
+
+  const svgEl = document.getElementById("detail-streams-svg-el");
+  const crosshair = document.getElementById("detail-chart-crosshair");
+  const dot = document.getElementById("detail-chart-dot");
+  if (!svgEl) return;
+
+  const handleScrub = (clientX) => {
+    const rect = svgEl.getBoundingClientRect();
+    if (!rect.width) return;
+    const svgX = ((clientX - rect.left) / rect.width) * W;
+    const clampedX = Math.max(padL, Math.min(padL + plotW, svgX));
+    const frac = (clampedX - padL) / plotW;
+    const idx = Math.min(dists.length - 1, Math.max(0, Math.round(frac * (dists.length - 1))));
+
+    const ptX = padL + (idx / Math.max(1, dists.length - 1)) * plotW;
+    if (crosshair) {
+      crosshair.setAttribute("x1", ptX.toFixed(1));
+      crosshair.setAttribute("x2", ptX.toFixed(1));
+      crosshair.style.display = "block";
+    }
+    const elevCoord = elevRes.coords[idx];
+    if (dot && elevCoord) {
+      dot.setAttribute("cx", ptX.toFixed(1));
+      dot.setAttribute("cy", elevCoord.y.toFixed(1));
+      dot.style.display = "block";
+    }
+
+    if (tooltipEl) {
+      const dVal = dists[idx] !== null && dists[idx] !== undefined ? `${Number(dists[idx]).toFixed(2)} km` : "—";
+      const tVal = (cs.time_sec && cs.time_sec[idx] !== null && cs.time_sec[idx] !== undefined) ? _fmtSecMS(cs.time_sec[idx]) : "";
+      const eVal = (cs.elevation_m && cs.elevation_m[idx] !== null && cs.elevation_m[idx] !== undefined) ? `${Math.round(cs.elevation_m[idx])} m` : "";
+      const pRaw = cs.pace_sec ? cs.pace_sec[idx] : null;
+      const pVal = (pRaw && pRaw > 120 && pRaw < 1200) ? `${_fmtSecMS(pRaw)}/km` : "";
+      const hVal = (cs.hr && cs.hr[idx]) ? `${cs.hr[idx]} ppm` : "";
+      const cVal = (cs.cadence && cs.cadence[idx]) ? `${cs.cadence[idx]} cad` : "";
+      const tmpVal = (cs.temp_c && cs.temp_c[idx] !== null && cs.temp_c[idx] !== undefined) ? `${cs.temp_c[idx]}°C` : "";
+
+      const parts = [
+        `<span style="display:inline-flex;align-items:center;gap:5px;font-weight:700;"><span style="width:7px;height:7px;border-radius:50%;background:#FF5500;display:inline-block;"></span>${dVal}</span>`,
+        tVal ? `<span>${tVal}</span>` : "",
+        eVal ? `<span>${eVal}</span>` : "",
+        pVal ? `<span style="color:#60A5FA;">${pVal}</span>` : "",
+        hVal ? `<span style="color:#F87171;">${hVal}</span>` : "",
+        cVal ? `<span style="color:#C084FC;">${cVal}</span>` : "",
+        tmpVal ? `<span style="color:#FBBF24;">${tmpVal}</span>` : ""
+      ].filter(Boolean);
+      tooltipEl.innerHTML = parts.join(" · ");
+      tooltipEl.style.display = "flex";
+    }
+
+    _syncMapMarkerAtIndex(idx);
+  };
+
+  svgEl.addEventListener("mousemove", (e) => handleScrub(e.clientX));
+  svgEl.addEventListener("touchstart", (e) => {
+    if (e.touches && e.touches[0]) handleScrub(e.touches[0].clientX);
+  }, { passive: true });
+  svgEl.addEventListener("touchmove", (e) => {
+    if (e.touches && e.touches[0]) handleScrub(e.touches[0].clientX);
+  }, { passive: true });
+  svgEl.addEventListener("mouseleave", () => {
+    if (crosshair) crosshair.style.display = "none";
+    if (dot) dot.style.display = "none";
+    if (tooltipEl) tooltipEl.style.display = "none";
+  });
 }
 
 function _paintActivityDetailHeaderAndMap(act) {
@@ -3879,6 +4128,8 @@ function _paintActivityDetailHeaderAndMap(act) {
   const segBtn = document.getElementById("btn-create-segment-from-act");
   const gpxBtn = document.getElementById("btn-download-gpx");
   if (_detailMapInstance) { _detailMapInstance.remove(); _detailMapInstance = null; }
+  _detailMapCursorMarker = null;
+  _detailMapHighlightLayer = null;
   if (window.L && act.polyline && act.polyline.length > 2) {
     mapCont.style.display = "block";
     if (segBtn) {
@@ -3978,23 +4229,26 @@ async function openActivityDetail(externalId, updateUrl = true) {
       }
     }
 
-    // Render Strava-style Parciales Table (KM, Ritmo, Desn.) including fractional last split
+    // Render Strava-style Parciales Table (KM, Ritmo, Desn.) including fractional last split & clickable inspector
+    _detailSelectedSplitIdx = null;
+    const splitInspector = document.getElementById("detail-split-inspector");
+    if (splitInspector) splitInspector.style.display = "none";
     const splitsList = document.getElementById("detail-splits-list");
     if (act.splits && act.splits.length > 0) {
       const minPace = Math.min(...act.splits.map(s => s.pace_sec));
       const maxPace = Math.max(...act.splits.map(s => s.pace_sec));
-      splitsList.innerHTML = act.splits.map(s => {
+      splitsList.innerHTML = act.splits.map((s, idx) => {
         const ratio = maxPace > minPace ? 100 - ((s.pace_sec - minPace) / (maxPace - minPace)) * 45 : 85;
         const elevTxt = s.elev_diff !== undefined && s.elev_diff !== null ? `${s.elev_diff >= 0 ? "+" : ""}${Math.round(s.elev_diff)} m` : "—";
         return `
-          <div class="detail-split-row">
+          <button type="button" class="detail-split-row" data-split-idx="${idx}" onclick="selectActivitySplit(${idx})">
             <span style="color:var(--text-secondary); font-weight:700;">${s.km} km</span>
             <div class="detail-split-pace-wrap">
               <span style="font-weight:800; color:var(--on-surface); min-width:58px;">${s.pace_str}</span>
               <div class="split-bar-track" style="flex:1;"><div class="split-bar-fill" style="width:${Math.round(ratio)}%;"></div></div>
             </div>
             <span style="color:var(--text-secondary); text-align:right;">${elevTxt}</span>
-          </div>
+          </button>
         `;
       }).join("");
     } else {
@@ -4051,6 +4305,8 @@ function closeActivityDetailModal(updateUrl = true) {
   const modal = document.getElementById("activity-detail-modal");
   if (modal) modal.style.display = "none";
   if (_detailMapInstance) { _detailMapInstance.remove(); _detailMapInstance = null; }
+  _detailMapCursorMarker = null;
+  _detailMapHighlightLayer = null;
   if (updateUrl && window.location.pathname.startsWith("/actividad/")) {
     const backPath = TAB_TO_ROUTE[_lastTabId] || "/inicio";
     history.pushState({ tabId: _lastTabId }, "", backPath);

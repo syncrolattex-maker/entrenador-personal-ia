@@ -2712,7 +2712,13 @@ async def api_activity_detail(external_id: str):
     detail = database.get_activity_detail(external_id)
     if not detail:
         raise HTTPException(status_code=404, detail="Actividad no encontrada")
-    if (not detail.get("splits") and not detail.get("polyline")) and garmin_client.is_garmin_connected():
+    cs = detail.get("chart_series") or {}
+    needs_stream_refresh = (
+        (not detail.get("splits") and not detail.get("polyline"))
+        or ("cadence" not in cs)
+        or ("temp_c" not in cs)
+    )
+    if needs_stream_refresh and garmin_client.is_garmin_connected():
         det = garmin_client.get_garmin_activity_details(external_id)
         if det.get("polyline") or det.get("splits"):
             saved_detail = database.save_activity_stream(
