@@ -45,8 +45,14 @@ def _get_conn():
     return conn
 
 
+_DB_INITIALIZED = False
+
+
 def init_db() -> None:
     """Creates the 4 core tables: activities, activity_streams, personal_records, gear."""
+    global _DB_INITIALIZED
+    if _DB_INITIALIZED:
+        return
     conn = _get_conn()
     cur = conn.cursor()
     is_pg = _use_postgres() and not isinstance(conn, sqlite3.Connection)
@@ -224,6 +230,7 @@ def init_db() -> None:
 
     conn.commit()
     conn.close()
+    _DB_INITIALIZED = True
 
 
 def _ph(conn) -> str:
@@ -519,7 +526,7 @@ def save_activity_stream(
     hr_zones: List[Dict[str, Any]],
     chart_series: Dict[str, Any],
     elevation_gain: float = 0.0,
-) -> None:
+) -> Optional[Dict[str, Any]]:
     init_db()
     conn = _get_conn()
     cur = conn.cursor()
@@ -546,6 +553,7 @@ def save_activity_stream(
     # Recompute physiological metrics with real streams + detect segments
     cur.execute(f"SELECT * FROM activities WHERE external_id = {p}", (str(external_id),))
     act_rows = _rows_to_dicts(cur, cur.fetchall())
+    act_result: Optional[Dict[str, Any]] = None
     if act_rows:
         act = act_rows[0]
         ftp = _get_ftp_from_conn(cur, p)
@@ -570,22 +578,56 @@ def save_activity_stream(
                 polyline, dur_min, act.get("avg_hr"), act.get("start_date", ""), chart_series=chart_series
             )
 
+        cur.execute(
+            f"""
+            SELECT se.*, s.name AS segment_name, s.distance_m
+            FROM segment_efforts se
+            JOIN segments s ON s.id = se.segment_id
+            WHERE se.activity_id = {p}
+            ORDER BY se.elapsed_sec ASC
+            """,
+            (str(external_id),),
+        )
+        seg_efforts = _rows_to_dicts(cur, cur.fetchall())
+        for se in seg_efforts:
+            sec = int(round(float(se.get("elapsed_sec") or 0)))
+            se["elapsed_str"] = f"{sec // 60}:{sec % 60:02d}"
+
+        act["relative_effort"] = rel_effort
+        act.update(phys)
+        act["polyline"] = polyline if polyline is not None else (json.loads(act["polyline_json"]) if act.get("polyline_json") else [])
+        act["splits"] = splits
+        act["hr_zones"] = hr_zones
+        act["chart_series"] = chart_series
+        act["segment_efforts"] = seg_efforts
+        act_result = act
+
     conn.commit()
     conn.close()
     recalculate_gear_and_prs()
+    return act_result
 
 
-def get_all_activities(limit: int = 50) -> List[Dict[str, Any]]:
+_ACT_COLS_NO_POLY = (
+    "id, external_id, source, sport_type, name, start_date, distance_km, duration_min, "
+    "elevation_gain, avg_hr, max_hr, calories, avg_pace_str, aerobic_te, relative_effort, "
+    "rpe, avg_power_w, energy_kj, intensity_pct, vam_mh, moving_duration_min, "
+    "elapsed_duration_min, avg_cadence, avg_temp_c, device_name, gear_id, description, private_notes"
+)
+
+
+def get_all_activities(limit: int = 50, include_polyline: bool = True) -> List[Dict[str, Any]]:
     init_db()
     conn = _get_conn()
     cur = conn.cursor()
     p = _ph(conn)
-    cur.execute(f"SELECT * FROM activities ORDER BY start_date DESC LIMIT {p}", (limit,))
+    cols = "*" if include_polyline else _ACT_COLS_NO_POLY
+    cur.execute(f"SELECT {cols} FROM activities ORDER BY start_date DESC LIMIT {p}", (limit,))
     rows = _rows_to_dicts(cur, cur.fetchall())
     conn.close()
 
     for r in rows:
-        if r.get("polyline_json"):
+        if include_polyline and r.get("polyline_json"):
             try:
                 r["polyline"] = json.loads(r["polyline_json"])
             except Exception:
@@ -593,6 +635,17 @@ def get_all_activities(limit: int = 50) -> List[Dict[str, Any]]:
         else:
             r["polyline"] = []
     return rows
+
+
+def get_streamed_activity_ids() -> set:
+    """Returns set of external_ids that already have cached streams in activity_streams."""
+    init_db()
+    conn = _get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT activity_id FROM activity_streams")
+    ids = {str(row[0]) for row in cur.fetchall() if row[0]}
+    conn.close()
+    return ids
 
 
 def get_activity_detail(external_id: str) -> Optional[Dict[str, Any]]:
@@ -712,7 +765,7 @@ def recalculate_gear_and_prs() -> None:
     cur = conn.cursor()
     p = _ph(conn)
 
-    cur.execute("SELECT * FROM activities")
+    cur.execute("SELECT external_id, sport_type, distance_km, start_date FROM activities")
     acts = _rows_to_dicts(cur, cur.fetchall())
 
     cur.execute("SELECT activity_id, chart_series_json FROM activity_streams")

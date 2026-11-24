@@ -156,12 +156,37 @@ class SincronizarCarreraPayload(BaseModel):
 
 async def get_intervals_history() -> List[dict]:
     """
-    Fetches the last 14-30 days of real activities from Garmin Connect (if connected)
-    or Intervals.icu API. Used by Gemini to decide and adapt the workout of the day.
+    Reads the last 30 real activities directly from the local/PostgreSQL database (zero external API latency).
+    Only falls back to Garmin Connect / Intervals.icu if the database is completely empty.
+    Explicit Garmin syncing is handled by GET /api/garmin/sync.
     """
+    db_acts = database.get_all_activities(limit=30, include_polyline=False)
+    if db_acts:
+        return [
+            {
+                "tipo": a["sport_type"],
+                "raw_tipo": a.get("sport_type"),
+                "nombre": a["name"],
+                "fecha": (a.get("start_date") or "")[:10],
+                "duracion_minutos": float(a.get("duration_min") or 0),
+                "frecuencia_cardiaca_media": a.get("avg_hr"),
+                "frecuencia_cardiaca_max": a.get("max_hr"),
+                "calorias_activas": a.get("calories"),
+                "distancia_km": a.get("distance_km"),
+                "ritmo_medio": a.get("avg_pace_str"),
+                "efecto_aerobico": a.get("aerobic_te"),
+                "fuente": a.get("source") or "Garmin Connect",
+            }
+            for a in db_acts
+        ]
+
     if garmin_client.is_garmin_connected():
         garmin_acts = garmin_client.get_garmin_history(limit=30)
         if garmin_acts:
+            try:
+                database.upsert_activities(garmin_acts)
+            except Exception as e:
+                print(f"[DB] Upsert fallback error: {e}")
             return [
                 {
                     "tipo": a["tipo"],
@@ -1952,27 +1977,41 @@ async def garmin_mfa(payload: GarminMfaPayload):
 
 @app.get("/api/garmin/sync")
 async def garmin_sync():
+    from concurrent.futures import ThreadPoolExecutor
+
     if not garmin_client.is_garmin_connected():
         raise HTTPException(status_code=401, detail="Garmin Connect no está vinculado todavía.")
     activities = garmin_client.get_garmin_history(limit=30)
     if activities:
         database.upsert_activities(activities)
-        # Pre-cache GPS polylines & splits for latest 5 activities
-        for act in activities[:5]:
-            eid = str(act.get("id") or "")
-            if eid:
-                existing = database.get_activity_detail(eid)
-                if not existing or not existing.get("polyline"):
-                    det = garmin_client.get_garmin_activity_details(eid)
-                    if det.get("polyline") or det.get("splits"):
-                        database.save_activity_stream(
-                            eid,
-                            det.get("polyline"),
-                            det.get("splits", []),
-                            det.get("hr_zones", []),
-                            det.get("chart_series", {}),
-                            det.get("elevation_gain", 0),
-                        )
+        # Pre-cache GPS polylines & splits for latest 15 activities missing from activity_streams in parallel
+        streamed_ids = database.get_streamed_activity_ids()
+        missing_eids = [
+            str(act.get("id"))
+            for act in activities[:15]
+            if act.get("id") and str(act.get("id")) not in streamed_ids
+        ]
+        if missing_eids:
+            def _fetch_detail(eid: str):
+                try:
+                    return eid, garmin_client.get_garmin_activity_details(eid)
+                except Exception as ex:
+                    print(f"[Garmin Sync] Parallel detail fetch failed for {eid}: {ex}")
+                    return eid, {}
+
+            with ThreadPoolExecutor(max_workers=5) as pool:
+                results = list(pool.map(_fetch_detail, missing_eids))
+
+            for eid, det in results:
+                if det and (det.get("polyline") or det.get("splits")):
+                    database.save_activity_stream(
+                        eid,
+                        det.get("polyline"),
+                        det.get("splits", []),
+                        det.get("hr_zones", []),
+                        det.get("chart_series", {}),
+                        det.get("elevation_gain", 0),
+                    )
     wellness = garmin_client.get_garmin_wellness()
     profile = garmin_client.get_garmin_athlete_profile()
     return {
@@ -2401,7 +2440,7 @@ async def post_training_goals(payload: TrainingGoalsPayload):
 # FASE 1-4: ACTIVITIES FEED, DETAIL STREAMS, SUMMIT ANALYTICS & GEAR
 # ============================================================
 @app.get("/api/activities")
-async def api_list_activities(limit: int = 30):
+async def api_list_activities(limit: int = 15):
     acts = database.get_all_activities(limit=limit)
     if not acts and garmin_client.is_garmin_connected():
         fresh = garmin_client.get_garmin_history(limit=limit)
@@ -2422,6 +2461,16 @@ async def api_list_activities(limit: int = 30):
                             det.get("elevation_gain", 0),
                         )
             acts = database.get_all_activities(limit=limit)
+
+    # Downsample polylines (1 of every 4 points) for fast feed rendering; full polyline is served by /api/activities/{id}
+    for a in acts:
+        poly = a.get("polyline")
+        if isinstance(poly, list) and len(poly) > 8:
+            sampled = poly[::4]
+            if sampled[-1] != poly[-1]:
+                sampled.append(poly[-1])
+            a["polyline"] = sampled
+
     return {"status": "ok", "activities": acts}
 
 
@@ -2433,7 +2482,7 @@ async def api_activity_detail(external_id: str):
     if (not detail.get("splits") and not detail.get("polyline")) and garmin_client.is_garmin_connected():
         det = garmin_client.get_garmin_activity_details(external_id)
         if det.get("polyline") or det.get("splits"):
-            database.save_activity_stream(
+            saved_detail = database.save_activity_stream(
                 external_id,
                 det.get("polyline"),
                 det.get("splits", []),
@@ -2441,7 +2490,8 @@ async def api_activity_detail(external_id: str):
                 det.get("chart_series", {}),
                 det.get("elevation_gain", 0),
             )
-            detail = database.get_activity_detail(external_id)
+            if saved_detail:
+                detail = saved_detail
     return detail
 
 
@@ -2512,12 +2562,12 @@ async def api_export_activity_gpx(external_id: str):
 @app.get("/api/analytics/summit")
 async def api_summit_analytics():
     from datetime import date, datetime, timedelta
-    acts = database.get_all_activities(limit=100)
+    acts = database.get_all_activities(limit=100, include_polyline=False)
     if not acts and garmin_client.is_garmin_connected():
         fresh = garmin_client.get_garmin_history(limit=30)
         if fresh:
             database.upsert_activities(fresh)
-            acts = database.get_all_activities(limit=100)
+            acts = database.get_all_activities(limit=100, include_polyline=False)
 
     today = date.today()
     # 1. Training Log (last 84 days = 12 weeks)

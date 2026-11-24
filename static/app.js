@@ -3571,20 +3571,31 @@ function renderStravaLeafletRoute(map, polyline) {
   return route;
 }
 
-async function loadActivitiesFeed() {
+let _feedActivitiesCache = [];
+let _feedLimit = 15;
+
+function loadMoreActivities() {
+  _feedLimit += 15;
+  loadActivitiesFeed(_feedLimit);
+}
+
+async function loadActivitiesFeed(limit = _feedLimit) {
   const feedEl = document.getElementById("dashboard-activities-feed");
   const listEl = document.getElementById("metrics-history-list");
   if (!feedEl && !listEl) return;
 
-  const skel = `<div class="skeleton-shimmer" style="height:120px; margin-bottom:12px;"></div><div class="skeleton-shimmer" style="height:120px;"></div>`;
-  if (feedEl) feedEl.innerHTML = skel;
-  if (listEl) listEl.innerHTML = skel;
+  if (_feedActivitiesCache.length === 0) {
+    const skel = `<div class="skeleton-shimmer" style="height:120px; margin-bottom:12px;"></div><div class="skeleton-shimmer" style="height:120px;"></div>`;
+    if (feedEl) feedEl.innerHTML = skel;
+    if (listEl) listEl.innerHTML = skel;
+  }
 
   try {
-    const res = await fetch("/api/activities?limit=25");
+    const res = await fetch(`/api/activities?limit=${limit}`);
     if (!res.ok) return;
     const data = await res.json();
     const acts = data.activities || [];
+    _feedActivitiesCache = acts;
 
     // Update Desktop Weekly Summary (Left Column Profile Card)
     const monday = getMondayOfCurrentWeek();
@@ -3685,8 +3696,12 @@ async function loadActivitiesFeed() {
       `;
     });
 
-    if (feedEl) feedEl.innerHTML = feedHtml;
-    if (listEl) listEl.innerHTML = listHtml;
+    const loadMoreBtn = acts.length >= limit
+      ? `<button type="button" class="btn btn-ghost" style="width:100%; border-radius:9999px; margin-top:4px;" onclick="loadMoreActivities()">Cargar más actividades</button>`
+      : "";
+
+    if (feedEl) feedEl.innerHTML = feedHtml + loadMoreBtn;
+    if (listEl) listEl.innerHTML = listHtml + loadMoreBtn;
 
     // Render interactive Leaflet Voyager maps for activities with GPS polylines
     _feedMapInstances.forEach(m => { try { m.remove(); } catch (e) {} });
@@ -3846,6 +3861,58 @@ function renderStravaDetailChart(series) {
   `;
 }
 
+function _paintActivityDetailHeaderAndMap(act) {
+  document.getElementById("detail-modal-sport").textContent = (act.sport_type || "GARMIN").toUpperCase();
+  document.getElementById("detail-modal-date").textContent = act.start_date || "";
+  const dtHeader = document.getElementById("detail-header-datetime");
+  if (dtHeader) dtHeader.textContent = `${act.start_date || ""} • ${act.sport_type || ""}`;
+  document.getElementById("detail-modal-title").textContent = act.name || "Actividad";
+
+  const descEl = document.getElementById("detail-input-description");
+  const notesEl = document.getElementById("detail-input-notes");
+  if (descEl) descEl.value = act.description || "";
+  if (notesEl) notesEl.value = act.private_notes || "";
+
+  document.getElementById("detail-stat-dist").textContent = act.distance_km ? `${act.distance_km} km` : `${Math.round(act.duration_min || 0)} min`;
+  const movingEl = document.getElementById("detail-stat-moving");
+  if (movingEl) movingEl.textContent = _fmtDurationHMS(act.moving_duration_min || act.duration_min || 0);
+  const isBici = act.sport_type === "Ciclismo";
+  document.getElementById("detail-stat-pace").textContent = isBici && act.duration_min > 0
+    ? `${((act.distance_km || 0) / (act.duration_min / 60)).toFixed(1)} km/h`
+    : (act.avg_pace_str || "—");
+  document.getElementById("detail-stat-elev").textContent = `+${Math.round(act.elevation_gain || 0)} m`;
+  const elapsedEl = document.getElementById("detail-stat-elapsed");
+  if (elapsedEl) elapsedEl.textContent = _fmtDurationHMS(act.elapsed_duration_min || act.duration_min || 0);
+  const calEl = document.getElementById("detail-stat-calories");
+  if (calEl) calEl.textContent = act.calories ? `${Math.round(act.calories)} kcal` : "—";
+  const devEl = document.getElementById("detail-device-name");
+  if (devEl) devEl.textContent = act.device_name || "Garmin Connect";
+
+  const mapCont = document.getElementById("detail-map-container");
+  const segBtn = document.getElementById("btn-create-segment-from-act");
+  const gpxBtn = document.getElementById("btn-download-gpx");
+  if (_detailMapInstance) { _detailMapInstance.remove(); _detailMapInstance = null; }
+  if (window.L && act.polyline && act.polyline.length > 2) {
+    mapCont.style.display = "block";
+    if (segBtn) {
+      segBtn.style.display = "inline-flex";
+      segBtn.onclick = () => createSegmentFromActivity(act.external_id, act.name);
+    }
+    if (gpxBtn) {
+      gpxBtn.style.display = "inline-flex";
+      gpxBtn.href = `/api/activities/${act.external_id}/gpx`;
+    }
+    setTimeout(() => {
+      _detailMapInstance = L.map(mapCont);
+      renderStravaLeafletRoute(_detailMapInstance, act.polyline);
+    }, 40);
+  } else {
+    mapCont.style.display = "none";
+    if (segBtn) segBtn.style.display = "none";
+    if (gpxBtn) gpxBtn.style.display = "none";
+  }
+}
+
 async function openActivityDetail(externalId, updateUrl = true) {
   const modal = document.getElementById("activity-detail-modal");
   if (!modal) return;
@@ -3858,37 +3925,26 @@ async function openActivityDetail(externalId, updateUrl = true) {
   }
   if (window.lucide) lucide.createIcons();
 
+  // 1. Instant render from cached feed data while full detail streams load in background
+  const cached = _feedActivitiesCache.find(x => String(x.external_id) === String(externalId));
+  if (cached) {
+    _currentDetailActivity = cached;
+    _paintActivityDetailHeaderAndMap(cached);
+    const splitsList = document.getElementById("detail-splits-list");
+    if (splitsList) splitsList.innerHTML = `<div class="skeleton-shimmer" style="height:48px;"></div>`;
+    const chartSvg = document.getElementById("detail-chart-svg");
+    if (chartSvg) chartSvg.innerHTML = `<div class="skeleton-shimmer" style="height:100%;"></div>`;
+  }
+
   try {
     const res = await fetch(`/api/activities/${externalId}`);
     if (!res.ok) return;
     const act = await res.json();
     _currentDetailActivity = act;
-
-    document.getElementById("detail-modal-sport").textContent = (act.sport_type || "GARMIN").toUpperCase();
-    document.getElementById("detail-modal-date").textContent = act.start_date || "";
-    const dtHeader = document.getElementById("detail-header-datetime");
-    if (dtHeader) dtHeader.textContent = `${act.start_date || ""} • ${act.sport_type || ""}`;
-    document.getElementById("detail-modal-title").textContent = act.name || "Actividad";
-
-    const descEl = document.getElementById("detail-input-description");
-    const notesEl = document.getElementById("detail-input-notes");
-    if (descEl) descEl.value = act.description || "";
-    if (notesEl) notesEl.value = act.private_notes || "";
-
-    document.getElementById("detail-stat-dist").textContent = act.distance_km ? `${act.distance_km} km` : `${Math.round(act.duration_min || 0)} min`;
-    const movingEl = document.getElementById("detail-stat-moving");
-    if (movingEl) movingEl.textContent = _fmtDurationHMS(act.moving_duration_min || act.duration_min || 0);
     const isBici = act.sport_type === "Ciclismo";
-    document.getElementById("detail-stat-pace").textContent = isBici && act.duration_min > 0
-      ? `${((act.distance_km || 0) / (act.duration_min / 60)).toFixed(1)} km/h`
-      : (act.avg_pace_str || "—");
-    document.getElementById("detail-stat-elev").textContent = `+${Math.round(act.elevation_gain || 0)} m`;
-    const elapsedEl = document.getElementById("detail-stat-elapsed");
-    if (elapsedEl) elapsedEl.textContent = _fmtDurationHMS(act.elapsed_duration_min || act.duration_min || 0);
-    const calEl = document.getElementById("detail-stat-calories");
-    if (calEl) calEl.textContent = act.calories ? `${Math.round(act.calories)} kcal` : "—";
-    const devEl = document.getElementById("detail-device-name");
-    if (devEl) devEl.textContent = act.device_name || "Garmin Connect";
+
+    // Re-paint header & map (with full-resolution polyline if available)
+    _paintActivityDetailHeaderAndMap(act);
 
     // Populate gear dropdown
     const gearSel = document.getElementById("detail-gear-select");
@@ -3904,31 +3960,6 @@ async function openActivityDetail(externalId, updateUrl = true) {
           gearSel.value = String(act.gear_id || 0);
         }
       } catch (e) {}
-    }
-
-    // Render full Leaflet map + GPX button + Create Segment
-    const mapCont = document.getElementById("detail-map-container");
-    const segBtn = document.getElementById("btn-create-segment-from-act");
-    const gpxBtn = document.getElementById("btn-download-gpx");
-    if (_detailMapInstance) { _detailMapInstance.remove(); _detailMapInstance = null; }
-    if (window.L && act.polyline && act.polyline.length > 2) {
-      mapCont.style.display = "block";
-      if (segBtn) {
-        segBtn.style.display = "inline-flex";
-        segBtn.onclick = () => createSegmentFromActivity(act.external_id, act.name);
-      }
-      if (gpxBtn) {
-        gpxBtn.style.display = "inline-flex";
-        gpxBtn.href = `/api/activities/${act.external_id}/gpx`;
-      }
-      setTimeout(() => {
-        _detailMapInstance = L.map(mapCont);
-        renderStravaLeafletRoute(_detailMapInstance, act.polyline);
-      }, 60);
-    } else {
-      mapCont.style.display = "none";
-      if (segBtn) segBtn.style.display = "none";
-      if (gpxBtn) gpxBtn.style.display = "none";
     }
 
     // Render Relative Effort, VAM & Interactive RPE (1-10)

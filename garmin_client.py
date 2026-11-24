@@ -57,6 +57,7 @@ def save_personal_key(api_key: str) -> None:
     try:
         import database
         database.set_setting("garmin_personal_key", clean)
+        database.set_setting("garmin_jwt_cache", "")
     except Exception as e:
         print(f"[Garmin] Could not persist personal key to DB: {e}")
     try:
@@ -67,7 +68,7 @@ def save_personal_key(api_key: str) -> None:
 
 
 def _get_personal_api_token() -> Optional[str]:
-    """Exchanges GARMIN_PERSONAL_API_KEY (GCDC_...) for a short-lived Bearer JWT token."""
+    """Exchanges GARMIN_PERSONAL_API_KEY (GCDC_...) for a short-lived Bearer JWT token, cached in memory & DB."""
     api_key = get_saved_personal_key()
     if not api_key:
         return None
@@ -75,6 +76,21 @@ def _get_personal_api_token() -> Optional[str]:
     now = time.time()
     if _personal_token_cache["token"] and now < _personal_token_cache["expires_at"] - 120:
         return _personal_token_cache["token"]
+
+    # Check persistent DB cache (avoids POST token exchange on every Vercel cold start)
+    try:
+        import database
+        cached_raw = database.get_setting("garmin_jwt_cache")
+        if cached_raw:
+            cached = json.loads(cached_raw)
+            c_token = cached.get("token")
+            c_exp = float(cached.get("expires_at") or 0.0)
+            if c_token and now < c_exp - 120:
+                _personal_token_cache["token"] = c_token
+                _personal_token_cache["expires_at"] = c_exp
+                return c_token
+    except Exception as e:
+        print(f"[Garmin Personal API] DB JWT cache read error: {e}")
 
     try:
         resp = requests.post(
@@ -84,9 +100,15 @@ def _get_personal_api_token() -> Optional[str]:
         )
         if resp.status_code == 200:
             token = resp.text.strip().strip('"')
+            expires_at = now + 12 * 3600
             _personal_token_cache["token"] = token
             # Tokens are valid up to 24h; refresh proactively every 12h
-            _personal_token_cache["expires_at"] = now + 12 * 3600
+            _personal_token_cache["expires_at"] = expires_at
+            try:
+                import database
+                database.set_setting("garmin_jwt_cache", json.dumps({"token": token, "expires_at": expires_at}))
+            except Exception as db_err:
+                print(f"[Garmin Personal API] DB JWT cache write error: {db_err}")
             return token
         print(f"[Garmin Personal API] Token exchange failed: {resp.status_code} {resp.text[:200]}")
     except Exception as e:
