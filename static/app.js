@@ -2150,7 +2150,14 @@ function renderTrainingTab(plan) {
   const calEl = document.getElementById("training-weekly-calendar");
   if (!calEl || !Array.isArray(plan.dias)) return;
 
-  calEl.innerHTML = plan.dias.map((d, idx) => {
+  const authNotice = plan.garmin_write_ready === false
+    ? `<div style="padding:10px 12px; border-radius:12px; background:#FFF2EB; border:1px solid rgba(255,85,0,0.28); display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+         <span class="body-xs" style="color:var(--on-surface);"><strong>Garmin Calendario:</strong> Tu conexión actual (<code>GCDC_</code>) es solo lectura. Vincula tu email y contraseña de Garmin Connect para que las sesiones se envíen solas al calendario y al reloj.</span>
+         <a href="/perfil" class="btn btn-primary" style="padding:6px 12px; font-size:0.76rem; text-decoration:none;" onclick="navigateTo(event, '/perfil', 'tab-profile')">Vincular en Perfil</a>
+       </div>`
+    : "";
+
+  calEl.innerHTML = authNotice + plan.dias.map((d, idx) => {
     const isRest = d.tipo === "Descanso";
     const isFuerza = d.tipo === "Fuerza";
     const isBici = d.tipo === "Ciclismo";

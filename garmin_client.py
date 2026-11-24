@@ -133,11 +133,54 @@ def _map_garmin_type(type_key: str) -> str:
     return type_key.replace("_", " ").title() if type_key else "Entrenamiento"
 
 
+def _save_tokens_to_db() -> None:
+    """Persists OAuth token JSON files from TOKEN_DIR into database app_settings (survives serverless restarts)."""
+    try:
+        import database
+        payload = {}
+        for f in TOKEN_DIR.glob("*.json"):
+            payload[f.name] = f.read_text(encoding="utf-8")
+        if payload:
+            database.set_setting("garmin_oauth_tokens_json", json.dumps(payload))
+    except Exception as e:
+        print(f"[Garmin] Save tokens to DB warning: {e}")
+
+
+def _restore_tokens_from_db() -> bool:
+    """Restores OAuth token JSON files into TOKEN_DIR from database app_settings if missing locally."""
+    try:
+        if any(TOKEN_DIR.glob("*.json")):
+            return True
+        import database
+        raw = database.get_setting("garmin_oauth_tokens_json")
+        if not raw:
+            return False
+        payload = json.loads(raw)
+        if not isinstance(payload, dict) or not payload:
+            return False
+        TOKEN_DIR.mkdir(parents=True, exist_ok=True)
+        for fname, content in payload.items():
+            if isinstance(fname, str) and fname.endswith(".json") and isinstance(content, str):
+                (TOKEN_DIR / Path(fname).name).write_text(content, encoding="utf-8")
+        return any(TOKEN_DIR.glob("*.json"))
+    except Exception as e:
+        print(f"[Garmin] Restore tokens from DB warning: {e}")
+        return False
+
+
+def has_garmin_write_session() -> bool:
+    """True when OAuth tokens (or email/password env) exist for uploading & scheduling workouts."""
+    if _restore_tokens_from_db():
+        return True
+    return bool(os.getenv("GARMIN_EMAIL", "").strip() and os.getenv("GARMIN_PASSWORD", "").strip())
+
+
 def get_garmin_client() -> Optional[Any]:
     """Returns an authenticated Garmin client using saved tokens or .env credentials."""
     if not HAS_GARMINCONNECT:
         return None
     TOKEN_DIR.mkdir(parents=True, exist_ok=True)
+    _restore_tokens_from_db()
     token_files = list(TOKEN_DIR.glob("*.json"))
 
     # 1. Try existing tokens first (no password or MFA needed)
@@ -164,6 +207,7 @@ def get_garmin_client() -> Optional[Any]:
             print("[Garmin] MFA required. Submit code via /api/garmin/mfa.")
             return None
         client.garth.dump(str(TOKEN_DIR))
+        _save_tokens_to_db()
         return client
     except Exception as e:
         print(f"[Garmin] Credential login error: {e}")
@@ -183,6 +227,7 @@ def start_garmin_login(email: str, password: str) -> Dict[str, Any]:
             _pending_mfa["state"] = client_state
             return {"status": "needs_mfa", "message": "Introduce el código 2FA enviado por Garmin."}
         client.garth.dump(str(TOKEN_DIR))
+        _save_tokens_to_db()
         return {"status": "connected", "message": "Garmin Connect vinculado correctamente."}
     except Exception as e:
         return {"status": "error", "message": f"Error de login Garmin: {str(e)}"}
@@ -198,6 +243,7 @@ def complete_garmin_mfa(mfa_code: str) -> Dict[str, Any]:
         client.resume_login(state, mfa_code.strip())
         TOKEN_DIR.mkdir(parents=True, exist_ok=True)
         client.garth.dump(str(TOKEN_DIR))
+        _save_tokens_to_db()
         _pending_mfa.clear()
         return {"status": "connected", "message": "Garmin Connect autenticado y tokens guardados."}
     except Exception as e:
@@ -493,17 +539,19 @@ def _build_garmin_connect_workout_json(workout: Dict[str, Any]) -> Dict[str, Any
     """Builds Garmin Connect workout JSON payload for garminconnect upload_workout."""
     tipo = workout.get("tipo_sesion", "Carrera")
     is_run = tipo == "Carrera"
-    sport_key = "running" if is_run else "strength_training"
-    sport_id = 1 if is_run else 5
+    is_bike = tipo == "Ciclismo"
+    is_cardio = is_run or is_bike
+    sport_key = "running" if is_run else "cycling" if is_bike else "strength_training"
+    sport_id = 1 if is_run else 2 if is_bike else 5
 
     workout_steps = []
     order = 1
 
-    if is_run:
+    if is_cardio:
         for p in workout.get("phases", []):
             p_type = (p.get("type") or "INTERVAL").upper()
-            step_type_id = 1 if p_type == "WARMUP" else 2 if p_type == "COOLDOWN" else 3
-            step_type_key = "warmup" if p_type == "WARMUP" else "cooldown" if p_type == "COOLDOWN" else "interval"
+            step_type_id = 1 if p_type == "WARMUP" else 2 if p_type == "COOLDOWN" else 4 if p_type == "REST" else 3
+            step_type_key = "warmup" if p_type == "WARMUP" else "cooldown" if p_type == "COOLDOWN" else "rest" if p_type == "REST" else "interval"
             workout_steps.append({
                 "type": "ExecutableStepDTO",
                 "stepOrder": order,
@@ -544,15 +592,19 @@ def _build_garmin_connect_workout_json(workout: Dict[str, Any]) -> Dict[str, Any
                         "stepOrder": 2,
                         "stepType": {"stepTypeId": 4, "stepTypeKey": "rest"},
                         "endCondition": {"conditionTypeId": 2, "conditionTypeKey": "time"},
-                        "endConditionValue": 45.0,
+                        "endConditionValue": float(ex.get("descanso_seg") or 45),
                         "description": "Descanso",
                     },
                 ],
             })
             order += 1
 
+    title = (workout.get("titulo") or "").strip()
+    target_date = str(workout.get("fecha") or date.today().isoformat())[:10]
+    w_name = f"AaronFit — {title}" if title else f"AaronFit — {tipo} ({target_date})"
+
     return {
-        "workoutName": f"AaronFit — {tipo} ({date.today().isoformat()})",
+        "workoutName": w_name[:120],
         "sportType": {"sportTypeId": sport_id, "sportTypeKey": sport_key},
         "workoutSegments": [
             {

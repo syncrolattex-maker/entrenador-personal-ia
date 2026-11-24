@@ -2529,7 +2529,9 @@ def _refresh_locked_plan_progress(plan: dict, history: List[dict]) -> dict:
 
 def _sync_weekly_plan_to_garmin_calendar(plan: dict) -> dict:
     """Programa automáticamente en el calendario de Garmin Connect las sesiones pendientes de la semana."""
-    if not garmin_client.is_garmin_connected():
+    write_ready = garmin_client.has_garmin_write_session()
+    plan["garmin_write_ready"] = write_ready
+    if not write_ready:
         return plan
 
     dias = plan.get("dias") or []
