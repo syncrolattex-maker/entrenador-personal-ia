@@ -17,7 +17,7 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=77">
+  <link rel="stylesheet" href="/style.css?v=78">
 
   <!-- Icons & Fonts (Geist & JetBrains Mono - Stride UI Kit) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -778,6 +778,19 @@
               <span class="equip-chip active">Reloj Garmin</span>
             </div>
           </div>
+
+          <!-- Calibración de Zonas de Ritmo (Ritmo Umbral) -->
+          <div class="glass-card" id="threshold-pace-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <h3 class="headline-sm" style="margin:0;">Calibración de Ritmo Umbral</h3>
+              <span id="profile-threshold-badge" class="pill-tag orange tabular-num">4:45 /km</span>
+            </div>
+            <p class="body-sm-muted" style="font-size:0.82rem;">Define tu ritmo de umbral anaeróbico (min:seg/km) para calibrar las 6 zonas de distribución del ritmo en tus análisis.</p>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="text" id="profile-threshold-pace-input" class="strava-input tabular-num" value="4:45" placeholder="Ej: 4:45" style="max-width:140px;">
+              <button type="button" class="btn btn-primary" style="padding:9px 16px; font-size:0.85rem;" onclick="saveThresholdPace()">Guardar Umbral</button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1081,7 +1094,8 @@
         <aside class="strava-detail-sidebar" aria-label="Secciones de actividad">
           <button type="button" class="detail-nav-item active" onclick="scrollDetailSection('detail-sec-overview', this)">Descripción general</button>
           <button type="button" class="detail-nav-item" onclick="scrollDetailSection('detail-sec-analysis', this)">Análisis</button>
-          <button type="button" class="detail-nav-item sub" onclick="scrollDetailSection('detail-sec-analysis', this)">Análisis del ritmo</button>
+          <button type="button" class="detail-nav-item sub" onclick="scrollDetailSection('detail-sec-pace-analysis', this)">Análisis del ritmo</button>
+          <button type="button" class="detail-nav-item sub" onclick="scrollDetailSection('detail-sec-pace-dist', this)">Distribución del ritmo</button>
           <button type="button" class="detail-nav-item sub" onclick="scrollDetailSection('detail-zones-card', this)">Frecuencia cardíaca</button>
           <button type="button" class="detail-nav-item" onclick="scrollDetailSection('detail-sec-segments', this)">Segmentos</button>
           <button type="button" class="detail-nav-item" onclick="scrollDetailSection('detail-sec-splits', this)">Parciales</button>
@@ -1148,6 +1162,16 @@
                 </div>
               </div>
             </div>
+          </section>
+
+          <!-- Rutas Coincidentes (Matched Runs) -->
+          <section id="detail-matched-runs-card" class="glass-card" style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+              <h3 class="headline-sm" style="margin:0;">Analiza tu rendimiento a lo largo del tiempo</h3>
+              <span id="detail-matched-count" class="pill-tag orange tabular-num">0 carreras</span>
+            </div>
+            <p class="body-xs">Rutas coincidentes (±7% distancia y mismo inicio/fin). Pulsa cualquier punto para comparar.</p>
+            <div id="detail-matched-svg" style="width:100%; height:130px;"></div>
           </section>
 
           <!-- Bloque Central (Grid 260px 1fr): Parciales a la izquierda + Mapa Leaflet & GPX a la derecha -->
@@ -1227,9 +1251,56 @@
             </div>
           </div>
 
-          <!-- Zonas FC + Segmentos + Mejores Tiempos -->
+          <!-- Subvista 1: Análisis del Ritmo (GAP + Parciales ampliados) -->
+          <section id="detail-sec-pace-analysis" class="glass-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+              <h3 class="headline-sm" style="margin:0;">Análisis del ritmo y GAP</h3>
+              <span class="body-xs">Ritmo Ajustado a la Pendiente (Minetti)</span>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;">
+              <div class="p-stat-box">
+                <span class="label-caps">RITMO EN MOV.</span>
+                <span id="detail-pace-moving" class="p-stat-val tabular-num">—</span>
+              </div>
+              <div class="p-stat-box">
+                <span class="label-caps">RITMO GAP MEDIO</span>
+                <span id="detail-pace-gap" class="p-stat-val tabular-num" style="color: var(--primary-text);">—</span>
+              </div>
+              <div class="p-stat-box">
+                <span class="label-caps">RITMO TRANSCURRIDO</span>
+                <span id="detail-pace-elapsed" class="p-stat-val tabular-num">—</span>
+              </div>
+            </div>
+            <div class="pace-analysis-head">
+              <span>KM</span>
+              <span>RITMO</span>
+              <span>GAP</span>
+              <span>DESN.</span>
+              <span style="text-align:right;">FC</span>
+            </div>
+            <div id="detail-pace-analysis-list" style="display:flex; flex-direction:column; gap:7px;">
+              <p class="body-xs">Sin parciales detallados.</p>
+            </div>
+          </section>
+
+          <!-- Subvista 2: Distribución del Ritmo (Z1-Z6) -->
+          <section id="detail-sec-pace-dist" class="glass-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+              <h3 class="headline-sm" style="margin:0;">Distribución del ritmo (Z1–Z6)</h3>
+              <span id="detail-pace-threshold-label" class="body-xs tabular-num">Umbral: 4:45 /km</span>
+            </div>
+            <div id="detail-pace-dist-list" style="display:flex; flex-direction:column; gap:8px;">
+              <p class="body-xs">Sin datos de ritmo por segundo.</p>
+            </div>
+          </section>
+
+          <!-- Subvista 3: Frecuencia Cardíaca (Z1-Z5, TRIMP, Desacoplamiento Aeróbico y Curva SVG) -->
           <div class="glass-card" id="detail-zones-card" style="display:none;">
-            <h3 class="headline-sm" style="margin:0;">Zonas de Frecuencia Cardíaca (Z1–Z5)</h3>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+              <h3 class="headline-sm" style="margin:0;">Frecuencia cardíaca (Z1–Z5)</h3>
+              <div id="detail-drift-badge" class="pill-tag tabular-num">Desacoplamiento: —</div>
+            </div>
+            <div id="detail-hr-curve-svg" style="width:100%; height:130px;"></div>
             <div id="detail-zones-list" style="display:flex; flex-direction:column; gap:8px;"></div>
           </div>
 
@@ -1305,6 +1376,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=77"></script>
+  <script src="/app.js?v=78"></script>
 </body>
 </html>

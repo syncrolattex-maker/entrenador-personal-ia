@@ -593,6 +593,26 @@ def send_workout_to_garmin_watch(workout: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _fmt_pace_str(sec: float) -> str:
+    s_int = max(1, int(round(sec)))
+    return f"{s_int // 60}:{s_int % 60:02d} /km"
+
+
+def calculate_gap_sec(pace_sec: float, grade_pct: float) -> int:
+    """
+    Calculates Grade Adjusted Pace (GAP) in sec/km using Minetti's energetic cost factor:
+    uphill: 1 + 0.033*g + 0.0018*g^2; downhill: smooth adjustment.
+    """
+    if not pace_sec or pace_sec <= 0:
+        return 0
+    g = max(-30.0, min(30.0, float(grade_pct or 0.0)))
+    if g >= 0:
+        cost = 1.0 + 0.033 * g + 0.0018 * (g ** 2)
+    else:
+        cost = max(0.65, 1.0 + 0.018 * g + 0.0007 * (g ** 2))
+    return max(120, int(round(pace_sec / cost)))
+
+
 def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
     """
     Fetches GPS polyline and time-series metrics from Garmin Personal API for an activity,
@@ -698,10 +718,14 @@ def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
                 pace_sec = int(seg_t % 60)
                 avg_hr = round(sum(split_hrs) / len(split_hrs)) if split_hrs else None
                 elev_diff = round((el - split_elev_start), 1) if (el is not None and split_elev_start is not None) else 0
+                grade_pct = (elev_diff / 1000.0) * 100.0
+                gap_s = calculate_gap_sec(seg_t, grade_pct)
                 splits.append({
                     "km": current_km,
                     "pace_sec": round(seg_t),
                     "pace_str": f"{pace_min}:{pace_sec:02d} /km",
+                    "gap_sec": gap_s,
+                    "gap_str": _fmt_pace_str(gap_s),
                     "avg_hr": avg_hr,
                     "elev_diff": elev_diff,
                 })
@@ -719,10 +743,14 @@ def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
         pace_sec = int(pace_per_km % 60)
         avg_hr = round(sum(split_hrs) / len(split_hrs)) if split_hrs else None
         elev_diff = round((last_el - split_elev_start), 1) if (last_el is not None and split_elev_start is not None) else 0
+        grade_pct = (elev_diff / max(50.0, rem_m)) * 100.0
+        gap_s = calculate_gap_sec(pace_per_km, grade_pct)
         splits.append({
             "km": round(rem_m / 1000.0, 2),
             "pace_sec": round(pace_per_km),
             "pace_str": f"{pace_min}:{pace_sec:02d} /km",
+            "gap_sec": gap_s,
+            "gap_str": _fmt_pace_str(gap_s),
             "avg_hr": avg_hr,
             "elev_diff": elev_diff,
             "is_partial": True,

@@ -259,6 +259,7 @@ async function initApp() {
   }
 
   cargarPreferenciasGuardadas();
+  loadThresholdPace();
 
   try {
     // 1. Get database status
@@ -4017,23 +4018,13 @@ async function openActivityDetail(externalId, updateUrl = true) {
     // Render Synchronized Chart + Toggles
     renderStravaDetailChart(act.chart_series || {});
 
-    // Render HR Zones Z1-Z5
-    const zonesCard = document.getElementById("detail-zones-card");
-    const zonesList = document.getElementById("detail-zones-list");
-    if (act.hr_zones && act.hr_zones.length > 0) {
-      zonesCard.style.display = "flex";
-      zonesList.innerHTML = act.hr_zones.map(z => `
-        <div style="display:flex; flex-direction:column; gap:3px;">
-          <div style="display:flex; justify-content:space-between; font-size:0.75rem;">
-            <span style="color:var(--on-surface); font-weight:700;">${z.zone} <small class="tabular-num" style="color:var(--text-muted);">(${z.range})</small></span>
-            <span class="tabular-num" style="color:${z.color}; font-weight:800;">${z.pct}%</span>
-          </div>
-          <div class="split-bar-track"><div style="height:100%; width:${z.pct}%; background:${z.color}; border-radius:999px;"></div></div>
-        </div>
-      `).join("");
-    } else {
-      zonesCard.style.display = "none";
-    }
+    // Render HR Zones Z1-Z5 + Cardiac Drift + HR Curve SVG
+    renderHrAnalysisSubview(act);
+
+    // Render Matched Runs + Pace Analysis (GAP) + Pace Distribution (Z1-Z6)
+    renderMatchedRuns(act.matched_runs || []);
+    renderPaceAnalysisSubview(act);
+    renderPaceDistributionSubview(act.pace_distribution || null);
 
     // Render Detected Segments in this Activity
     const segListEl = document.getElementById("detail-segments-list");
@@ -4164,3 +4155,238 @@ async function saveNewGear() {
 
 
 
+
+
+// ============================================================
+// STRAVA PREMIUM SUBVIEWS & THRESHOLD PACE CALIBRATION
+// ============================================================
+async function loadThresholdPace() {
+  try {
+    const res = await fetch("/api/settings/threshold-pace");
+    if (!res.ok) return;
+    const data = await res.json();
+    const sec = Number(data.threshold_pace_sec || 285);
+    const mm = Math.floor(sec / 60);
+    const ss = String(sec % 60).padStart(2, "0");
+    const inp = document.getElementById("profile-threshold-pace-input");
+    const badge = document.getElementById("profile-threshold-badge");
+    if (inp) inp.value = `${mm}:${ss}`;
+    if (badge) badge.textContent = `${mm}:${ss} /km`;
+  } catch (e) {}
+}
+
+async function saveThresholdPace() {
+  const inp = document.getElementById("profile-threshold-pace-input");
+  const badge = document.getElementById("profile-threshold-badge");
+  if (!inp) return;
+  const raw = inp.value.trim();
+  const match = raw.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) {
+    showSuccessBanner("⚠️ Usa formato mm:ss (ej. 4:45).");
+    return;
+  }
+  const sec = parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+  try {
+    const res = await fetch("/api/settings/threshold-pace", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ threshold_pace_sec: sec })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (badge) badge.textContent = data.threshold_pace_str || `${raw} /km`;
+      showSuccessBanner(`✅ Ritmo umbral calibrado a ${data.threshold_pace_str || raw}`);
+    }
+  } catch (e) {}
+}
+
+function renderMatchedRuns(matchedRuns) {
+  const card = document.getElementById("detail-matched-runs-card");
+  const countEl = document.getElementById("detail-matched-count");
+  const svgEl = document.getElementById("detail-matched-svg");
+  if (!card || !svgEl) return;
+
+  if (!Array.isArray(matchedRuns) || matchedRuns.length <= 1) {
+    card.style.display = "none";
+    return;
+  }
+  card.style.display = "flex";
+  if (countEl) countEl.textContent = `${matchedRuns.length} carreras`;
+
+  const valid = matchedRuns.filter(r => r.pace_sec && r.pace_sec > 0);
+  if (valid.length < 2) {
+    svgEl.innerHTML = `<p class="body-xs">Sin datos de ritmo suficientes para comparar.</p>`;
+    return;
+  }
+
+  const W = 560, H = 120, padX = 28, padY = 18;
+  const paces = valid.map(r => r.pace_sec);
+  const minP = Math.min(...paces), maxP = Math.max(...paces), rng = (maxP - minP) || 10;
+
+  const coords = valid.map((r, i) => {
+    const x = padX + (i / (valid.length - 1)) * (W - padX * 2);
+    // Faster pace (lower sec) higher up on chart
+    const y = padY + ((r.pace_sec - minP) / rng) * (H - padY * 2);
+    return { x, y, r };
+  });
+
+  const linePath = coords.map((pt, i) => `${i === 0 ? "M" : "L"}${pt.x.toFixed(1)},${pt.y.toFixed(1)}`).join(" ");
+  const dotsHtml = coords.map(pt => {
+    const col = pt.r.is_current ? "#FC5200" : "#0066B3";
+    const rad = pt.r.is_current ? 6 : 4.5;
+    return `
+      <g style="cursor:pointer;" onclick="openActivityDetail('${pt.r.external_id}')">
+        <title>${pt.r.start_date} · ${pt.r.avg_pace_str}</title>
+        <circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="${rad}" fill="${col}" stroke="#FFFFFF" stroke-width="1.5"/>
+      </g>
+    `;
+  }).join("");
+
+  svgEl.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:100%; background:#FAFAFC; border:1px solid #E5E5EA; border-radius:8px;">
+      <path d="${linePath}" fill="none" stroke="#93C5FD" stroke-width="2"/>
+      ${dotsHtml}
+    </svg>
+  `;
+}
+
+function renderPaceAnalysisSubview(act) {
+  const mvEl = document.getElementById("detail-pace-moving");
+  const gapEl = document.getElementById("detail-pace-gap");
+  const elEl = document.getElementById("detail-pace-elapsed");
+  const listEl = document.getElementById("detail-pace-analysis-list");
+  if (!listEl) return;
+
+  if (mvEl) mvEl.textContent = act.avg_pace_str || "—";
+  if (gapEl) gapEl.textContent = act.avg_gap_str || act.avg_pace_str || "—";
+  if (elEl) {
+    const dist = Number(act.distance_km || 0);
+    const elMin = Number(act.elapsed_duration_min || act.duration_min || 0);
+    if (dist > 0.1 && elMin > 0.1) {
+      const s = Math.round((elMin * 60) / dist);
+      elEl.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} /km`;
+    } else {
+      elEl.textContent = act.avg_pace_str || "—";
+    }
+  }
+
+  const splits = act.splits || [];
+  if (splits.length === 0) {
+    listEl.innerHTML = `<p class="body-xs">Sin parciales detallados para esta sesión.</p>`;
+    return;
+  }
+
+  const minPace = Math.min(...splits.map(s => s.pace_sec));
+  const maxPace = Math.max(...splits.map(s => s.pace_sec));
+  listEl.innerHTML = splits.map(s => {
+    const ratio = maxPace > minPace ? 100 - ((s.pace_sec - minPace) / (maxPace - minPace)) * 48 : 85;
+    const isFast = s.pace_sec <= minPace + 5;
+    const barColor = isFast ? "#FC5200" : "#0066B3";
+    const elevTxt = s.elev_diff !== undefined && s.elev_diff !== null ? `${s.elev_diff >= 0 ? "+" : ""}${Math.round(s.elev_diff)}m` : "—";
+    const hrTxt = s.avg_hr ? `${Math.round(s.avg_hr)}` : "—";
+    return `
+      <div class="pace-analysis-row">
+        <strong style="color:var(--text-secondary);">${s.km}</strong>
+        <div class="pace-bar-dual">
+          <strong style="min-width:54px; color:var(--on-surface);">${s.pace_str}</strong>
+          <div class="split-bar-track" style="flex:1;"><div style="height:100%; width:${Math.round(ratio)}%; background:${barColor}; border-radius:999px;"></div></div>
+        </div>
+        <strong style="color:var(--primary-text);">${s.gap_str || s.pace_str}</strong>
+        <span style="color:var(--text-secondary);">${elevTxt}</span>
+        <span style="text-align:right; color:var(--text-secondary);">${hrTxt}</span>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderPaceDistributionSubview(paceDist) {
+  const listEl = document.getElementById("detail-pace-dist-list");
+  const lblEl = document.getElementById("detail-pace-threshold-label");
+  if (!listEl) return;
+
+  if (!paceDist || !Array.isArray(paceDist.zones)) {
+    listEl.innerHTML = `<p class="body-xs">Sin datos de ritmo por segundo disponibles.</p>`;
+    return;
+  }
+  if (lblEl && paceDist.threshold_pace_str) {
+    lblEl.textContent = `Umbral: ${paceDist.threshold_pace_str}`;
+  }
+
+  listEl.innerHTML = paceDist.zones.map(z => `
+    <div class="pace-dist-row">
+      <div>
+        <strong style="display:block; color:var(--on-surface);">${z.zone}</strong>
+        <span class="body-xs" style="font-size:0.68rem;">${z.range_str}</span>
+      </div>
+      <div class="split-bar-track" style="height:12px;">
+        <div style="height:100%; width:${z.pct}%; background:${z.color}; border-radius:999px;"></div>
+      </div>
+      <span style="text-align:right; font-weight:700;">${z.time_str}</span>
+      <span style="text-align:right; color:var(--text-secondary);">${z.pct}%</span>
+    </div>
+  `).join("");
+}
+
+function renderHrAnalysisSubview(act) {
+  const zonesCard = document.getElementById("detail-zones-card");
+  const zonesList = document.getElementById("detail-zones-list");
+  const driftBadge = document.getElementById("detail-drift-badge");
+  const hrSvg = document.getElementById("detail-hr-curve-svg");
+  if (!zonesCard || !zonesList) return;
+
+  const zones = act.hr_zones || [];
+  if (zones.length === 0) {
+    zonesCard.style.display = "none";
+    return;
+  }
+  zonesCard.style.display = "flex";
+
+  const hrAnalysis = act.hr_analysis || {};
+  if (driftBadge) {
+    const drift = hrAnalysis.cardiac_drift_pct;
+    if (drift !== null && drift !== undefined) {
+      driftBadge.textContent = `Desacoplamiento: ${drift >= 0 ? "+" : ""}${drift}%`;
+      driftBadge.className = `pill-tag tabular-num ${Math.abs(drift) <= 5 ? "" : "orange"}`;
+    } else {
+      driftBadge.textContent = "Desacoplamiento: —";
+    }
+  }
+
+  if (hrSvg) {
+    const hrs = ((act.chart_series || {}).hr || []).filter(v => v !== null && v !== undefined && v > 40);
+    if (hrs.length >= 6) {
+      const W = 560, H = 120, pad = 8;
+      const mn = Math.min(...hrs, 100), mx = Math.max(...hrs, 180), rng = (mx - mn) || 1;
+      const pathPts = hrs.map((h, i) => {
+        const x = pad + (i / (hrs.length - 1)) * (W - pad * 2);
+        const y = H - pad - ((h - mn) / rng) * (H - pad * 2);
+        return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(" ");
+      hrSvg.innerHTML = `
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%; height:100%; border:1px solid #E5E5EA; border-radius:8px; overflow:hidden;">
+          <rect x="0" y="0" width="${W}" height="${H * 0.2}" fill="rgba(255,23,68,0.08)"/>
+          <rect x="0" y="${H * 0.2}" width="${W}" height="${H * 0.2}" fill="rgba(255,152,0,0.08)"/>
+          <rect x="0" y="${H * 0.4}" width="${W}" height="${H * 0.2}" fill="rgba(0,230,118,0.08)"/>
+          <rect x="0" y="${H * 0.6}" width="${W}" height="${H * 0.2}" fill="rgba(0,174,239,0.08)"/>
+          <rect x="0" y="${H * 0.8}" width="${W}" height="${H * 0.2}" fill="rgba(100,116,139,0.08)"/>
+          <path d="${pathPts}" fill="none" stroke="#E53935" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+      `;
+    } else {
+      hrSvg.innerHTML = "";
+      hrSvg.style.height = "auto";
+    }
+  }
+
+  zonesList.innerHTML = zones.map(z => `
+    <div style="display:flex; flex-direction:column; gap:3px;">
+      <div style="display:flex; justify-content:space-between; font-size:0.75rem; gap:6px; flex-wrap:wrap;">
+        <span style="color:var(--on-surface); font-weight:700;">${z.zone} <small class="tabular-num" style="color:var(--text-muted);">(${z.range})</small></span>
+        <span class="tabular-num" style="color:${z.color}; font-weight:800;">
+          ${z.time_str || "0:00"} • ${z.pct}% ${z.trimp_points ? `• ${z.trimp_points} TRIMP` : ""}
+        </span>
+      </div>
+      <div class="split-bar-track"><div style="height:100%; width:${z.pct}%; background:${z.color}; border-radius:999px;"></div></div>
+    </div>
+  `).join("");
+}

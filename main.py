@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Literal, Optional, Any
 import os
+import re
 import json
 import httpx
 import requests
@@ -2474,6 +2475,151 @@ async def api_list_activities(limit: int = 15):
     return {"status": "ok", "activities": acts}
 
 
+def _fmt_mmss(sec: float) -> str:
+    s_int = max(0, int(round(sec)))
+    return f"{s_int // 60}:{s_int % 60:02d}"
+
+
+def _parse_pace_str_sec(pace_str: Optional[str], dist_km: float = 0.0, dur_min: float = 0.0) -> Optional[int]:
+    if pace_str:
+        m = re.search(r"(\d+):(\d{2})", str(pace_str))
+        if m:
+            return int(m.group(1)) * 60 + int(m.group(2))
+    if dist_km and dist_km > 0.1 and dur_min and dur_min > 0.1:
+        return round((dur_min * 60.0) / dist_km)
+    return None
+
+
+def _compute_pace_distribution(chart_series: dict, duration_min: float, threshold_sec: float = 285.0) -> dict:
+    paces = chart_series.get("pace_sec") or []
+    times = chart_series.get("time_sec") or []
+    t_sec = max(150.0, float(threshold_sec or 285.0))
+
+    # 6 Pace Zones relative to Threshold Pace (s/km): slower = higher sec/km
+    z_defs = [
+        ("Z1 Recuperación", f"> {_fmt_mmss(t_sec * 1.29)} /km", "#94A3B8", t_sec * 1.29, 99999.0),
+        ("Z2 Resistencia", f"{_fmt_mmss(t_sec * 1.14)} – {_fmt_mmss(t_sec * 1.29)} /km", "#38BDF8", t_sec * 1.14, t_sec * 1.29),
+        ("Z3 Tempo", f"{_fmt_mmss(t_sec * 1.06)} – {_fmt_mmss(t_sec * 1.14)} /km", "#22C55E", t_sec * 1.06, t_sec * 1.14),
+        ("Z4 Umbral", f"{_fmt_mmss(t_sec * 0.97)} – {_fmt_mmss(t_sec * 1.06)} /km", "#F59E0B", t_sec * 0.97, t_sec * 1.06),
+        ("Z5 VO2 Max", f"{_fmt_mmss(t_sec * 0.88)} – {_fmt_mmss(t_sec * 0.97)} /km", "#FC5200", t_sec * 0.88, t_sec * 0.97),
+        ("Z6 Anaeróbico", f"< {_fmt_mmss(t_sec * 0.88)} /km", "#EF4444", 0.0, t_sec * 0.88),
+    ]
+    z_secs = [0.0] * 6
+
+    valid_indices = [i for i, p in enumerate(paces) if p is not None and 120 <= float(p) <= 1200]
+    if valid_indices:
+        use_times = len(times) == len(paces) and any(t is not None for t in times)
+        fallback_dt = max(1.0, (float(duration_min or 0) * 60.0) / len(valid_indices)) if duration_min else 5.0
+        for pos, idx in enumerate(valid_indices):
+            p_val = float(paces[idx])
+            dt = fallback_dt
+            if use_times:
+                t_cur = times[idx]
+                t_prev = times[valid_indices[pos - 1]] if pos > 0 else 0.0
+                if t_cur is not None and t_prev is not None and float(t_cur) > float(t_prev):
+                    dt = min(120.0, float(t_cur) - float(t_prev))
+            for zi, (_, _, _, lo, hi) in enumerate(z_defs):
+                if lo <= p_val < hi or (zi == 0 and p_val >= lo):
+                    z_secs[zi] += dt
+                    break
+
+    total_sec = sum(z_secs) or 1.0
+    zones = [
+        {
+            "zone": z_defs[i][0],
+            "range_str": z_defs[i][1],
+            "color": z_defs[i][2],
+            "time_sec": round(z_secs[i]),
+            "time_str": _fmt_mmss(z_secs[i]),
+            "pct": round((z_secs[i] / total_sec) * 100) if sum(z_secs) > 0 else 0,
+        }
+        for i in range(6)
+    ]
+    return {
+        "threshold_pace_sec": round(t_sec),
+        "threshold_pace_str": f"{_fmt_mmss(t_sec)} /km",
+        "zones": zones,
+    }
+
+
+def _enrich_hr_analysis(hr_zones: list, chart_series: dict, duration_min: float, avg_hr: Optional[int], max_hr: Optional[int]) -> dict:
+    total_sec = max(60.0, float(duration_min or 0) * 60.0)
+    zone_weights = [1.0, 1.8, 2.8, 4.0, 5.2]
+    enriched_zones = []
+    for i, z in enumerate(hr_zones or []):
+        pct = float(z.get("pct") or 0)
+        t_sec = round((pct / 100.0) * total_sec)
+        w = zone_weights[i] if i < len(zone_weights) else 2.0
+        trimp_pts = round((t_sec / 60.0) * w * 0.75, 1)
+        item = dict(z)
+        item["time_sec"] = t_sec
+        item["time_str"] = _fmt_mmss(t_sec)
+        item["trimp_points"] = trimp_pts
+        enriched_zones.append(item)
+
+    # Compute Cardiac Drift % (1st half vs 2nd half Efficiency Factor = speed / hr)
+    paces = chart_series.get("pace_sec") or []
+    hrs = chart_series.get("hr") or []
+    pairs = [
+        (1000.0 / float(p), float(h))
+        for p, h in zip(paces, hrs)
+        if p is not None and h is not None and 120 <= float(p) <= 1200 and float(h) > 40
+    ]
+    cardiac_drift_pct = None
+    if len(pairs) >= 10:
+        mid = len(pairs) // 2
+        h1, h2 = pairs[:mid], pairs[mid:]
+        ef1 = (sum(x[0] for x in h1) / len(h1)) / (sum(x[1] for x in h1) / len(h1))
+        ef2 = (sum(x[0] for x in h2) / len(h2)) / (sum(x[1] for x in h2) / len(h2))
+        if ef1 > 0:
+            cardiac_drift_pct = round(((ef1 - ef2) / ef1) * 100.0, 1)
+
+    return {
+        "cardiac_drift_pct": cardiac_drift_pct,
+        "avg_hr": avg_hr,
+        "max_hr": max_hr,
+        "zones": enriched_zones,
+    }
+
+
+def _find_matched_runs(current_act: dict) -> list:
+    poly = current_act.get("polyline") or []
+    dist = float(current_act.get("distance_km") or 0)
+    if dist < 0.5 or len(poly) < 2:
+        return []
+    cur_start = poly[0]
+    cur_end = poly[-1]
+    cur_id = str(current_act.get("external_id"))
+    cur_sport = current_act.get("sport_type")
+
+    candidates = database.get_all_activities(limit=80, include_polyline=True)
+    matched = []
+    for c in candidates:
+        if c.get("sport_type") != cur_sport:
+            continue
+        c_dist = float(c.get("distance_km") or 0)
+        if not (0.93 * dist <= c_dist <= 1.07 * dist):
+            continue
+        c_poly = c.get("polyline") or []
+        if len(c_poly) < 2:
+            continue
+        d_start = database.haversine_m(cur_start[0], cur_start[1], c_poly[0][0], c_poly[0][1])
+        d_end = database.haversine_m(cur_end[0], cur_end[1], c_poly[-1][0], c_poly[-1][1])
+        if d_start <= 200.0 and d_end <= 200.0:
+            p_sec = _parse_pace_str_sec(c.get("avg_pace_str"), c_dist, float(c.get("duration_min") or 0))
+            matched.append({
+                "external_id": str(c.get("external_id")),
+                "start_date": c.get("start_date") or "",
+                "name": c.get("name") or "Carrera",
+                "avg_pace_str": c.get("avg_pace_str") or (_fmt_mmss(p_sec) + " /km" if p_sec else "—"),
+                "pace_sec": p_sec,
+                "is_current": str(c.get("external_id")) == cur_id,
+            })
+
+    matched.sort(key=lambda x: x["start_date"])
+    return matched
+
+
 @app.get("/api/activities/{external_id}")
 async def api_activity_detail(external_id: str):
     detail = database.get_activity_detail(external_id)
@@ -2492,7 +2638,66 @@ async def api_activity_detail(external_id: str):
             )
             if saved_detail:
                 detail = saved_detail
+
+    # 1. Enrich splits with GAP (Grade Adjusted Pace) & compute avg_gap_str
+    splits = detail.get("splits") or []
+    gap_secs = []
+    for s in splits:
+        if not s.get("gap_sec") and s.get("pace_sec"):
+            km_len = float(s.get("km") or 1.0)
+            dist_m = km_len * 1000.0 if s.get("is_partial") else 1000.0
+            grade_pct = (float(s.get("elev_diff") or 0.0) / max(50.0, dist_m)) * 100.0
+            g_sec = garmin_client.calculate_gap_sec(float(s["pace_sec"]), grade_pct)
+            s["gap_sec"] = g_sec
+            s["gap_str"] = f"{_fmt_mmss(g_sec)} /km" if g_sec else s.get("pace_str")
+        if s.get("gap_sec"):
+            gap_secs.append(float(s["gap_sec"]))
+    if gap_secs:
+        detail["avg_gap_str"] = f"{_fmt_mmss(sum(gap_secs) / len(gap_secs))} /km"
+    else:
+        detail["avg_gap_str"] = detail.get("avg_pace_str") or "—"
+
+    # 2. Pace Distribution (Z1-Z6) calibrated by threshold_pace_sec
+    thresh_raw = database.get_setting("threshold_pace_sec")
+    threshold_sec = float(thresh_raw) if thresh_raw else 285.0
+    detail["pace_distribution"] = _compute_pace_distribution(
+        detail.get("chart_series") or {},
+        float(detail.get("duration_min") or 0),
+        threshold_sec=threshold_sec,
+    )
+
+    # 3. Extended HR Analysis (time_sec, time_str, trimp_points, cardiac_drift_pct)
+    hr_analysis = _enrich_hr_analysis(
+        detail.get("hr_zones") or [],
+        detail.get("chart_series") or {},
+        float(detail.get("duration_min") or 0),
+        detail.get("avg_hr"),
+        detail.get("max_hr"),
+    )
+    detail["hr_zones"] = hr_analysis["zones"]
+    detail["hr_analysis"] = hr_analysis
+
+    # 4. Matched Runs (same route ±7% dist, <200m start/end)
+    detail["matched_runs"] = _find_matched_runs(detail)
     return detail
+
+
+class ThresholdPacePayload(BaseModel):
+    threshold_pace_sec: int = 285
+
+
+@app.get("/api/settings/threshold-pace")
+async def get_threshold_pace():
+    raw = database.get_setting("threshold_pace_sec")
+    sec = int(float(raw)) if raw else 285
+    return {"threshold_pace_sec": sec, "threshold_pace_str": f"{_fmt_mmss(sec)} /km"}
+
+
+@app.post("/api/settings/threshold-pace")
+async def set_threshold_pace(payload: ThresholdPacePayload):
+    sec = max(150, min(600, int(payload.threshold_pace_sec)))
+    database.set_setting("threshold_pace_sec", str(sec))
+    return {"status": "ok", "threshold_pace_sec": sec, "threshold_pace_str": f"{_fmt_mmss(sec)} /km"}
 
 
 class ActivityUpdatePayload(BaseModel):

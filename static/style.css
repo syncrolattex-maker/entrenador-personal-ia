@@ -2759,3 +2759,54 @@ body {
   padding: 2px 7px;
   border-radius: 999px;
 }
+
+
+/* ==========================================================================
+   STRAVA PREMIUM SUBVIEWS: PACE ANALYSIS, PACE DIST Z1-Z6, HR DRIFT & MATCHED
+   ========================================================================== */
+.pace-analysis-head,
+.pace-analysis-row {
+  display: grid;
+  grid-template-columns: 44px 1fr 70px 56px 52px;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pace-analysis-head {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding-bottom: 6px;
+  border-bottom: 1px solid #E5E5EA;
+}
+
+.pace-bar-dual {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pace-dist-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 56px 42px;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 600px) {
+  .pace-analysis-head,
+  .pace-analysis-row {
+    grid-template-columns: 36px 1fr 58px 46px 42px;
+    font-size: 0.72rem;
+    gap: 4px;
+  }
+  .pace-dist-row {
+    grid-template-columns: 96px 1fr 48px 36px;
+    font-size: 0.74rem;
+    gap: 6px;
+  }
+}
