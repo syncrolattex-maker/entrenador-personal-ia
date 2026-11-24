@@ -2338,13 +2338,14 @@ const ROUTE_TO_TAB = {
   "/inicio": "tab-dashboard",
   "/entrenamiento": "tab-metrics",
   "/entrenamientos": "tab-training",
+  "/plan": "tab-training",
   "/perfil": "tab-profile"
 };
 
 const TAB_TO_ROUTE = {
   "tab-dashboard": "/inicio",
   "tab-metrics": "/entrenamiento",
-  "tab-training": "/entrenamientos",
+  "tab-training": "/plan",
   "tab-profile": "/perfil"
 };
 

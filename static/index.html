@@ -17,7 +17,7 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=87">
+  <link rel="stylesheet" href="/style.css?v=88">
 
   <!-- Icons & Fonts (Geist & JetBrains Mono - Stride UI Kit) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -42,7 +42,7 @@
         <nav class="desktop-nav" aria-label="Navegación principal">
           <a href="/inicio" class="nav-tab-btn desktop-nav-btn active" data-target="tab-dashboard" onclick="navigateTo(event, '/inicio', 'tab-dashboard')">Inicio</a>
           <a href="/entrenamiento" class="nav-tab-btn desktop-nav-btn" data-target="tab-metrics" onclick="navigateTo(event, '/entrenamiento', 'tab-metrics')">Entrenamiento</a>
-          <a href="/entrenamientos" class="nav-tab-btn desktop-nav-btn" data-target="tab-training" onclick="navigateTo(event, '/entrenamientos', 'tab-training')">Entrenos</a>
+          <a href="/plan" class="nav-tab-btn desktop-nav-btn" data-target="tab-training" onclick="navigateTo(event, '/plan', 'tab-training')">Plan</a>
           <a href="/perfil" class="nav-tab-btn desktop-nav-btn" data-target="tab-profile" onclick="navigateTo(event, '/perfil', 'tab-profile')">Perfil</a>
         </nav>
       </div>
@@ -175,7 +175,7 @@
             <div id="stride-up-next-wrap" class="stride-up-next-wrap" style="display: none;">
               <div class="stride-section-head">
                 <h2 class="stride-section-title">Próximos entrenos</h2>
-                <a href="/entrenamientos" class="stride-section-link" onclick="navigateTo(event, '/entrenamientos', 'tab-training')">Ver plan →</a>
+                <a href="/plan" class="stride-section-link" onclick="navigateTo(event, '/plan', 'tab-training')">Ver plan →</a>
               </div>
               <div id="stride-up-next-card" class="stride-white-card"></div>
             </div>
@@ -225,28 +225,14 @@
           <!-- COLUMNA DERECHA (Desktop sticky: Recomendación IA + Carrera Objetivo + Plan Semanal) -->
           <aside class="dash-col-right">
 
-            <!-- Stride 05 · Morning Readiness Circular Dial Card (Recomendación IA) -->
-            <div id="recommendation-box" class="glass-card daily-goal-card stride-readiness-card">
+            <!-- Recomendación del día (el cálculo de readiness trabaja en segundo plano) -->
+            <div id="recommendation-box" class="glass-card daily-goal-card">
               <div class="stride-readiness-head">
-                <span class="label-caps">READINESS MATINAL</span>
+                <h2 class="headline-sm" style="margin:0;">Recomendación de hoy</h2>
                 <span id="rec-tipo-label" class="pill-tag orange">-</span>
               </div>
 
-              <div class="ring-container stride-dial-container">
-                <svg class="ring-svg" viewBox="0 0 140 140">
-                  <circle class="stride-dial-ticks" cx="70" cy="70" r="65" stroke-dasharray="1.5 6.8"></circle>
-                  <circle class="ring-track" cx="70" cy="70" r="56"></circle>
-                  <circle id="daily-ring-arc" class="ring-fill" cx="70" cy="70" r="56"></circle>
-                </svg>
-                <div class="ring-text-center">
-                  <span id="daily-goal-percent" class="metric-xl tabular-num stride-dial-num">--<small>%</small></span>
-                  <span class="label-caps">ESTADO ÓPTIMO</span>
-                </div>
-              </div>
-
-              <div class="daily-goal-content">
-                <h2 class="headline-sm" style="margin:0; text-align:center;">Recomendación de hoy</h2>
-
+              <div class="daily-goal-content" style="width:100%;">
                 <div id="rec-last-context" class="rec-last-context" style="display: none;">
                   <!-- Dynamically populated from last workout -->
                 </div>
@@ -485,12 +471,26 @@
       <!-- ================================================================= -->
       <section id="tab-training" class="tab-view">
         <div class="greeting-header">
-          <h1 class="greeting-title">Entrenamientos</h1>
-          <p class="body-sm-muted">Plan semanal determinista Lunes–Domingo sincronizado con Garmin Connect</p>
+          <h1 class="greeting-title">Plan Semanal</h1>
+          <p class="body-sm-muted">Calendario Lunes–Domingo con tus próximos entrenamientos sincronizados con Garmin Connect</p>
+        </div>
+
+        <!-- Bloque 1 (Principal en /plan): Calendario Semanal de Entrenamientos (7 días) -->
+        <div class="glass-card" id="training-calendar-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <h2 class="headline-sm" style="margin:0;">Calendario Semanal (Lunes – Domingo)</h2>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <button type="button" id="btnDiaGris" class="strava-chip-btn" style="font-size:0.74rem; padding:4px 10px;" aria-label="Generar rutina suave de 10 minutos">🔋 Día Gris (10 min)</button>
+              <span id="training-plan-badge" class="pill-tag orange">BASE / MANTENIMIENTO</span>
+            </div>
+          </div>
+          <div id="training-weekly-calendar" class="training-weekly-calendar">
+            <div class="skeleton-shimmer" style="height:90px;"></div>
+          </div>
         </div>
 
         <div class="training-top-grid">
-          <!-- Bloque 1: Objetivos Semanales (Lunes–Domingo) -->
+          <!-- Bloque 2: Objetivos Semanales (Lunes–Domingo) -->
           <div class="glass-card" id="training-goals-card">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <h2 class="headline-sm" style="margin:0;">Objetivos Semanales (L–D)</h2>
@@ -538,7 +538,7 @@
             <button type="button" class="btn btn-primary" style="width:100%;" onclick="saveTrainingGoals()">Guardar Objetivos</button>
           </div>
 
-          <!-- Bloque 2: Selector de Plan Activo -->
+          <!-- Bloque 3: Selector de Plan Activo -->
           <div class="glass-card" id="training-plan-selector-card">
             <h2 class="headline-sm" style="margin:0;">Selector de Plan Activo</h2>
             <p class="body-sm-muted" style="font-size:0.82rem;">Elige el enfoque de tu bloque semanal y vincula una carrera objetivo si tienes prueba en el calendario.</p>
@@ -559,20 +559,6 @@
               </div>
               <button type="button" class="btn btn-ghost" onclick="saveTrainingRaceGoal()">Vincular Carrera Objetivo</button>
             </div>
-          </div>
-        </div>
-
-        <!-- Bloque 3: Calendario Semanal de Entrenamientos (7 días) -->
-        <div class="glass-card" id="training-calendar-card">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-            <h2 class="headline-sm" style="margin:0;">Calendario Semanal (Lunes – Domingo)</h2>
-            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-              <button type="button" id="btnDiaGris" class="strava-chip-btn" style="font-size:0.74rem; padding:4px 10px;" aria-label="Generar rutina suave de 10 minutos">🔋 Día Gris (10 min)</button>
-              <span id="training-plan-badge" class="pill-tag orange">BASE / MANTENIMIENTO</span>
-            </div>
-          </div>
-          <div id="training-weekly-calendar" class="training-weekly-calendar">
-            <div class="skeleton-shimmer" style="height:90px;"></div>
           </div>
         </div>
       </section>
@@ -701,7 +687,7 @@
         <span class="tab-label">Inicio</span>
       </a>
 
-      <a href="/entrenamientos" class="nav-tab-btn" data-target="tab-training" onclick="navigateTo(event, '/entrenamientos', 'tab-training')">
+      <a href="/plan" class="nav-tab-btn" data-target="tab-training" onclick="navigateTo(event, '/plan', 'tab-training')">
         <svg class="tab-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <span class="tab-label">Plan</span>
       </a>
@@ -1269,6 +1255,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=87"></script>
+  <script src="/app.js?v=88"></script>
 </body>
 </html>
