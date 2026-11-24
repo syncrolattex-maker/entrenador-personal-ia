@@ -411,7 +411,6 @@ function mostrarPantallaSeleccion() {
   elSelectionCard.style.display = "flex";
   elWorkoutCard.style.display = "none";
   elLoadingState.style.display = "none";
-  if (elCoachChatCard) elCoachChatCard.style.display = "flex";
 }
 
 function renderRecommendation(rec) {
@@ -609,34 +608,6 @@ function renderRecommendation(rec) {
   // Render dynamic real metrics tab with Intervals.icu history
   renderMetricsTab(rec.historial_real || [], rec.razon);
 
-  // Show chat card
-  if (elCoachChatCard) elCoachChatCard.style.display = "flex";
-
-
-  // Persistent Chat History loading
-  const savedChat = localStorage.getItem("coach_chat_history");
-  if (savedChat) {
-    try {
-      chatHistory = JSON.parse(savedChat);
-    } catch(e) {
-      chatHistory = [];
-    }
-  }
-
-  // Check if we should append a new daily recommendation or if history is empty
-  const todayStr = new Date().toDateString();
-  const lastRecDate = localStorage.getItem("last_rec_chat_date");
-
-  if (lastRecDate !== todayStr || chatHistory.length === 0) {
-    chatHistory.push({
-      role: "model",
-      parts: `¡Hola Aarón! He analizado tu historial de entrenamientos en tu reloj. Para hoy te recomiendo una sesión de **${rec.recomendacion}**.\n\n${rec.razon}\n\n¿Quieres que adaptemos algo de los ejercicios o estás listo para empezar?`
-    });
-    localStorage.setItem("last_rec_chat_date", todayStr);
-    saveChat();
-  }
-  
-  renderChatMessages();
 }
 
 // ============================================================
@@ -646,7 +617,6 @@ function renderWorkout(workout) {
 
   elSelectionCard.style.display = "none";
   elWorkoutCard.style.display = "flex";
-  if (elCoachChatCard) elCoachChatCard.style.display = "none";
 
   elWorkoutContent.innerHTML = "";
   elWorkoutNote.textContent = workout.mensaje || "";
