@@ -2183,9 +2183,11 @@ function renderTrainingTab(plan) {
               ${d.opcional ? `<span class="pill-tag">OPCIONAL</span>` : ""}
               ${isCancelled ? `<span class="pill-tag" style="background:#FEE2E2; color:#B91C1C;">CANCELADO</span>` : ""}
             </div>
-            ${d.completado
-              ? `<span class="pill-tag" style="background:rgba(21,128,61,0.12); color:#15803D;">${matchedLabel}</span>`
-              : `<span class="body-xs tabular-num">${distInfo}${d.zona_objetivo ? ` • ${d.zona_objetivo}` : ""}</span>`}
+              ${d.completado
+                ? `<span class="pill-tag" style="background:rgba(21,128,61,0.12); color:#15803D;">${matchedLabel}</span>`
+                : d.garmin_scheduled
+                  ? `<span class="pill-tag" style="background:rgba(21,128,61,0.10); color:#15803D;">📅 En Calendario Garmin</span>`
+                  : `<span class="body-xs tabular-num">${distInfo}${d.zona_objetivo ? ` • ${d.zona_objetivo}` : ""}</span>`}
           </div>
           <div style="font-weight:800; font-size:0.96rem; color:var(--on-surface); margin-top:4px; ${isCancelled ? "text-decoration:line-through;" : ""}">${d.titulo}</div>
           <div class="body-xs" style="margin-top:2px;">${d.detalle}</div>
@@ -2376,7 +2378,11 @@ function startPlannedWorkout(dayIdx) {
         <span style="font-size:0.72rem; font-weight:700; letter-spacing:0.06em; color:rgba(255,255,255,0.78); display:inline-flex; align-items:center; gap:6px;">
           <span class="stride-dot-orange"></span> ${d.dia.toUpperCase()} · ${d.tipo.toUpperCase()}
         </span>
-        ${d.completado ? `<span style="font-size:0.72rem; color:#4ADE80; font-weight:700;">✓ Completado en Garmin</span>` : ""}
+        ${d.completado
+          ? `<span style="font-size:0.72rem; color:#4ADE80; font-weight:700;">✓ Completado en Garmin</span>`
+          : d.garmin_scheduled
+            ? `<span style="font-size:0.72rem; color:#4ADE80; font-weight:700;">📅 En Calendario Garmin</span>`
+            : ""}
       </div>
       <h2 style="margin:0; font-size:1.35rem; font-weight:700; letter-spacing:-0.02em; color:#FFFFFF;">${d.titulo}</h2>
       <div style="display:flex; align-items:baseline; gap:6px;">${bigMetric}</div>

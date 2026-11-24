@@ -2527,6 +2527,39 @@ def _refresh_locked_plan_progress(plan: dict, history: List[dict]) -> dict:
     return plan
 
 
+def _sync_weekly_plan_to_garmin_calendar(plan: dict) -> dict:
+    """Programa automáticamente en el calendario de Garmin Connect las sesiones pendientes de la semana."""
+    if not garmin_client.is_garmin_connected():
+        return plan
+
+    dias = plan.get("dias") or []
+    changed = False
+    for d in dias:
+        if d.get("tipo") == "Descanso" or d.get("cancelado") or d.get("completado") or d.get("garmin_workout_id"):
+            continue
+        w_payload = {
+            "tipo_sesion": d.get("tipo"),
+            "fecha": d.get("fecha"),
+            "titulo": d.get("titulo"),
+            "phases": d.get("phases", []),
+            "ejercicios": d.get("ejercicios", []),
+        }
+        try:
+            res = garmin_client.send_workout_to_garmin_watch(w_payload)
+            if isinstance(res, dict) and res.get("status") == "sent" and res.get("workout_id"):
+                d["garmin_workout_id"] = res["workout_id"]
+                d["garmin_scheduled"] = True
+                changed = True
+            elif isinstance(res, dict) and res.get("status") == "needs_garmin_login":
+                break
+        except Exception as e:
+            print(f"[Garmin] Auto-schedule weekly day {d.get('fecha')} error: {e}")
+
+    if changed:
+        database.set_setting("locked_weekly_plan", json.dumps(plan, ensure_ascii=False))
+    return plan
+
+
 def _get_or_create_locked_weekly_plan(history: List[dict], carrera_obj: Optional[dict], force_rebuild: bool = False) -> dict:
     """Devuelve el plan semanal inamovible de la semana actual (L-D); solo genera uno nuevo al cambiar de semana o al editar objetivos."""
     from datetime import date, timedelta
@@ -2539,13 +2572,14 @@ def _get_or_create_locked_weekly_plan(history: List[dict], carrera_obj: Optional
             try:
                 locked_plan = json.loads(raw_locked)
                 if locked_plan.get("semana_inicio") == monday_str and len(locked_plan.get("dias", [])) == 7:
-                    return _refresh_locked_plan_progress(locked_plan, history)
+                    refreshed = _refresh_locked_plan_progress(locked_plan, history)
+                    return _sync_weekly_plan_to_garmin_calendar(refreshed)
             except Exception:
                 pass
 
     plan = _construir_plan_semanal(history, carrera_obj)
     database.set_setting("locked_weekly_plan", json.dumps(plan, ensure_ascii=False))
-    return plan
+    return _sync_weekly_plan_to_garmin_calendar(plan)
 
 
 class CancelPlanDayPayload(BaseModel):
