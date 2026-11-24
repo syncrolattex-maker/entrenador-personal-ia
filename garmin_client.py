@@ -568,9 +568,9 @@ def send_workout_to_garmin_watch(workout: Dict[str, Any]) -> Dict[str, Any]:
             uploaded = client.upload_workout(payload)
             workout_id = uploaded.get("workoutId") if isinstance(uploaded, dict) else None
             if workout_id:
-                today_str = date.today().isoformat()
+                target_date = str(workout.get("fecha") or date.today().isoformat())[:10]
                 try:
-                    client.schedule_workout(workout_id, today_str)
+                    client.schedule_workout(workout_id, target_date)
                 except Exception as sched_err:
                     print(f"[Garmin] Schedule workout warning: {sched_err}")
                 try:
@@ -581,7 +581,8 @@ def send_workout_to_garmin_watch(workout: Dict[str, Any]) -> Dict[str, Any]:
                     "status": "sent",
                     "method": "garmin_direct",
                     "workout_id": workout_id,
-                    "message": "¡Entrenamiento enviado y programado en tu reloj Garmin!",
+                    "scheduled_date": target_date,
+                    "message": f"¡Entrenamiento enviado y programado en tu reloj Garmin ({target_date})!",
                 }
         except Exception as e:
             print(f"[Garmin] Direct workout upload failed: {e}")

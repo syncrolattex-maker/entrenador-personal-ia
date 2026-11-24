@@ -2322,35 +2322,91 @@ def _construir_plan_semanal(history: List[dict], carrera_obj: Optional[dict]) ->
             {"dia_idx": 6, "tipo": "Descanso", "titulo": "Recuperación Semanal", "detalle": "Descanso completo para consolidar la tendencia ascendente.", "opcional": False, "duracion_min": 0, "distancia_km": 0.0, "zona_objetivo": "Recuperación"},
         ]
 
+    try:
+        cancelled_raw = database.get_setting("cancelled_plan_dates")
+        cancelled_dates = set(json.loads(cancelled_raw)) if cancelled_raw else set()
+    except Exception:
+        cancelled_dates = set()
+
+    # Track unallocated weekly activities by sport so off-schedule Garmin workouts also satisfy weekly sessions
+    unallocated_by_sport: dict = {"Carrera": [], "Ciclismo": [], "Fuerza": []}
+    for act in history:
+        f_str = (act.get("fecha") or "")[:10]
+        if f_str >= monday_str:
+            t_a = act.get("tipo", "")
+            if t_a in unallocated_by_sport:
+                unallocated_by_sport[t_a].append(act)
+
     dias = []
+    # Pass 1: exact date + matching sport first
+    exact_matches: dict = {}
     for item in template:
         d_date = monday + timedelta(days=item["dia_idx"])
         d_str = d_date.isoformat()
-        acts_today = completed_by_date.get(d_str, [])
+        match_sport = item["tipo"]
+        acts_today = [a for a in completed_by_date.get(d_str, []) if a.get("tipo") == match_sport]
+        if acts_today:
+            exact_matches[d_str] = acts_today
+            for a in acts_today:
+                t_a = a.get("tipo", "")
+                if t_a in unallocated_by_sport and a in unallocated_by_sport[t_a]:
+                    unallocated_by_sport[t_a].remove(a)
+
+    for item in template:
+        d_date = monday + timedelta(days=item["dia_idx"])
+        d_str = d_date.isoformat()
+        acts_today = exact_matches.get(d_str, [])
         is_race_day = (
             carrera_obj
             and carrera_obj.get("activo")
             and carrera_obj.get("fecha", "")[:10] == d_str
         )
+        planned_tipo = "Carrera Objetivo" if is_race_day else item["tipo"]
+        match_sport = "Carrera" if planned_tipo == "Carrera Objetivo" else planned_tipo
+
+        matched_off_day = None
+        if not acts_today and match_sport in unallocated_by_sport and unallocated_by_sport[match_sport]:
+            matched_off_day = unallocated_by_sport[match_sport].pop(0)
+
+        is_completed = len(acts_today) > 0 or (matched_off_day is not None)
+        is_cancelled = (d_str in cancelled_dates) and not is_completed
+
+        garmin_names = [a.get("nombre") for a in acts_today]
+        if matched_off_day:
+            garmin_names.append(f"{matched_off_day.get('nombre')} ({matched_off_day.get('fecha')})")
+
         entry = {
             "dia": day_names[item["dia_idx"]],
             "fecha": d_str,
             "es_hoy": d_date == today,
-            "tipo": "Carrera Objetivo" if is_race_day else item["tipo"],
+            "tipo": planned_tipo,
             "titulo": f"{carrera_obj['nombre']} ({carrera_obj['distancia_km']} km)" if is_race_day else item["titulo"],
             "detalle": "¡Día de competición! Disfruta todo el trabajo acumulado." if is_race_day else item["detalle"],
             "opcional": False if is_race_day else item["opcional"],
             "duracion_min": item["duracion_min"],
             "distancia_km": float(carrera_obj["distancia_km"]) if is_race_day else item["distancia_km"],
             "zona_objetivo": "Competición" if is_race_day else item["zona_objetivo"],
-            "completado": len(acts_today) > 0,
-            "garmin_actividades": [a.get("nombre") for a in acts_today],
+            "completado": is_completed,
+            "completado_en_semana": matched_off_day is not None,
+            "cancelado": is_cancelled,
+            "garmin_actividades": garmin_names,
         }
         if "phases" in item:
             entry["phases"] = item["phases"]
         if "ejercicios" in item:
             entry["ejercicios"] = item["ejercicios"]
         dias.append(entry)
+
+    run_pct = min(100, round((week_run_km / base_weekly_km) * 100)) if base_weekly_km > 0 else 100
+    bike_pct = min(100, round((week_bike_km / goal_bike_km) * 100)) if goal_bike_km > 0 else 100
+    str_pct = min(100, round((week_strength_sessions / goal_strength_sessions) * 100)) if goal_strength_sessions > 0 else 100
+    overall_pct = round((run_pct * 0.55) + (bike_pct * 0.25) + (str_pct * 0.20))
+    if overall_pct >= 90:
+        comp_label = "Objetivo semanal cumplido"
+    elif overall_pct >= 50:
+        comp_label = "En progreso hacia el objetivo"
+    else:
+        comp_label = "Semana iniciada · Pendiente de carga"
 
     return {
         "semana_inicio": monday.isoformat(),
@@ -2368,10 +2424,41 @@ def _construir_plan_semanal(history: List[dict], carrera_obj: Optional[dict]) ->
             "bike_km": round(week_bike_km, 1),
             "strength_sessions": week_strength_sessions,
         },
+        "weekly_compliance": {
+            "run_pct": run_pct,
+            "bike_pct": bike_pct,
+            "strength_pct": str_pct,
+            "overall_pct": overall_pct,
+            "status_label": comp_label,
+        },
         "metrics": metrics,
         "carrera_objetivo": carrera_obj,
         "dias": dias,
     }
+
+
+class CancelPlanDayPayload(BaseModel):
+    fecha: str
+    cancel: bool = True
+
+
+@app.post("/api/training/cancel-day")
+async def post_cancel_plan_day(payload: CancelPlanDayPayload):
+    try:
+        raw = database.get_setting("cancelled_plan_dates")
+        dates = set(json.loads(raw)) if raw else set()
+    except Exception:
+        dates = set()
+    f_str = payload.fecha.strip()[:10]
+    if payload.cancel:
+        dates.add(f_str)
+    else:
+        dates.discard(f_str)
+    database.set_setting("cancelled_plan_dates", json.dumps(sorted(dates)))
+    state_data = _load_plan_state()
+    history = await get_intervals_history()
+    plan = _construir_plan_semanal(history, state_data.get("carrera_objetivo"))
+    return {"status": "ok", "plan": plan}
 
 
 @app.get("/api/carrera-objetivo")

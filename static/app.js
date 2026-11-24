@@ -270,7 +270,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v81"; // Stride Running Coach UI Kit integration
+    const APP_VERSION = "v85"; // Entrenos: cancel/restore, direct Garmin Connect push, weekly compliance check
 
 
 
@@ -2096,6 +2096,8 @@ function _buildWorkoutFromPlannedDay(d) {
   const isFuerza = d.tipo === "Fuerza";
   return {
     tipo_sesion: isFuerza ? "Fuerza" : (d.tipo === "Ciclismo" ? "Ciclismo" : "Carrera"),
+    fecha: d.fecha,
+    titulo: d.titulo,
     explicacion_tipo: d.detalle || d.titulo,
     mensaje_adaptacion: `${d.dia} (${d.fecha}) • ${d.zona_objetivo || ""}`,
     nota_coach: d.detalle || "",
@@ -2110,7 +2112,10 @@ function renderTrainingTab(plan) {
 
   const weekRange = document.getElementById("training-week-range");
   if (weekRange && plan.semana_inicio && plan.semana_fin) {
-    weekRange.textContent = `${plan.semana_inicio} – ${plan.semana_fin}`;
+    const comp = plan.weekly_compliance;
+    weekRange.textContent = comp
+      ? `${plan.semana_inicio} – ${plan.semana_fin} • ${comp.overall_pct}% (${comp.status_label})`
+      : `${plan.semana_inicio} – ${plan.semana_fin}`;
   }
 
   const goals = plan.goals || {};
@@ -2171,30 +2176,40 @@ function renderTrainingTab(plan) {
     const isFuerza = d.tipo === "Fuerza";
     const isBici = d.tipo === "Ciclismo";
     const badgeCls = isFuerza ? "orange" : isBici ? "cyan" : "";
+    const isCancelled = !!d.cancelado;
     const hasActions = !isRest;
     const distInfo = d.distancia_km > 0 ? `${d.distancia_km} km` : (d.duracion_min > 0 ? `${d.duracion_min} min` : "Descanso");
+    const matchedLabel = Array.isArray(d.garmin_actividades) && d.garmin_actividades.length > 0
+      ? `✓ Garmin (${d.garmin_actividades[0]})`
+      : "✓ Garmin";
 
     return `
-      <div class="training-day-card ${d.es_hoy ? "is-today" : ""}">
+      <div class="training-day-card ${d.es_hoy && !isCancelled ? "is-today" : ""}" style="${isCancelled ? "opacity:0.65; background:#F4F4F6;" : ""}">
         <div class="training-day-info">
           <div class="training-day-head">
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-              <strong style="font-size:0.92rem; color:${d.es_hoy ? "var(--primary-text)" : "var(--on-surface)"};">${d.dia}${d.es_hoy ? " • HOY" : ""}</strong>
+              <strong style="font-size:0.92rem; color:${d.es_hoy && !isCancelled ? "var(--primary-text)" : "var(--on-surface)"};">${d.dia}${d.es_hoy ? " • HOY" : ""}</strong>
               <span class="body-xs tabular-num">${d.fecha}</span>
               <span class="pill-tag ${badgeCls}">${d.tipo}</span>
               ${d.opcional ? `<span class="pill-tag">OPCIONAL</span>` : ""}
+              ${isCancelled ? `<span class="pill-tag" style="background:#FEE2E2; color:#B91C1C;">CANCELADO</span>` : ""}
             </div>
             ${d.completado
-              ? `<span class="pill-tag" style="background:rgba(21,128,61,0.12); color:#15803D;">✓ Garmin</span>`
+              ? `<span class="pill-tag" style="background:rgba(21,128,61,0.12); color:#15803D;">${matchedLabel}</span>`
               : `<span class="body-xs tabular-num">${distInfo}${d.zona_objetivo ? ` • ${d.zona_objetivo}` : ""}</span>`}
           </div>
-          <div style="font-weight:800; font-size:0.96rem; color:var(--on-surface); margin-top:4px;">${d.titulo}</div>
+          <div style="font-weight:800; font-size:0.96rem; color:var(--on-surface); margin-top:4px; ${isCancelled ? "text-decoration:line-through;" : ""}">${d.titulo}</div>
           <div class="body-xs" style="margin-top:2px;">${d.detalle}</div>
         </div>
         ${hasActions ? `
           <div class="training-day-actions">
-            <button type="button" class="btn btn-primary" style="padding:8px 12px; font-size:0.8rem;" onclick="startPlannedWorkout(${idx})">Ver / Iniciar</button>
-            <button type="button" class="btn btn-ghost" style="padding:8px 12px; font-size:0.8rem;" onclick="sendPlannedDayToGarmin(${idx})">Enviar a Garmin (.FIT)</button>
+            ${isCancelled ? `
+              <button type="button" class="btn btn-ghost" style="padding:8px 12px; font-size:0.8rem;" onclick="toggleCancelPlannedDay('${d.fecha}', false)">Reactivar</button>
+            ` : `
+              <button type="button" class="btn btn-primary" style="padding:8px 12px; font-size:0.8rem;" onclick="startPlannedWorkout(${idx})">Ver / Iniciar</button>
+              <button type="button" class="btn btn-ghost" style="padding:8px 12px; font-size:0.8rem;" onclick="sendPlannedDayToGarmin(${idx})">⌚ Enviar a Garmin</button>
+              ${!d.completado ? `<button type="button" class="btn btn-ghost" style="padding:8px 10px; font-size:0.78rem; color:#B91C1C;" onclick="toggleCancelPlannedDay('${d.fecha}', true)">Cancelar</button>` : ""}
+            `}
           </div>
         ` : ""}
       </div>
@@ -2263,10 +2278,25 @@ function startPlannedWorkout(dayIdx) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+async function toggleCancelPlannedDay(fecha, cancel = true) {
+  try {
+    const res = await fetch("/api/training/cancel-day", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fecha, cancel })
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.plan) renderWeeklyPlan(data.plan);
+    showSuccessBanner(cancel ? "Entrenamiento cancelado en el plan semanal." : "Entrenamiento reactivado.");
+  } catch (e) {}
+}
+
 async function sendPlannedDayToGarmin(dayIdx) {
   if (!_latestWeeklyPlan || !_latestWeeklyPlan.dias || !_latestWeeklyPlan.dias[dayIdx]) return;
   const d = _latestWeeklyPlan.dias[dayIdx];
   const workout = _buildWorkoutFromPlannedDay(d);
+  showSuccessBanner(`⌚ Enviando "${d.titulo}" a Garmin Connect...`);
   try {
     const sendRes = await fetch("/api/garmin/send-workout", {
       method: "POST",
@@ -2275,12 +2305,12 @@ async function sendPlannedDayToGarmin(dayIdx) {
     });
     if (sendRes.ok) {
       const sendData = await sendRes.json();
-      if (sendData.status === "ok" && sendData.sent) {
-        showSuccessBanner(`Sesión "${d.titulo}" enviada directamente a tu reloj Garmin.`);
+      if (sendData.status === "sent") {
+        showSuccessBanner(`⌚ ${sendData.message || `Sesión "${d.titulo}" enviada a tu reloj Garmin.`}`);
         return;
       }
     }
-    // Fallback to native .FIT download
+    // Fallback to native .FIT download if OAuth watch-push is not active yet
     const fitRes = await fetch("/api/garmin/export-fit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -2291,12 +2321,12 @@ async function sendPlannedDayToGarmin(dayIdx) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `aaronfit_${(d.tipo || "sesion").toLowerCase()}.fit`;
+      a.download = `aaronfit_${(d.tipo || "sesion").toLowerCase()}_${d.fecha || "hoy"}.fit`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      showSuccessBanner(`Archivo .FIT generado para "${d.titulo}".`);
+      showSuccessBanner(`Archivo .FIT generado para "${d.titulo}". Activa tu login Garmin en Perfil para envío directo sin cables.`);
     }
   } catch (e) {
     showSuccessBanner("No se pudo exportar la sesión a Garmin.");
