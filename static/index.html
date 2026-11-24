@@ -17,7 +17,7 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=86">
+  <link rel="stylesheet" href="/style.css?v=87">
 
   <!-- Icons & Fonts (Geist & JetBrains Mono - Stride UI Kit) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -36,7 +36,7 @@
           </div>
           <span class="app-brand-name">AARONFIT</span>
         </a>
-        <span class="version-tag">v27</span>
+        <span class="version-tag">STRIDE</span>
 
         <!-- Desktop Horizontal Navigation (>= 1024px) -->
         <nav class="desktop-nav" aria-label="Navegación principal">
@@ -134,8 +134,51 @@
             </div>
           </aside>
 
-          <!-- COLUMNA CENTRAL (Dedicada exclusivamente al Feed de Actividades recientes desde el primer píxel) -->
+          <!-- COLUMNA CENTRAL (Stride 04 · Home Hero + Up Next + Feed Garmin) -->
           <div class="dash-col-center">
+
+            <!-- Stride 04 · Home Dark Atmospheric Hero Workout Card -->
+            <div class="stride-hero-card" id="stride-hero-card">
+              <div class="stride-hero-ember" aria-hidden="true"></div>
+              <svg class="stride-hero-route-svg" viewBox="0 0 320 155" fill="none" aria-hidden="true">
+                <path d="M18 118 C48 110, 62 66, 98 72 C136 78, 152 30, 194 42 C232 52, 248 22, 302 28" stroke="rgba(255,255,255,0.14)" stroke-width="2" stroke-linecap="round" stroke-dasharray="4 6"/>
+                <path d="M18 118 C48 110, 62 66, 98 72 C136 78, 152 30, 194 42 C232 52, 248 22, 302 28" stroke="#FF5500" stroke-width="2.5" stroke-linecap="round" opacity="0.72"/>
+                <circle cx="194" cy="42" r="4.5" fill="#FF5500"/>
+                <circle cx="194" cy="42" r="9" fill="#FF5500" opacity="0.22"/>
+              </svg>
+
+              <div class="stride-hero-top-row">
+                <span class="stride-time-pill">
+                  <span class="stride-dot-orange" aria-hidden="true"></span>
+                  <span id="stride-hero-badge">Hoy · Sesión recomendada</span>
+                </span>
+                <span class="stride-garmin-tag">Garmin FIT</span>
+              </div>
+
+              <div class="stride-hero-main-row">
+                <div class="stride-hero-text">
+                  <span class="stride-hero-kicker">PLAN DE HOY · AARÓN</span>
+                  <h2 id="stride-hero-title" class="stride-hero-title">Carrera Estructurada</h2>
+                  <p id="stride-hero-subtitle" class="stride-hero-subtitle">Progresión aeróbica y ritmos objetivo · Listo para Garmin</p>
+                </div>
+                <button type="button" id="stride-hero-play-btn" class="stride-hero-play-btn" onclick="iniciarGeneracionEntrenamiento('Carrera')" aria-label="Comenzar sesión de hoy">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="7 4 20 12 7 20 7 4"/></svg>
+                </button>
+              </div>
+
+              <svg class="stride-hero-wave-svg" viewBox="0 0 340 36" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M0 30 L34 30 C44 30 48 12 58 12 L96 12 C106 12 110 26 120 26 L142 26 C152 26 156 8 166 8 L208 8 C218 8 222 26 232 26 L256 26 C266 26 270 12 280 12 L306 12 C316 12 320 30 330 30 L340 30" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+
+            <!-- Stride "Up next" (Próximos entrenos) -->
+            <div id="stride-up-next-wrap" class="stride-up-next-wrap" style="display: none;">
+              <div class="stride-section-head">
+                <h2 class="stride-section-title">Próximos entrenos</h2>
+                <a href="/entrenamientos" class="stride-section-link" onclick="navigateTo(event, '/entrenamientos', 'tab-training')">Ver plan →</a>
+              </div>
+              <div id="stride-up-next-card" class="stride-white-card"></div>
+            </div>
 
             <!-- Strava-style Garmin Activities Feed -->
             <div id="dashboard-feed-wrap" class="dashboard-feed-wrap">
@@ -239,12 +282,15 @@
                 </div>
               </div>
 
-              <div id="race-goal-banner" class="race-banner-box" style="display:none;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                  <strong id="race-banner-name" style="color: var(--on-surface); font-size:0.9rem;">—</strong>
-                  <span id="race-banner-days" class="label-caps tabular-num" style="color: var(--primary-text);">—</span>
+              <div id="race-goal-banner" class="race-banner-box stride-race-countdown" style="display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                  <div>
+                    <span class="stride-race-kicker">CARRERA OBJETIVO</span>
+                    <strong id="race-banner-name" class="stride-race-name">—</strong>
+                  </div>
+                  <span id="race-banner-days" class="stride-race-days tabular-num">—</span>
                 </div>
-                <span id="race-banner-phase" class="body-sm-muted" style="font-size:0.78rem; display:block; margin-top:2px;">—</span>
+                <span id="race-banner-phase" class="stride-race-phase">—</span>
               </div>
 
               <div id="race-goal-form" style="display:none; flex-direction:column; gap:8px; padding-top:8px; border-top:1px solid var(--border-glass);">
@@ -1223,6 +1269,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=86"></script>
+  <script src="/app.js?v=87"></script>
 </body>
 </html>

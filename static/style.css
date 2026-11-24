@@ -21,7 +21,9 @@
 
   /* Stride Athletic Orange */
   --primary: #FF5500;
+  --primary-btn: #C83E00;
   --primary-text: #C23B00;
+  --primary-on-dark: #FF7A33;
   --primary-fixed-dim: #E04800;
   --on-primary: #FFFFFF;
   --primary-container: rgba(255, 85, 0, 0.10);
@@ -34,8 +36,8 @@
   --runna-green: #15803D;
 
   --text-primary: #111113;
-  --text-secondary: #6E6E78;
-  --text-muted: #8A8A94;
+  --text-secondary: #5B5B66;
+  --text-muted: #5B5B66;
   --outline: rgba(0, 0, 0, 0.06);
   --border-glass: rgba(0, 0, 0, 0.06);
   --bg-glass: #FFFFFF;
@@ -360,14 +362,14 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  order: 2;
+  order: 1;
 }
 
 .dash-col-right {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  order: 1;
+  order: 2;
 }
 
 /* Status Banner */
@@ -444,16 +446,19 @@ body {
   flex-direction: column;
   align-items: center;
   text-align: center;
+  gap: 3px;
+  width: 92px;
 }
 
 .ring-text-center .metric-xl {
   font-size: 1.35rem;
-  line-height: 1.1;
+  line-height: 1.05;
 }
 
 .ring-text-center .label-caps {
   font-size: 11px;
-  letter-spacing: 0.02em;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
 }
 
 .daily-goal-content {
@@ -533,12 +538,12 @@ body {
 }
 
 .btn-primary {
-  background: var(--primary);
+  background: var(--primary-btn);
   color: #FFFFFF;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #C23B00;
+  background: #A93300;
 }
 
 .btn-ghost {
@@ -562,8 +567,8 @@ body {
 }
 
 .strava-chip-btn.active {
-  background: var(--primary);
-  border-color: var(--primary);
+  background: var(--primary-btn);
+  border-color: var(--primary-btn);
   color: #FFFFFF;
 }
 
@@ -602,7 +607,7 @@ body {
 }
 
 .p-stat-val.lime {
-  color: var(--primary);
+  color: var(--primary-text);
 }
 
 .p-stat-val.cyan {
@@ -1063,7 +1068,7 @@ body {
 
 .chat-bubble.user {
   align-self: flex-end;
-  background: var(--primary);
+  background: var(--primary-btn);
   color: #FFFFFF;
 }
 
@@ -1127,7 +1132,7 @@ body {
   border-radius: 50%;
   background: #FFF2EB;
   border: 2px solid var(--primary);
-  color: #FC5200;
+  color: var(--primary-text);
   font-weight: 900;
   display: flex;
   align-items: center;
@@ -1137,7 +1142,7 @@ body {
 
 .level-badge {
   margin-top: -10px;
-  background: var(--primary);
+  background: var(--primary-btn);
   color: #FFFFFF;
   font-size: 0.75rem;
   font-weight: 800;
@@ -1210,14 +1215,14 @@ body {
 }
 
 .nav-tab-btn .tab-label {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
   color: inherit;
 }
 
-.nav-tab-btn.active {
+.bottom-dock-nav .nav-tab-btn.active {
   background: #111113;
   color: #FFFFFF;
 }
@@ -1667,6 +1672,7 @@ body {
   .desktop-nav-btn {
     height: 56px;
     padding: 0 14px;
+    border-radius: 0;
     border-bottom: 2px solid transparent;
     font-size: 0.88rem;
     font-weight: 700;
@@ -1688,7 +1694,7 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: #FC5200;
+    background: var(--primary-btn);
     color: #FFFFFF;
     border: none;
     border-radius: 6px;
@@ -1700,7 +1706,7 @@ body {
   }
 
   .desktop-sync-btn:hover {
-    background: #C23B00;
+    background: #A93300;
   }
 
   .app-container {
@@ -1747,8 +1753,8 @@ body {
     height: 46px;
     border-radius: 50%;
     background: #FFF2EB;
-    border: 2px solid #FC5200;
-    color: #FC5200;
+    border: 2px solid var(--primary);
+    color: var(--primary-text);
     font-weight: 900;
     display: flex;
     align-items: center;
@@ -2513,7 +2519,7 @@ body {
 .stride-garmin-tag {
   font-size: 0.7rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .stride-hero-main-row {
@@ -2534,11 +2540,11 @@ body {
 }
 
 .stride-hero-kicker {
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--primary-on-dark);
 }
 
 .stride-hero-title {
@@ -2620,7 +2626,7 @@ body {
 }
 
 .stride-section-link:hover {
-  color: var(--primary);
+  color: var(--primary-text);
 }
 
 .stride-white-card {
@@ -2758,6 +2764,47 @@ body {
   font-weight: 700;
   padding: 2px 7px;
   border-radius: 999px;
+}
+
+/* Stride 08 · Race Day Countdown Dark Card */
+.stride-race-countdown {
+  background: linear-gradient(135deg, #121215 0%, #2B1509 100%) !important;
+  border: 1px solid rgba(255, 85, 0, 0.25) !important;
+  border-radius: 16px !important;
+  padding: 14px 16px !important;
+  color: #FFFFFF;
+}
+
+.stride-race-kicker {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--primary-on-dark);
+  margin-bottom: 2px;
+}
+
+.stride-race-name {
+  display: block;
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.stride-race-days {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.stride-race-phase {
+  display: block;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.78);
+  margin-top: 6px;
 }
 
 
