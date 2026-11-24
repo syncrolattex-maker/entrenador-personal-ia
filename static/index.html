@@ -17,13 +17,13 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=80">
+  <link rel="stylesheet" href="/style.css?v=81">
 
-  <!-- Icons & Fonts (Hanken Grotesk & JetBrains Mono) -->
+  <!-- Icons & Fonts (Geist & JetBrains Mono - Stride UI Kit) -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <!-- Top Bar (Mobile Compact Header / Desktop Fixed Strava Web Navbar) -->
@@ -70,28 +70,23 @@
       <!-- ================================================================= -->
       <section id="tab-dashboard" class="tab-view active">
 
-        <div class="greeting-header mobile-only-header figma-hero-dark">
-          <div class="figma-hero-top">
-            <div>
-              <h1 class="greeting-title" style="color:#FFFFFF;">Hola, Aarón</h1>
-              <p class="body-sm-muted" style="color:#D1D5DB;">43 años • 1,83 m • 93 kg • Pesas 5 kg & Cintas</p>
-            </div>
-            <button type="button" class="figma-hero-sync" onclick="syncGarminNow()" aria-label="Sincronizar Garmin">
+        <!-- Stride 04 · Home Greeting Header (Mobile) -->
+        <div class="stride-home-header mobile-only-header">
+          <div class="stride-home-header-left">
+            <span id="stride-today-date" class="stride-date-caption">Cargando fecha...</span>
+            <h1 id="stride-greeting-title" class="stride-greeting-title">Buenos días, Aarón</h1>
+          </div>
+          <div class="stride-home-header-actions">
+            <button type="button" class="stride-icon-circle-btn" onclick="syncGarminNow()" aria-label="Sincronizar Garmin">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
             </button>
+            <a href="/perfil" class="stride-avatar-pill" onclick="navigateTo(event, '/perfil', 'tab-profile')" aria-label="Perfil de Aarón">AA</a>
           </div>
-          <a href="/entrenamiento" class="figma-coral-strip" onclick="navigateTo(event, '/entrenamiento', 'tab-metrics')">
-            <div style="display:flex; align-items:center; gap:10px;">
-              <span class="figma-strip-badge">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-              </span>
-              <div style="text-align:left;">
-                <strong style="display:block; font-size:0.9rem; color:#FFFFFF;">Historial y Summit</strong>
-                <span style="display:block; font-size:0.75rem; color:#FFF2EB;">Ver progreso semanal, curva CTL/ATL y segmentos</span>
-              </div>
-            </div>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-          </a>
+        </div>
+
+        <!-- Stride Weekly Calendar Strip (L M X J V S D) -->
+        <div id="stride-week-strip" class="stride-week-strip" aria-label="Calendario semanal">
+          <!-- Populated dynamically by JS -->
         </div>
 
         <!-- Offline Banner -->
@@ -141,6 +136,70 @@
 
           <!-- COLUMNA CENTRAL (Hoy + Feed principal de actividades Garmin) -->
           <div class="dash-col-center">
+
+            <!-- Stride 04 · Home Dark Atmospheric Hero Workout Card -->
+            <div id="stride-hero-card" class="stride-hero-card">
+              <div class="stride-hero-ember" aria-hidden="true"></div>
+              <!-- Route SVG glow track -->
+              <svg class="stride-hero-route-svg" viewBox="0 0 350 180" fill="none" aria-hidden="true">
+                <defs>
+                  <filter id="stride-route-glow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="4" result="blur"/>
+                    <feMerge>
+                      <feMergeNode in="blur"/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
+                </defs>
+                <path d="M98 18 L145 24 L182 42 L248 36 L262 72 L244 106 L252 138 L190 144 L152 152 L116 146 L114 96 L94 64 Z"
+                      stroke="#FF5500" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"
+                      filter="url(#stride-route-glow)" opacity="0.88"/>
+              </svg>
+
+              <div class="stride-hero-top-row">
+                <span class="stride-time-pill">
+                  <span class="stride-dot-orange"></span>
+                  <span id="stride-hero-badge">Hoy · Coach Garmin</span>
+                </span>
+                <span class="stride-garmin-tag">Garmin Connect</span>
+              </div>
+
+              <div class="stride-hero-main-row">
+                <div class="stride-hero-text">
+                  <span class="stride-hero-kicker">ENTRENO DE HOY</span>
+                  <h2 id="stride-hero-title" class="stride-hero-title">Analizando...</h2>
+                  <p id="stride-hero-subtitle" class="stride-hero-subtitle">Sincronizando tu historial y forma...</p>
+                </div>
+                <button type="button" id="stride-hero-play-btn" class="stride-hero-play-btn" aria-label="Comenzar entreno de hoy">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="#111113" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+                </button>
+              </div>
+
+              <!-- Stride Interval Profile Wave -->
+              <svg class="stride-hero-wave-svg" viewBox="0 0 340 42" preserveAspectRatio="none" aria-hidden="true">
+                <defs>
+                  <linearGradient id="strideWaveGrad" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stop-color="#8A8A94"/>
+                    <stop offset="22%" stop-color="#FF5500"/>
+                    <stop offset="78%" stop-color="#FF5500"/>
+                    <stop offset="100%" stop-color="#8A8A94"/>
+                  </linearGradient>
+                </defs>
+                <path d="M0 32 L45 32 C55 32 58 10 68 10 L118 10 C128 10 130 32 140 32 C150 32 152 10 162 10 L212 10 C222 10 224 32 234 32 C244 32 246 10 256 10 L295 10 C305 10 308 32 318 32 L340 32"
+                      fill="none" stroke="url(#strideWaveGrad)" stroke-width="2.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+
+            <!-- Stride 04 · Home "Up next" Section -->
+            <div id="stride-up-next-wrap" class="stride-up-next-wrap" style="display: none;">
+              <div class="stride-section-head">
+                <h2 class="stride-section-title">Próximos entrenos</h2>
+                <a href="/entrenamientos" class="stride-section-link" onclick="navigateTo(event, '/entrenamientos', 'tab-training')">Ver plan</a>
+              </div>
+              <div id="stride-up-next-card" class="stride-white-card stride-up-next-list">
+                <!-- Populated dynamically from /api/plan-semanal -->
+              </div>
+            </div>
 
             <!-- Quick Activity Stats Banner -->
             <div class="status-banner">
@@ -279,24 +338,27 @@
           <!-- COLUMNA DERECHA (Desktop sticky: Recomendación IA + Carrera Objetivo + Plan Semanal) -->
           <aside class="dash-col-right">
 
-            <!-- Daily Goal Circular Ring Card (Recomendación IA) -->
-            <div id="recommendation-box" class="glass-card daily-goal-card">
-              <div class="ring-container">
+            <!-- Stride 05 · Morning Readiness Circular Dial Card (Recomendación IA) -->
+            <div id="recommendation-box" class="glass-card daily-goal-card stride-readiness-card">
+              <div class="stride-readiness-head">
+                <span class="label-caps">READINESS MATINAL</span>
+                <span id="rec-tipo-label" class="pill-tag orange">-</span>
+              </div>
+
+              <div class="ring-container stride-dial-container">
                 <svg class="ring-svg" viewBox="0 0 140 140">
-                  <circle class="ring-track" cx="70" cy="70" r="58"></circle>
-                  <circle id="daily-ring-arc" class="ring-fill" cx="70" cy="70" r="58"></circle>
+                  <circle class="stride-dial-ticks" cx="70" cy="70" r="65" stroke-dasharray="1.5 6.8"></circle>
+                  <circle class="ring-track" cx="70" cy="70" r="56"></circle>
+                  <circle id="daily-ring-arc" class="ring-fill" cx="70" cy="70" r="56"></circle>
                 </svg>
                 <div class="ring-text-center">
-                  <span id="daily-goal-percent" class="metric-xl tabular-num">--<small>%</small></span>
+                  <span id="daily-goal-percent" class="metric-xl tabular-num stride-dial-num">--<small>%</small></span>
                   <span class="label-caps">ESTADO ÓPTIMO</span>
                 </div>
               </div>
 
               <div class="daily-goal-content">
-                <div class="rec-badge-row">
-                  <h2 class="headline-sm" style="margin:0;">Recomendación de hoy</h2>
-                  <span id="rec-tipo-label" class="pill-tag orange">-</span>
-                </div>
+                <h2 class="headline-sm" style="margin:0; text-align:center;">Recomendación de hoy</h2>
 
                 <div id="rec-last-context" class="rec-last-context" style="display: none;">
                   <!-- Dynamically populated from last workout -->
@@ -305,8 +367,8 @@
                 <p id="rec-razon-text" class="body-md">Analizando tu historial real en Garmin Connect...</p>
                 <p id="rec-semanal-text" class="body-sm-muted"></p>
 
-                <button id="btn-comenzar-hoy" class="btn btn-primary" style="display: none; margin-top: 8px; width: 100%; font-size: 0.96rem; padding: 12px 16px;">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                <button id="btn-comenzar-hoy" class="btn btn-primary stride-btn-dark" style="display: none; margin-top: 8px; width: 100%; font-size: 0.96rem; padding: 13px 16px;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg>
                   <span id="btn-comenzar-hoy-texto">Comenzar Entrenamiento de Hoy</span>
                 </button>
               </div>
@@ -726,26 +788,26 @@
       <span id="success-text" class="success-text">¡Preferencias guardadas con éxito!</span>
     </div>
 
-    <!-- Bottom Dock Navigation Bar (Mobile < 1024px) -->
-    <nav class="bottom-dock-nav" aria-label="Navegación móvil">
+    <!-- Stride Floating Pill Bottom Dock Navigation (Mobile < 1024px) -->
+    <nav class="bottom-dock-nav stride-bottom-dock" aria-label="Navegación móvil">
       <a href="/inicio" class="nav-tab-btn active" data-target="tab-dashboard" onclick="navigateTo(event, '/inicio', 'tab-dashboard')">
-        <svg class="tab-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-        <span class="label-caps tab-label">Inicio</span>
-      </a>
-
-      <a href="/entrenamiento" class="nav-tab-btn" data-target="tab-metrics" onclick="navigateTo(event, '/entrenamiento', 'tab-metrics')">
-        <svg class="tab-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-        <span class="label-caps tab-label">Summit</span>
+        <svg class="tab-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span class="tab-label">Inicio</span>
       </a>
 
       <a href="/entrenamientos" class="nav-tab-btn" data-target="tab-training" onclick="navigateTo(event, '/entrenamientos', 'tab-training')">
-        <svg class="tab-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        <span class="label-caps tab-label">Entrenos</span>
+        <svg class="tab-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span class="tab-label">Plan</span>
+      </a>
+
+      <a href="/entrenamiento" class="nav-tab-btn" data-target="tab-metrics" onclick="navigateTo(event, '/entrenamiento', 'tab-metrics')">
+        <svg class="tab-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span class="tab-label">Progreso</span>
       </a>
 
       <a href="/perfil" class="nav-tab-btn" data-target="tab-profile" onclick="navigateTo(event, '/perfil', 'tab-profile')">
-        <svg class="tab-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        <span class="label-caps tab-label">Perfil</span>
+        <svg class="tab-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span class="tab-label">Perfil</span>
       </a>
     </nav>
 
@@ -1243,6 +1305,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=80"></script>
+  <script src="/app.js?v=81"></script>
 </body>
 </html>

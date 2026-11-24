@@ -1,29 +1,30 @@
 /* ==========================================================================
-   AARONFIT — STRAVA LIGHT MODE & DUAL ARCHITECTURE (v71)
-   Clean Light Surface (#F7F7FA / #FFFFFF), Hairline Borders (#E5E5EA),
-   Single Performance Accent (#FC5200), Tabular Numerals & Dual Mobile/Desktop
+   AARONFIT — STRIDE UI KIT (v81)
+   Geist Typography, Clean Light Surface (#F4F4F6 / #FFFFFF),
+   Dark Atmospheric Hero (#121214), Athletic Orange (#FF5500) & Floating Pill Dock
    ========================================================================== */
 
 :root {
-  --background: #F7F7FA;
+  --background: #F4F4F6;
   --surface: #FFFFFF;
   --surface-dim: #F7F7FA;
   --surface-bright: #FFFFFF;
-  --surface-container-lowest: #F7F7FA;
+  --surface-dark: #121214;
+  --surface-container-lowest: #F4F4F6;
   --surface-container-low: #FFFFFF;
   --surface-container: #FFFFFF;
-  --surface-container-high: #F0F0F5;
+  --surface-container-high: #EFEFF3;
   --surface-container-highest: #E5E5EA;
 
-  --on-surface: #242428;
-  --on-surface-variant: #6D6D78;
+  --on-surface: #111113;
+  --on-surface-variant: #6E6E78;
 
-  /* Single Accent: Strava Orange */
-  --primary: #FC5200;
+  /* Stride Athletic Orange */
+  --primary: #FF5500;
   --primary-text: #C23B00;
   --primary-fixed-dim: #E04800;
   --on-primary: #FFFFFF;
-  --primary-container: rgba(252, 82, 0, 0.08);
+  --primary-container: rgba(255, 85, 0, 0.10);
   --on-primary-container: #C23B00;
 
   /* Subtle Secondary & Semantic (WCAG AA >= 4.5:1 on light surfaces) */
@@ -32,25 +33,25 @@
   --success: #15803D;
   --runna-green: #15803D;
 
-  --text-primary: #242428;
-  --text-secondary: #595963;
-  --text-muted: #5E5E68;
-  --outline: #E5E5EA;
-  --border-glass: #E5E5EA;
+  --text-primary: #111113;
+  --text-secondary: #6E6E78;
+  --text-muted: #8A8A94;
+  --outline: rgba(0, 0, 0, 0.06);
+  --border-glass: rgba(0, 0, 0, 0.06);
   --bg-glass: #FFFFFF;
 
-  --font-hanken: 'Hanken Grotesk', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-hanken: 'Geist', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  --rounded-sm: 4px;
-  --rounded-default: 8px;
-  --rounded-md: 8px;
-  --rounded-lg: 8px;
-  --rounded-xl: 12px;
+  --rounded-sm: 8px;
+  --rounded-default: 14px;
+  --rounded-md: 16px;
+  --rounded-lg: 20px;
+  --rounded-xl: 24px;
   --rounded-full: 9999px;
 
-  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --card-shadow-hover: 0 2px 8px rgba(0, 0, 0, 0.07);
+  --card-shadow: 0 2px 10px rgba(0, 0, 0, 0.035);
+  --card-shadow-hover: 0 6px 20px rgba(0, 0, 0, 0.065);
 }
 
 ::selection {
@@ -317,14 +318,14 @@ body {
 }
 
 /* ==========================================================================
-   STRAVA LIGHT CARD SYSTEM (ZERO NEONS, ZERO GLASSMORPHISM)
+   STRIDE LIGHT CARD SYSTEM (CLEAN WHITE, 20PX RADIUS, SUBTLE HAIRLINE)
    ========================================================================== */
 .glass-card {
   background: #FFFFFF;
-  border: 1px solid #E5E5EA;
-  border-radius: 8px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  padding: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.055);
+  border-radius: 20px;
+  box-shadow: var(--card-shadow);
+  padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1169,18 +1170,27 @@ body {
 }
 
 /* ==========================================================================
-   MOBILE BOTTOM DOCK & FAB (< 1024px)
+   MOBILE FLOATING PILL BOTTOM DOCK (< 1024px) — STRIDE UI KIT
    ========================================================================== */
+.bottom-dock-nav.stride-bottom-dock,
 .bottom-dock-nav {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: 14px;
+  left: 16px;
+  right: 16px;
+  max-width: 448px;
+  margin: 0 auto;
   height: 64px;
-  background: #FFFFFF;
-  border-top: 1px solid #E5E5EA;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 9999px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.09);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
   z-index: 1000;
 }
 
@@ -1192,18 +1202,24 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  color: #595963;
+  gap: 2px;
+  color: #6E6E78;
+  border-radius: 9999px;
   cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease;
 }
 
 .nav-tab-btn .tab-label {
-  font-size: 11px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
   color: inherit;
 }
 
 .nav-tab-btn.active {
-  color: var(--primary-text);
+  background: #111113;
+  color: #FFFFFF;
 }
 
 .fab-btn {
@@ -2303,4 +2319,443 @@ body {
   .detail-phys-row {
     grid-template-columns: 1fr 1fr;
   }
+}
+
+
+/* ==========================================================================
+   STRIDE RUNNING COACH UI KIT — HOME, HERO CARD, UP NEXT, READINESS & DETAIL
+   ========================================================================== */
+.stride-home-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 2px 2px;
+}
+
+.stride-home-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stride-date-caption {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.stride-greeting-title {
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--on-surface);
+  line-height: 1.15;
+}
+
+.stride-home-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stride-icon-circle-btn,
+.stride-avatar-pill {
+  width: 42px;
+  height: 42px;
+  border-radius: 9999px;
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--on-surface);
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.14s ease;
+}
+
+.stride-avatar-pill {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.stride-icon-circle-btn:active,
+.stride-avatar-pill:active {
+  transform: scale(0.95);
+}
+
+/* Weekly Strip (L M X J V S D) */
+.stride-week-strip {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  padding: 4px 0 6px;
+}
+
+.stride-day-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.stride-day-letter {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.stride-day-num {
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--on-surface);
+  font-variant-numeric: tabular-nums;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.stride-day-col.is-today .stride-day-num {
+  background: #111113;
+  color: #FFFFFF;
+  font-weight: 700;
+}
+
+.stride-day-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.stride-day-col.is-today .stride-day-dot {
+  background: #FF5500;
+}
+
+.stride-day-col.is-done .stride-day-dot {
+  background: #111113;
+}
+
+.stride-day-col.is-planned .stride-day-dot {
+  background: #C7C7D1;
+}
+
+/* Stride 04 · Home Dark Atmospheric Hero Workout Card */
+.stride-hero-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #121215 0%, #191615 55%, #3B1A08 100%);
+  color: #FFFFFF;
+  padding: 18px 20px 16px;
+  min-height: 270px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 12px 32px rgba(18, 18, 20, 0.18);
+}
+
+.stride-hero-ember {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 55% 110%, rgba(255, 85, 0, 0.36) 0%, rgba(255, 85, 0, 0) 68%);
+  pointer-events: none;
+}
+
+.stride-hero-route-svg {
+  position: absolute;
+  inset: 12px 16px 64px 16px;
+  width: calc(100% - 32px);
+  height: 155px;
+  pointer-events: none;
+  opacity: 0.92;
+}
+
+.stride-hero-top-row {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stride-time-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(8px);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+.stride-dot-orange {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #FF5500;
+}
+
+.stride-garmin-tag {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.stride-hero-main-row {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 14px;
+  margin-top: 86px;
+}
+
+.stride-hero-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.stride-hero-kicker {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.stride-hero-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: #FFFFFF;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.stride-hero-subtitle {
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.35;
+  margin: 0;
+}
+
+.stride-hero-play-btn {
+  width: 50px;
+  height: 50px;
+  border-radius: 9999px;
+  background: #FFFFFF;
+  color: #111113;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease;
+}
+
+.stride-hero-play-btn:hover {
+  transform: scale(1.05);
+}
+
+.stride-hero-play-btn:active {
+  transform: scale(0.95);
+}
+
+.stride-hero-wave-svg {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 36px;
+  margin-top: 10px;
+}
+
+/* Stride "Up next" Section */
+.stride-up-next-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stride-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 2px;
+}
+
+.stride-section-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--on-surface);
+  margin: 0;
+}
+
+.stride-section-link {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.stride-section-link:hover {
+  color: var(--primary);
+}
+
+.stride-white-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.055);
+  border-radius: 22px;
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+
+.stride-up-next-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: background-color 0.14s ease;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+}
+
+.stride-up-next-item:hover {
+  background: #FAFAFC;
+}
+
+.stride-up-next-item + .stride-up-next-item {
+  border-top: 1px solid rgba(0, 0, 0, 0.055);
+}
+
+.stride-mini-route {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: #F4F4F6;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Stride 05 · Morning Readiness Dial */
+.stride-readiness-head {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stride-dial-ticks {
+  fill: none;
+  stroke: #D4D4DC;
+  stroke-width: 2.5;
+}
+
+.stride-dial-num {
+  font-size: 2rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.04em !important;
+}
+
+.stride-btn-dark {
+  background: #111113 !important;
+  color: #FFFFFF !important;
+  border-radius: 9999px !important;
+}
+
+.stride-btn-dark:hover:not(:disabled) {
+  background: #27272C !important;
+}
+
+/* Stride 09 · Workout Detail Hero & Step Bars */
+.stride-workout-detail-hero {
+  border-radius: 20px;
+  background: linear-gradient(180deg, #161618 0%, #2D1508 100%);
+  color: #FFFFFF;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stride-detail-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.stride-detail-pill {
+  padding: 4px 10px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+.stride-steps-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.055);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.stride-step-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.stride-step-row + .stride-step-row {
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.stride-step-bar {
+  width: 3px;
+  height: 30px;
+  border-radius: 999px;
+  background: #D4D4DC;
+  flex-shrink: 0;
+}
+
+.stride-step-bar.work {
+  background: #FF5500;
+}
+
+.stride-step-repeat-pill {
+  background: rgba(255, 85, 0, 0.12);
+  color: #C23B00;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
 }

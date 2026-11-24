@@ -221,8 +221,24 @@ function updateOnlineStatus() {
 // ============================================================
 // BOOT — FETCH RECOMMENDATION
 // ============================================================
+function renderStrideHomeHeader() {
+  const now = new Date();
+  const dateEl = document.getElementById("stride-today-date");
+  const greetEl = document.getElementById("stride-greeting-title");
+  if (dateEl) {
+    const raw = now.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+    dateEl.textContent = raw.charAt(0).toUpperCase() + raw.slice(1);
+  }
+  if (greetEl) {
+    const h = now.getHours();
+    const salute = h < 13 ? "Buenos días" : h < 20 ? "Buenas tardes" : "Buenas noches";
+    greetEl.textContent = `${salute}, Aarón`;
+  }
+}
+
 async function initApp() {
   if (window.lucide) lucide.createIcons();
+  renderStrideHomeHeader();
   hideSuccessBanner();
   mostrarPantallaSeleccion();
 
@@ -238,7 +254,7 @@ async function initApp() {
     if (elRecTipoLabel) elRecTipoLabel.textContent = "...";
     if (elRecRazonText) elRecRazonText.textContent = "Analizando tu historial con tu Coach IA...";
     if (elPercent) elPercent.innerHTML = `--<small>%</small>`;
-    if (elRingArc) elRingArc.style.strokeDashoffset = 364; // empty ring while analyzing
+    if (elRingArc) elRingArc.style.strokeDashoffset = 351.86; // empty ring while analyzing
     if (elBtnComenzarHoy) elBtnComenzarHoy.style.display = "none";
   }
 
@@ -250,7 +266,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v62"; // Today's workout completed state & smart rest logic
+    const APP_VERSION = "v81"; // Stride Running Coach UI Kit integration
 
 
 
@@ -497,6 +513,30 @@ function renderRecommendation(rec) {
     }
   }
 
+  // Populate Stride 04 · Home Dark Hero Card
+  const heroBadge = document.getElementById("stride-hero-badge");
+  const heroTitle = document.getElementById("stride-hero-title");
+  const heroSub = document.getElementById("stride-hero-subtitle");
+  const heroPlayBtn = document.getElementById("stride-hero-play-btn");
+  if (heroTitle && heroSub) {
+    if (rec.recomendacion === "Carrera") {
+      if (heroBadge) heroBadge.textContent = "Hoy · Carrera Runna";
+      heroTitle.textContent = "Carrera Estructurada";
+      heroSub.textContent = "Progresión aeróbica y ritmos objetivo · Listo para Garmin";
+      if (heroPlayBtn) heroPlayBtn.onclick = () => iniciarGeneracionEntrenamiento("Carrera");
+    } else if (rec.recomendacion === "Fuerza") {
+      if (heroBadge) heroBadge.textContent = "Hoy · Fuerza Opcional";
+      heroTitle.textContent = "Fuerza Strava (25–35 min)";
+      heroSub.textContent = "Mancuernas 5 kg y cintas elásticas · Full-Body";
+      if (heroPlayBtn) heroPlayBtn.onclick = () => iniciarGeneracionEntrenamiento("Fuerza");
+    } else {
+      if (heroBadge) heroBadge.textContent = "Hoy · Recuperación";
+      heroTitle.textContent = "Día de Descanso";
+      heroSub.textContent = "Asimilación muscular activa · Pulsa para movilidad 10 min";
+      if (heroPlayBtn) heroPlayBtn.onclick = () => iniciarGeneracionEntrenamiento("Fuerza", true);
+    }
+  }
+
   // Update dynamic readiness score (Weekly Load Balance Score)
   const elPercent = document.getElementById("daily-goal-percent");
   const elRingArc = document.getElementById("daily-ring-arc");
@@ -505,7 +545,7 @@ function renderRecommendation(rec) {
     elPercent.innerHTML = `${score}<small>%</small>`;
   }
   if (elRingArc) {
-    const r = 58;
+    const r = 56;
     const circumference = 2 * Math.PI * r;
     const offset = circumference - (score / 100) * circumference;
     elRingArc.style.strokeDasharray = circumference;
@@ -699,44 +739,69 @@ function renderWorkout(workout) {
         </div>`;
     }
 
+    let totalSeconds = 0;
     let stepsHtml = "";
     if (workout.phases && workout.phases.length > 0) {
-      stepsHtml = '<div class="watch-steps">';
+      stepsHtml = '<div class="stride-steps-card">';
       workout.phases.forEach(p => {
+        totalSeconds += Number(p.duration_seconds || 0);
         const m = Math.floor(p.duration_seconds / 60);
         const s = p.duration_seconds % 60;
+        const isWork = p.type === "WORK" || /interval|tempo|serie|fartlek|velocidad|ritmo/i.test(p.name || "");
         stepsHtml += `
-          <div class="watch-step">
-            <span class="watch-step-name">${p.name}</span>
-            <span class="watch-step-duration">${m}:${String(s).padStart(2,"0")}</span>
+          <div class="stride-step-row">
+            <span class="stride-step-bar ${isWork ? 'work' : ''}"></span>
+            <div style="flex:1; min-width:0;">
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <strong style="font-size:0.9rem; color:var(--on-surface);">${p.name}</strong>
+                ${isWork ? `<span class="stride-step-repeat-pill">CALIDAD / ZONA</span>` : ""}
+              </div>
+              <span class="body-xs">${p.type === "WARMUP" ? "Calentamiento suave" : p.type === "COOLDOWN" ? "Vuelta a la calma" : "Bloque principal Runna"}</span>
+            </div>
+            <strong class="tabular-num" style="font-size:0.88rem; color:var(--on-surface);">${m}:${String(s).padStart(2,"0")}</strong>
           </div>`;
       });
       stepsHtml += "</div>";
     }
 
+    const totalMins = Math.max(1, Math.round(totalSeconds / 60));
+    const estKm = (totalMins * 0.18).toFixed(1);
+
     elWorkoutContent.innerHTML = `
-      <div class="carrera-container">
-        <div class="watch-icon-wrapper">
-          <i data-lucide="watch" style="width:40px;height:40px;color:#00E676;"></i>
+      <div class="stride-workout-detail-hero">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:0.72rem; font-weight:700; letter-spacing:0.06em; color:rgba(255,255,255,0.72); display:inline-flex; align-items:center; gap:6px;">
+            <span class="stride-dot-orange"></span> CARRERA RUNNA · HOY
+          </span>
+          ${watchBadge ? '<span style="font-size:0.7rem; color:#4ADE80; font-weight:700;">✓ Garmin</span>' : ''}
         </div>
-        <h3 class="carrera-title">Carrera Guiada (Estilo Runna)</h3>
-        <p class="carrera-instructions" style="margin-top:4px;">
-          Bloques estructurados por ritmo y zonas para tu <strong>reloj Garmin</strong>.<br>
-          Pulsa <strong>"▶ Comenzar Carrera (Runna)"</strong> para seguir los intervalos con audio-coach y medidor de ritmo.
-        </p>
-        ${stepsHtml}
-      </div>`;
+        <div style="display:flex; align-items:baseline; gap:6px;">
+          <span class="tabular-num" style="font-size:2.6rem; font-weight:800; line-height:1; letter-spacing:-0.04em;">${estKm}</span>
+          <span style="font-size:1rem; font-weight:500; color:rgba(255,255,255,0.68);">km est.</span>
+        </div>
+        <div class="stride-detail-pills">
+          <span class="stride-detail-pill tabular-num">${totalMins} min</span>
+          <span class="stride-detail-pill">${workout.phases ? workout.phases.length : 0} fases</span>
+          <span class="stride-detail-pill">Garmin FIT</span>
+        </div>
+        <svg viewBox="0 0 340 36" preserveAspectRatio="none" style="width:100%; height:32px;">
+          <path d="M0 28 L45 28 C55 28 58 8 68 8 L120 8 C130 8 132 28 142 28 C152 28 154 8 164 8 L216 8 C226 8 228 28 238 28 C248 28 250 8 260 8 L295 8 C305 8 308 28 318 28 L340 28"
+                fill="none" stroke="#FF5500" stroke-width="2.4" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h3 class="stride-section-title" style="margin-top:6px;">Pasos del entrenamiento</h3>
+      ${stepsHtml}`;
 
     elWorkoutActions.innerHTML = `
-      <button id="btn-empezar-carrera" class="btn btn-primary guided-action-btn carrera" style="background: linear-gradient(135deg, #00E676 0%, #00B0FF 100%); color: #000; border: none;">
-        <i data-lucide="play" style="width: 20px; height: 20px;"></i>
+      <button id="btn-empezar-carrera" class="btn btn-primary stride-btn-dark guided-action-btn carrera">
+        <i data-lucide="play" style="width: 18px; height: 18px;"></i>
         Comenzar Carrera (Runna)
       </button>
-      <button id="btn-send-garmin-carrera" class="btn btn-ghost" style="border: 1px solid rgba(0, 174, 239, 0.4); color: #00AEEF; font-weight: 700;" onclick="sendWorkoutToGarminWatch()">
+      <button id="btn-send-garmin-carrera" class="btn btn-ghost" style="border-radius:9999px; font-weight: 700;" onclick="sendWorkoutToGarminWatch()">
         <i data-lucide="watch" style="width: 18px; height: 18px;"></i>
         ${workout.enviado_al_reloj ? '✅ Enviado a Garmin Connect' : '⌚ Enviar a Garmin Connect'}
       </button>
-      <button id="btn-volver" class="btn btn-secondary">
+      <button id="btn-volver" class="btn btn-ghost" style="border-radius:9999px;">
         Atrás
       </button>
     `;
@@ -3123,16 +3188,16 @@ function renderWeeklyPlan(plan) {
     plan.dias.forEach(d => {
       const isFuerza = d.tipo === "Fuerza";
       const isCarrera = d.tipo === "Carrera" || d.tipo === "Carrera Objetivo";
-      const accent = isCarrera ? "#16A34A" : isFuerza ? "#FC5200" : "var(--text-muted)";
+      const accent = isCarrera ? "#16A34A" : isFuerza ? "#FF5500" : "var(--text-muted)";
       const todayBorder = d.es_hoy ? `border: 1.5px solid ${accent}; background: #FFF7F3;` : "border: 1px solid var(--border-glass); background: var(--surface-dim);";
-      const clickable = (isFuerza || isCarrera) ? `onclick="iniciarGeneracionEntrenamiento('${isFuerza ? 'Fuerza' : 'Carrera'}')" style="cursor:pointer; ${todayBorder} border-radius:8px; padding:10px 12px; display:flex; flex-direction:column; gap:4px;"` : `style="${todayBorder} border-radius:8px; padding:10px 12px; display:flex; flex-direction:column; gap:4px;"`;
+      const clickable = (isFuerza || isCarrera) ? `onclick="iniciarGeneracionEntrenamiento('${isFuerza ? 'Fuerza' : 'Carrera'}')" style="cursor:pointer; ${todayBorder} border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; gap:4px;"` : `style="${todayBorder} border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; gap:4px;"`;
 
       html += `
         <div ${clickable}>
           <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
             <div style="display:flex; align-items:center; gap:6px;">
               <span class="label-caps" style="color:${accent}; font-size:0.72rem;">${d.dia}${d.es_hoy ? " • HOY" : ""}</span>
-              ${d.opcional ? `<span class="label-caps" style="background:rgba(252,82,0,0.12); color:#FC5200; padding:2px 6px; border-radius:4px; font-size:0.62rem;">OPCIONAL</span>` : ""}
+              ${d.opcional ? `<span class="label-caps" style="background:rgba(255,85,0,0.12); color:#C23B00; padding:2px 6px; border-radius:6px; font-size:0.62rem;">OPCIONAL</span>` : ""}
             </div>
             ${d.completado ? `<span class="label-caps" style="color:#0077CC; font-size:0.68rem;">✓ Garmin</span>` : (d.duracion_min > 0 ? `<span class="body-xs tabular-num" style="color:var(--text-muted);">${d.duracion_min} min</span>` : "")}
           </div>
@@ -3142,6 +3207,88 @@ function renderWeeklyPlan(plan) {
       `;
     });
     listEl.innerHTML = html;
+
+    // 1. Render Stride Weekly Calendar Strip (L M X J V S D)
+    const weekStripEl = document.getElementById("stride-week-strip");
+    if (weekStripEl) {
+      const dayLetters = ["L", "M", "X", "J", "V", "S", "D"];
+      weekStripEl.innerHTML = plan.dias.map((d, idx) => {
+        const letter = dayLetters[idx] || (d.dia || "").slice(0, 1).toUpperCase();
+        const dayNum = (d.fecha || "").split("-")[2] ? parseInt(d.fecha.split("-")[2], 10) : (idx + 1);
+        const cls = [
+          "stride-day-col",
+          d.es_hoy ? "is-today" : "",
+          d.completado ? "is-done" : (d.tipo !== "Descanso" ? "is-planned" : "")
+        ].filter(Boolean).join(" ");
+        const actionAttr = d.tipo !== "Descanso" ? `onclick="startPlannedWorkout(${idx})"` : `onclick="switchTab('tab-training')"`;
+        return `
+          <button type="button" class="${cls}" ${actionAttr} aria-label="${d.dia} ${dayNum}: ${d.titulo}">
+            <span class="stride-day-letter">${letter}</span>
+            <span class="stride-day-num">${dayNum}</span>
+            <span class="stride-day-dot"></span>
+          </button>
+        `;
+      }).join("");
+    }
+
+    // 2. Enhance Stride Dark Hero Card with today's planned session if available
+    const todayDay = plan.dias.find(d => d.es_hoy);
+    if (todayDay) {
+      const hTitle = document.getElementById("stride-hero-title");
+      const hSub = document.getElementById("stride-hero-subtitle");
+      const hBadge = document.getElementById("stride-hero-badge");
+      const hPlay = document.getElementById("stride-hero-play-btn");
+      const todayIdx = plan.dias.indexOf(todayDay);
+      if (hTitle) hTitle.textContent = todayDay.titulo || hTitle.textContent;
+      const metricsParts = [];
+      if (todayDay.distancia_km > 0) metricsParts.push(`${todayDay.distancia_km} km`);
+      if (todayDay.duracion_min > 0) metricsParts.push(`${todayDay.duracion_min} min`);
+      if (todayDay.zona_objetivo) metricsParts.push(todayDay.zona_objetivo);
+      if (hSub && metricsParts.length > 0) hSub.textContent = metricsParts.join(" · ");
+      if (hBadge) hBadge.textContent = todayDay.completado ? "Hoy · Completado en Garmin" : `Hoy · ${todayDay.tipo}`;
+      if (hPlay && todayIdx >= 0 && todayDay.tipo !== "Descanso") {
+        hPlay.onclick = () => startPlannedWorkout(todayIdx);
+      }
+    }
+
+    // 3. Render Stride "Up next" (Próximos entrenos)
+    const upNextWrap = document.getElementById("stride-up-next-wrap");
+    const upNextCard = document.getElementById("stride-up-next-card");
+    if (upNextWrap && upNextCard) {
+      const todayIdx = plan.dias.findIndex(d => d.es_hoy);
+      const upcoming = plan.dias
+        .map((d, idx) => ({ d, idx }))
+        .filter(({ d, idx }) => idx > todayIdx && d.tipo !== "Descanso")
+        .slice(0, 2);
+
+      if (upcoming.length > 0) {
+        upNextWrap.style.display = "flex";
+        upNextCard.innerHTML = upcoming.map(({ d, idx }) => {
+          const dayShort = (d.dia || "").slice(0, 3);
+          const dayNum = (d.fecha || "").split("-")[2] ? parseInt(d.fecha.split("-")[2], 10) : "";
+          const metaParts = [`${dayShort} ${dayNum}`.trim()];
+          if (d.distancia_km > 0) metaParts.push(`${d.distancia_km} km`);
+          else if (d.duracion_min > 0) metaParts.push(`${d.duracion_min} min`);
+          if (d.zona_objetivo) metaParts.push(d.zona_objetivo);
+          const strokeCol = d.tipo === "Fuerza" ? "#111113" : "#FF5500";
+          const miniIcon = d.tipo === "Fuerza"
+            ? `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${strokeCol}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/></svg>`
+            : `<svg width="34" height="34" viewBox="0 0 40 40" fill="none"><path d="M8 14 L18 10 L30 15 L32 25 L22 30 L10 26 Z" stroke="${strokeCol}" stroke-width="2.2" stroke-linejoin="round" fill="none"/></svg>`;
+          return `
+            <button type="button" class="stride-up-next-item" onclick="startPlannedWorkout(${idx})">
+              <div class="stride-mini-route">${miniIcon}</div>
+              <div style="flex:1; min-width:0;">
+                <div style="font-weight:700; font-size:0.95rem; color:var(--on-surface); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${d.titulo}</div>
+                <div class="body-xs" style="margin-top:2px;">${metaParts.join(" · ")}</div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8A8A94" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          `;
+        }).join("");
+      } else {
+        upNextWrap.style.display = "none";
+      }
+    }
   }
   renderTrainingTab(plan);
 }
