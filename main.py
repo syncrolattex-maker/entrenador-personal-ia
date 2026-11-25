@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 import garmin_client
+import strava_client
 import fit_encoder
 import database
 
@@ -2010,19 +2011,29 @@ async def garmin_mfa(payload: GarminMfaPayload):
     return res
 
 @app.get("/api/garmin/sync")
-async def garmin_sync():
+async def garmin_sync(backfill: bool = False, max_batches: int = 4):
     from concurrent.futures import ThreadPoolExecutor
 
     if not garmin_client.is_garmin_connected():
         raise HTTPException(status_code=401, detail="Garmin Connect no está vinculado todavía.")
-    activities = garmin_client.get_garmin_history(limit=30)
+
+    existing_rows = database.get_activities_paginated(limit=200, offset=0, include_polyline=False)["activities"]
+    known_ids = {str(r.get("external_id") or "") for r in existing_rows}
+
+    activities = garmin_client.sync_garmin_incremental(
+        known_ids=known_ids,
+        batch_size=30,
+        max_batches=max(1, min(10, max_batches)),
+        backfill=backfill,
+    )
+    inserted_garmin = 0
     if activities:
-        database.upsert_activities(activities)
-        # Pre-cache GPS polylines & splits for latest 15 activities missing from activity_streams in parallel
+        inserted_garmin = database.upsert_activities(activities)
+        # Pre-cache GPS polylines & splits only for latest 5 missing activities (lazy-loaded on detail otherwise)
         streamed_ids = database.get_streamed_activity_ids()
         missing_eids = [
             str(act.get("id"))
-            for act in activities[:15]
+            for act in activities[:5]
             if act.get("id") and str(act.get("id")) not in streamed_ids
         ]
         if missing_eids:
@@ -2046,14 +2057,35 @@ async def garmin_sync():
                         det.get("chart_series", {}),
                         det.get("elevation_gain", 0),
                     )
+
+    inserted_strava = 0
+    if strava_client.is_strava_configured():
+        strava_acts = strava_client.get_strava_activities(per_page=30, page=1)
+        if strava_acts:
+            inserted_strava = database.upsert_activities(strava_acts)
+
     wellness = garmin_client.get_garmin_wellness()
     profile = garmin_client.get_garmin_athlete_profile()
     return {
         "status": "ok",
         "activities_count": len(activities),
-        "activities": activities,
+        "inserted_garmin": inserted_garmin,
+        "inserted_strava": inserted_strava,
+        "backfill": backfill,
         "wellness": wellness,
         "profile": profile,
+    }
+
+
+@app.get("/api/data/health")
+async def api_data_health():
+    return {
+        "status": "ok",
+        "garmin_connected": garmin_client.is_garmin_connected(),
+        "garmin_write_connected": garmin_client.has_garmin_write_session(),
+        "strava_configured": strava_client.is_strava_configured(),
+        "db_backend": "postgresql" if database.is_postgres_active() else "sqlite",
+        "health": database.get_data_health_report(),
     }
 
 
@@ -2803,13 +2835,31 @@ async def post_training_goals(payload: TrainingGoalsPayload):
 # FASE 1-4: ACTIVITIES FEED, DETAIL STREAMS, SUMMIT ANALYTICS & GEAR
 # ============================================================
 @app.get("/api/activities")
-async def api_list_activities(limit: int = 15):
-    acts = database.get_all_activities(limit=limit)
-    if not acts and garmin_client.is_garmin_connected():
-        fresh = garmin_client.get_garmin_history(limit=limit)
+async def api_list_activities(
+    limit: int = 20,
+    offset: int = 0,
+    sport_type: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    include_polyline: bool = True,
+):
+    safe_limit = max(1, min(50, limit))
+    safe_offset = max(0, offset)
+    page = database.get_activities_paginated(
+        limit=safe_limit,
+        offset=safe_offset,
+        sport_type=sport_type,
+        date_from=date_from,
+        date_to=date_to,
+        include_polyline=include_polyline,
+    )
+    acts = page["activities"]
+
+    if page["total_count"] == 0 and safe_offset == 0 and not sport_type and not date_from and not date_to and garmin_client.is_garmin_connected():
+        fresh = garmin_client.get_garmin_history(limit=safe_limit)
         if fresh:
             database.upsert_activities(fresh)
-            # Fetch polylines for top 5 so minimaps render immediately
+            # Fetch polylines only for top 5 so minimaps render immediately; others load lazily on detail
             for a in fresh[:5]:
                 eid = str(a.get("id") or "")
                 if eid:
@@ -2823,7 +2873,10 @@ async def api_list_activities(limit: int = 15):
                             det.get("chart_series", {}),
                             det.get("elevation_gain", 0),
                         )
-            acts = database.get_all_activities(limit=limit)
+            page = database.get_activities_paginated(
+                limit=safe_limit, offset=0, include_polyline=include_polyline
+            )
+            acts = page["activities"]
 
     # Downsample polylines (1 of every 4 points) for fast feed rendering; full polyline is served by /api/activities/{id}
     for a in acts:
@@ -2834,7 +2887,14 @@ async def api_list_activities(limit: int = 15):
                 sampled.append(poly[-1])
             a["polyline"] = sampled
 
-    return {"status": "ok", "activities": acts}
+    return {
+        "status": "ok",
+        "activities": acts,
+        "total_count": page["total_count"],
+        "has_more": page["has_more"],
+        "limit": safe_limit,
+        "offset": safe_offset,
+    }
 
 
 def _fmt_mmss(sec: float) -> str:

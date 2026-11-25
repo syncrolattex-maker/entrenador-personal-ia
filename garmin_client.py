@@ -370,8 +370,8 @@ def is_garmin_connected() -> bool:
     return bool(get_saved_personal_key()) or has_garmin_write_session()
 
 
-def get_garmin_history(limit: int = 30) -> List[dict]:
-    """Fetches and normalizes recent activities from Garmin Connect (Personal API or garminconnect)."""
+def get_garmin_history(limit: int = 30, start: int = 0) -> List[dict]:
+    """Fetches and normalizes activities from Garmin Connect (Personal API or garminconnect) with pagination support."""
     raw_activities = []
 
     # 1. Try Official Garmin Personal API (GCDC_ key)
@@ -380,7 +380,7 @@ def get_garmin_history(limit: int = 30) -> List[dict]:
         try:
             r = requests.get(
                 f"{PERSONAL_API_BASE}/activitylist-service/activities/search/activities",
-                params={"limit": limit},
+                params={"limit": limit, "start": start},
                 headers={"Authorization": f"Bearer {bearer}"},
                 timeout=12,
             )
@@ -397,7 +397,7 @@ def get_garmin_history(limit: int = 30) -> List[dict]:
         if not client:
             return []
         try:
-            raw_activities = client.get_activities(0, limit)
+            raw_activities = client.get_activities(start, limit)
         except Exception as e:
             print(f"[Garmin] Error fetching activities: {e}")
             return []
@@ -441,12 +441,15 @@ def get_garmin_history(limit: int = 30) -> List[dict]:
         normalized.append({
             "id": str(act.get("activityId", "")),
             "fecha": fecha,
+            "start_local": start_local,
+            "timezone": act.get("timeZoneId") or "Europe/Madrid",
             "tipo": mapped_type,
             "tipo_garmin": type_key,
             "nombre": act.get("activityName") or mapped_type,
             "duracion_min": duracion_min,
             "distancia_km": distancia_km if distancia_km > 0 else None,
             "desnivel_m": round(act.get("elevationGain") or 0),
+            "desnivel_negativo_m": round(act.get("elevationLoss") or 0),
             "frecuencia_cardiaca_media": round(avg_hr) if avg_hr else None,
             "frecuencia_cardiaca_max": round(max_hr) if max_hr else None,
             "calorias": round(calories) if calories else None,
@@ -460,10 +463,30 @@ def get_garmin_history(limit: int = 30) -> List[dict]:
             "avg_temp_c": temp_val,
             "device_name": act.get("deviceName") or "Garmin Connect",
             "avg_power_w": act.get("avgPower") or act.get("averagePower"),
+            "raw_payload": act,
             "fuente": "Garmin Connect",
         })
 
     return normalized
+
+
+def sync_garmin_incremental(known_ids: set, batch_size: int = 30, max_batches: int = 4, backfill: bool = False) -> List[dict]:
+    """
+    Incremental batched sync from Garmin Connect.
+    Stops early once a batch contains only known activities (unless backfill=True).
+    """
+    collected: List[dict] = []
+    for b in range(max_batches):
+        batch = get_garmin_history(limit=batch_size, start=b * batch_size)
+        if not batch:
+            break
+        collected.extend(batch)
+        new_in_batch = [a for a in batch if str(a.get("id") or "") not in known_ids]
+        if not backfill and len(new_in_batch) == 0:
+            break
+        if len(batch) < batch_size:
+            break
+    return collected
 
 
 def get_garmin_wellness(target_date: Optional[str] = None) -> Dict[str, Any]:

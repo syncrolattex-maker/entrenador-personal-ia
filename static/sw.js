@@ -1,4 +1,4 @@
-const CACHE_NAME = "aaronfit-cache-v107";
+const CACHE_NAME = "aaronfit-cache-v108";
 const ASSETS = [
   "/",
   "/index.html",

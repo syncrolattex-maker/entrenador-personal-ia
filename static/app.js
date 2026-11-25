@@ -4154,30 +4154,41 @@ function renderStravaLeafletRoute(map, polyline) {
 }
 
 let _feedActivitiesCache = [];
-let _feedLimit = 15;
+const _feedPageSize = 20;
+let _feedOffset = 0;
+let _feedHasMore = false;
 
 function loadMoreActivities() {
-  _feedLimit += 15;
-  loadActivitiesFeed(_feedLimit);
+  loadActivitiesFeed(_feedPageSize, _feedOffset, true);
 }
 
-async function loadActivitiesFeed(limit = _feedLimit) {
+async function loadActivitiesFeed(limit = _feedPageSize, offset = 0, append = false) {
   const feedEl = document.getElementById("dashboard-activities-feed");
   const listEl = document.getElementById("metrics-history-list");
   if (!feedEl && !listEl) return;
 
-  if (_feedActivitiesCache.length === 0) {
+  if (!append && _feedActivitiesCache.length === 0) {
     const skel = `<div class="skeleton-shimmer" style="height:120px; margin-bottom:12px;"></div><div class="skeleton-shimmer" style="height:120px;"></div>`;
     if (feedEl) feedEl.innerHTML = skel;
     if (listEl) listEl.innerHTML = skel;
   }
 
   try {
-    const res = await fetch(`/api/activities?limit=${limit}`);
+    const res = await fetch(`/api/activities?limit=${limit}&offset=${offset}`);
     if (!res.ok) return;
     const data = await res.json();
-    const acts = data.activities || [];
-    _feedActivitiesCache = acts;
+    const pageActs = data.activities || [];
+    _feedHasMore = Boolean(data.has_more);
+    if (append) {
+      const seen = new Set(_feedActivitiesCache.map(x => String(x.external_id)));
+      pageActs.forEach(x => {
+        if (!seen.has(String(x.external_id))) _feedActivitiesCache.push(x);
+      });
+    } else {
+      _feedActivitiesCache = pageActs;
+    }
+    _feedOffset = _feedActivitiesCache.length;
+    const acts = _feedActivitiesCache;
 
     // Update Desktop Weekly Summary (Left Column Profile Card)
     const monday = getMondayOfCurrentWeek();
@@ -4280,7 +4291,7 @@ async function loadActivitiesFeed(limit = _feedLimit) {
       }
     });
 
-    const loadMoreBtn = acts.length >= limit
+    const loadMoreBtn = _feedHasMore
       ? `<button type="button" class="btn btn-ghost" style="width:100%; border-radius:9999px; margin-top:4px;" onclick="loadMoreActivities()">Cargar más actividades</button>`
       : "";
 

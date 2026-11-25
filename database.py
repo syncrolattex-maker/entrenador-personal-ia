@@ -108,6 +108,12 @@ def init_db() -> None:
         ("gear_id", "INTEGER"),
         ("description", "TEXT"),
         ("private_notes", "TEXT"),
+        ("elevation_loss", "REAL"),
+        ("timezone", "TEXT"),
+        ("strava_id", "TEXT"),
+        ("raw_payload_json", "TEXT"),
+        ("data_quality_json", "TEXT"),
+        ("updated_at", "TEXT"),
     ]
     try:
         if is_pg:
@@ -213,6 +219,35 @@ def init_db() -> None:
             value TEXT
         )
     """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS daily_summaries (
+            date TEXT PRIMARY KEY,
+            run_km REAL DEFAULT 0,
+            bike_km REAL DEFAULT 0,
+            other_km REAL DEFAULT 0,
+            total_min REAL DEFAULT 0,
+            elevation_gain REAL DEFAULT 0,
+            elevation_loss REAL DEFAULT 0,
+            relative_effort REAL DEFAULT 0,
+            activities_count INTEGER DEFAULT 0,
+            sports_json TEXT,
+            updated_at TEXT
+        )
+    """)
+
+    # Performance indexes for paginated history, date-range analytics, and deduplication
+    for idx_sql in [
+        "CREATE INDEX IF NOT EXISTS idx_activities_start_date ON activities (start_date DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_activities_sport_date ON activities (sport_type, start_date DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_activities_source ON activities (source)",
+        "CREATE INDEX IF NOT EXISTS idx_activities_strava_id ON activities (strava_id)",
+        "CREATE INDEX IF NOT EXISTS idx_daily_summaries_date ON daily_summaries (date DESC)",
+    ]:
+        try:
+            cur.execute(idx_sql)
+        except Exception as idx_err:
+            print(f"[DB] Index note: {idx_err}")
 
     # Seed default gear if empty
     cur.execute("SELECT COUNT(*) FROM gear")
@@ -436,31 +471,220 @@ def _detect_segments_in_conn(
             )
 
 
+def validate_activity_record(a: Dict[str, Any]) -> Dict[str, Any]:
+    """Validates an incoming activity record, flagging anomalies and recording metric provenance."""
+    from datetime import datetime, timezone
+    anomalies: List[str] = []
+    source = str(a.get("fuente") or a.get("source") or "Garmin Connect")
+    is_garmin = "garmin" in source.lower()
+    src_tag = "garmin_real" if is_garmin else "strava_geo" if "strava" in source.lower() else "manual"
+
+    dist_km = float(a.get("distancia_km") or a.get("distance_km") or 0)
+    dur_min = float(a.get("duracion_min") or a.get("duracion_minutos") or a.get("duration_min") or 0)
+    avg_hr = a.get("frecuencia_cardiaca_media") if a.get("frecuencia_cardiaca_media") is not None else a.get("avg_hr")
+    max_hr = a.get("frecuencia_cardiaca_max") if a.get("frecuencia_cardiaca_max") is not None else a.get("max_hr")
+    sport = a.get("tipo") or a.get("sport_type") or "Carrera"
+
+    if dist_km > 0 and dur_min <= 0:
+        anomalies.append("distance_without_duration")
+    if avg_hr is not None and (avg_hr < 35 or avg_hr > 230):
+        anomalies.append("anomalous_avg_hr")
+        avg_hr = None
+    if max_hr is not None and (max_hr < 40 or max_hr > 240):
+        anomalies.append("anomalous_max_hr")
+        max_hr = None
+    if sport == "Carrera" and dist_km > 0.2 and dur_min > 0:
+        pace_sec = (dur_min * 60.0) / dist_km
+        if pace_sec < 120 or pace_sec > 1500:
+            anomalies.append("anomalous_avg_pace")
+    if avg_hr is None and sport in ("Carrera", "Ciclismo"):
+        anomalies.append("missing_hr")
+
+    provenance = {
+        "source": source,
+        "distance": src_tag if dist_km > 0 else "unavailable",
+        "duration": src_tag if dur_min > 0 else "unavailable",
+        "hr": src_tag if avg_hr is not None else "unavailable",
+        "elevation": src_tag if (a.get("desnivel_m") or a.get("elevation_gain")) else "unavailable",
+        "cadence": src_tag if (a.get("cadencia_media") or a.get("avg_cadence")) else "unavailable",
+        "power": src_tag if a.get("avg_power_w") else ("estimated" if sport == "Ciclismo" and dist_km > 0 else "unavailable"),
+        "relative_effort": "calculated",
+    }
+    return {
+        "anomalies": anomalies,
+        "provenance": provenance,
+        "validated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _find_duplicate_activity(cur, p: str, ext_id: str, strava_id: Optional[str], sport: str, fecha: str, dist_km: float, dur_min: float):
+    """Detects duplicates by external_id, strava_id, or (sport + date + distance ±3% + duration ±5%)."""
+    cur.execute(f"SELECT id, external_id, source, polyline_json, strava_id, avg_hr, max_hr, avg_cadence, avg_temp_c, elevation_loss, avg_power_w, device_name, raw_payload_json FROM activities WHERE external_id = {p}", (ext_id,))
+    row = cur.fetchone()
+    if row:
+        return _rows_to_dicts(cur, [row])[0]
+    if strava_id:
+        cur.execute(f"SELECT id, external_id, source, polyline_json, strava_id, avg_hr, max_hr, avg_cadence, avg_temp_c, elevation_loss, avg_power_w, device_name, raw_payload_json FROM activities WHERE strava_id = {p}", (str(strava_id),))
+        row = cur.fetchone()
+        if row:
+            return _rows_to_dicts(cur, [row])[0]
+    d_day = (fecha or "")[:10]
+    if d_day and dur_min > 1.0:
+        cur.execute(
+            f"SELECT id, external_id, source, polyline_json, strava_id, avg_hr, max_hr, avg_cadence, avg_temp_c, elevation_loss, avg_power_w, device_name, raw_payload_json, distance_km, duration_min FROM activities WHERE sport_type = {p} AND start_date LIKE {p}",
+            (sport, f"{d_day}%"),
+        )
+        for cand in _rows_to_dicts(cur, cur.fetchall()):
+            c_dist = float(cand.get("distance_km") or 0)
+            c_dur = float(cand.get("duration_min") or 0)
+            dur_ok = abs(c_dur - dur_min) <= max(2.0, dur_min * 0.05)
+            dist_ok = (dist_km == 0 and c_dist == 0) or (max(dist_km, c_dist) > 0 and abs(c_dist - dist_km) <= max(0.25, max(dist_km, c_dist) * 0.03))
+            if dur_ok and dist_ok:
+                return cand
+    return None
+
+
+def rebuild_daily_summaries(date_from: Optional[str] = None) -> int:
+    """Rebuilds precomputed daily_summaries rollups from real activities in DB."""
+    from datetime import datetime, timezone
+    init_db()
+    conn = _get_conn()
+    cur = conn.cursor()
+    p = _ph(conn)
+
+    if date_from:
+        cur.execute(
+            f"SELECT start_date, sport_type, distance_km, duration_min, elevation_gain, elevation_loss, relative_effort FROM activities WHERE start_date >= {p}",
+            (date_from,),
+        )
+    else:
+        cur.execute("SELECT start_date, sport_type, distance_km, duration_min, elevation_gain, elevation_loss, relative_effort FROM activities")
+
+    rows = _rows_to_dicts(cur, cur.fetchall())
+    by_day: Dict[str, Dict[str, Any]] = {}
+    for r in rows:
+        d_str = (r.get("start_date") or "")[:10]
+        if not d_str or len(d_str) < 10:
+            continue
+        agg = by_day.setdefault(d_str, {
+            "run_km": 0.0, "bike_km": 0.0, "other_km": 0.0,
+            "total_min": 0.0, "elevation_gain": 0.0, "elevation_loss": 0.0,
+            "relative_effort": 0.0, "count": 0, "sports": {},
+        })
+        st = r.get("sport_type") or "Otro"
+        dist = float(r.get("distance_km") or 0)
+        dur = float(r.get("duration_min") or 0)
+        eg = float(r.get("elevation_gain") or 0)
+        el = float(r.get("elevation_loss") or 0)
+        re = float(r.get("relative_effort") or 0)
+        if st == "Carrera":
+            agg["run_km"] += dist
+        elif st == "Ciclismo":
+            agg["bike_km"] += dist
+        else:
+            agg["other_km"] += dist
+        agg["total_min"] += dur
+        agg["elevation_gain"] += eg
+        agg["elevation_loss"] += el
+        agg["relative_effort"] += re
+        agg["count"] += 1
+        agg["sports"][st] = agg["sports"].get(st, 0) + 1
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    for d_str, agg in by_day.items():
+        cur.execute(f"DELETE FROM daily_summaries WHERE date = {p}", (d_str,))
+        cur.execute(
+            f"""
+            INSERT INTO daily_summaries
+            (date, run_km, bike_km, other_km, total_min, elevation_gain, elevation_loss, relative_effort, activities_count, sports_json, updated_at)
+            VALUES ({','.join([p]*11)})
+            """,
+            (
+                d_str,
+                round(agg["run_km"], 2),
+                round(agg["bike_km"], 2),
+                round(agg["other_km"], 2),
+                round(agg["total_min"], 1),
+                round(agg["elevation_gain"], 1),
+                round(agg["elevation_loss"], 1),
+                round(agg["relative_effort"], 1),
+                agg["count"],
+                json.dumps(agg["sports"]),
+                now_iso,
+            ),
+        )
+    conn.commit()
+    conn.close()
+    return len(by_day)
+
+
 def upsert_activities(activities: List[Dict[str, Any]]) -> int:
-    """Inserts new activities incrementally; returns count of newly inserted records."""
+    """Inserts new activities incrementally and enriches existing ones without overwriting user notes or Garmin metrics with Strava."""
+    from datetime import datetime, timezone
     init_db()
     conn = _get_conn()
     cur = conn.cursor()
     p = _ph(conn)
     ftp = _get_ftp_from_conn(cur, p)
     inserted = 0
+    touched = 0
+    now_iso = datetime.now(timezone.utc).isoformat()
 
     for a in activities:
         ext_id = str(a.get("id") or a.get("external_id") or "")
         if not ext_id:
             continue
 
-        cur.execute(f"SELECT id FROM activities WHERE external_id = {p}", (ext_id,))
-        exists = cur.fetchone()
-        if exists:
-            continue
-
         sport = a.get("tipo", "Carrera")
+        fecha = a.get("fecha", "")
         dist_km = float(a.get("distancia_km") or 0)
         dur_min = float(a.get("duracion_min") or a.get("duracion_minutos") or 0)
         elev_m = float(a.get("desnivel_m") or 0)
+        elev_loss = float(a.get("desnivel_negativo_m") or a.get("elevation_loss") or 0)
         avg_hr = a.get("frecuencia_cardiaca_media")
         poly = a.get("polyline")
+        strava_id = str(a.get("strava_id") or (ext_id if "strava" in str(a.get("fuente", "")).lower() else "") or "") or None
+        incoming_source = a.get("fuente", "Garmin Connect")
+        quality = validate_activity_record(a)
+        raw_json = json.dumps(a.get("raw_payload") or {k: v for k, v in a.items() if k != "polyline"})
+
+        existing = _find_duplicate_activity(cur, p, ext_id, strava_id, sport, fecha, dist_km, dur_min)
+        if existing:
+            # Incremental enrichment: never overwrite Garmin physiological metrics with Strava
+            is_incoming_strava = "strava" in incoming_source.lower()
+            is_existing_garmin = "garmin" in str(existing.get("source") or "").lower()
+            updates = []
+            params = []
+            if strava_id and not existing.get("strava_id"):
+                updates.append(f"strava_id = {p}")
+                params.append(strava_id)
+            if poly and not existing.get("polyline_json"):
+                updates.append(f"polyline_json = {p}")
+                params.append(json.dumps(poly))
+            if not (is_incoming_strava and is_existing_garmin):
+                for col, val in [
+                    ("avg_cadence", a.get("cadencia_media") or a.get("avg_cadence")),
+                    ("avg_temp_c", a.get("avg_temp_c")),
+                    ("elevation_loss", elev_loss if elev_loss > 0 else None),
+                    ("avg_power_w", a.get("avg_power_w")),
+                    ("device_name", a.get("device_name")),
+                ]:
+                    if val is not None and existing.get(col) is None:
+                        updates.append(f"{col} = {p}")
+                        params.append(val)
+                if not existing.get("raw_payload_json"):
+                    updates.append(f"raw_payload_json = {p}")
+                    params.append(raw_json)
+            if updates:
+                if not (is_incoming_strava and is_existing_garmin):
+                    updates.append(f"data_quality_json = {p}")
+                    params.append(json.dumps(quality))
+                updates.append(f"updated_at = {p}")
+                params.append(now_iso)
+                params.append(existing["id"])
+                cur.execute(f"UPDATE activities SET {', '.join(updates)} WHERE id = {p}", tuple(params))
+                touched += 1
+            continue
 
         rel_effort = compute_relative_effort(dur_min, hr_zones=None, rpe=None, avg_hr=avg_hr)
         phys = compute_cycling_and_vam_metrics(
@@ -471,20 +695,22 @@ def upsert_activities(activities: List[Dict[str, Any]]) -> int:
             f"""
             INSERT INTO activities
             (external_id, source, sport_type, name, start_date, distance_km, duration_min,
-             elevation_gain, avg_hr, max_hr, calories, avg_pace_str, aerobic_te, polyline_json,
+             elevation_gain, elevation_loss, avg_hr, max_hr, calories, avg_pace_str, aerobic_te, polyline_json,
              relative_effort, rpe, avg_power_w, energy_kj, intensity_pct, vam_mh,
-             moving_duration_min, elapsed_duration_min, avg_cadence, avg_temp_c, device_name, gear_id, description, private_notes)
-            VALUES ({','.join([p]*28)})
+             moving_duration_min, elapsed_duration_min, avg_cadence, avg_temp_c, device_name, gear_id,
+             description, private_notes, timezone, strava_id, raw_payload_json, data_quality_json, updated_at)
+            VALUES ({','.join([p]*34)})
             """,
             (
                 ext_id,
-                a.get("fuente", "Garmin Connect"),
+                incoming_source,
                 sport,
                 a.get("nombre", "Entrenamiento"),
-                a.get("fecha", ""),
+                fecha,
                 dist_km,
                 dur_min,
                 elev_m,
+                elev_loss,
                 avg_hr,
                 a.get("frecuencia_cardiaca_max"),
                 a.get("calorias") or a.get("calorias_activas"),
@@ -505,17 +731,24 @@ def upsert_activities(activities: List[Dict[str, Any]]) -> int:
                 a.get("gear_id"),
                 a.get("description") or "",
                 a.get("private_notes") or "",
+                a.get("timezone") or "Europe/Madrid",
+                strava_id,
+                raw_json,
+                json.dumps(quality),
+                now_iso,
             ),
         )
         if poly:
-            _detect_segments_in_conn(cur, p, ext_id, sport, poly, dur_min, avg_hr, a.get("fecha", ""))
+            _detect_segments_in_conn(cur, p, ext_id, sport, poly, dur_min, avg_hr, fecha)
         inserted += 1
 
     conn.commit()
     conn.close()
 
-    if inserted > 0:
-        recalculate_gear_and_prs()
+    if inserted > 0 or touched > 0:
+        rebuild_daily_summaries()
+        if inserted > 0:
+            recalculate_gear_and_prs()
     return inserted
 
 
@@ -610,19 +843,48 @@ def save_activity_stream(
 
 _ACT_COLS_NO_POLY = (
     "id, external_id, source, sport_type, name, start_date, distance_km, duration_min, "
-    "elevation_gain, avg_hr, max_hr, calories, avg_pace_str, aerobic_te, relative_effort, "
+    "elevation_gain, elevation_loss, avg_hr, max_hr, calories, avg_pace_str, aerobic_te, relative_effort, "
     "rpe, avg_power_w, energy_kj, intensity_pct, vam_mh, moving_duration_min, "
-    "elapsed_duration_min, avg_cadence, avg_temp_c, device_name, gear_id, description, private_notes"
+    "elapsed_duration_min, avg_cadence, avg_temp_c, device_name, gear_id, description, private_notes, "
+    "timezone, strava_id, data_quality_json"
 )
 
 
-def get_all_activities(limit: int = 50, include_polyline: bool = True) -> List[Dict[str, Any]]:
+def get_activities_paginated(
+    limit: int = 20,
+    offset: int = 0,
+    sport_type: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    include_polyline: bool = True,
+) -> Dict[str, Any]:
+    """Optimized paginated query with optional sport/date filters; never loads activity_streams."""
     init_db()
     conn = _get_conn()
     cur = conn.cursor()
     p = _ph(conn)
-    cols = "*" if include_polyline else _ACT_COLS_NO_POLY
-    cur.execute(f"SELECT {cols} FROM activities ORDER BY start_date DESC LIMIT {p}", (limit,))
+
+    clauses = []
+    params: List[Any] = []
+    if sport_type and sport_type not in ("Todo", "all", ""):
+        clauses.append(f"sport_type = {p}")
+        params.append(sport_type)
+    if date_from:
+        clauses.append(f"start_date >= {p}")
+        params.append(date_from[:10])
+    if date_to:
+        clauses.append(f"start_date <= {p}")
+        params.append(f"{date_to[:10]}Z")
+
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    cur.execute(f"SELECT COUNT(*) FROM activities {where_sql}", tuple(params))
+    total_count = int(cur.fetchone()[0] or 0)
+
+    cols = f"{_ACT_COLS_NO_POLY}, polyline_json" if include_polyline else _ACT_COLS_NO_POLY
+    cur.execute(
+        f"SELECT {cols} FROM activities {where_sql} ORDER BY start_date DESC LIMIT {p} OFFSET {p}",
+        tuple(params + [limit, offset]),
+    )
     rows = _rows_to_dicts(cur, cur.fetchall())
     conn.close()
 
@@ -634,7 +896,85 @@ def get_all_activities(limit: int = 50, include_polyline: bool = True) -> List[D
                 r["polyline"] = []
         else:
             r["polyline"] = []
+        r.pop("polyline_json", None)
+
+    return {
+        "activities": rows,
+        "total_count": total_count,
+        "has_more": (offset + len(rows)) < total_count,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+def get_daily_summaries(date_from: Optional[str] = None, date_to: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Returns precomputed daily rollups; auto-seeds from activities if empty."""
+    init_db()
+    conn = _get_conn()
+    cur = conn.cursor()
+    p = _ph(conn)
+    cur.execute("SELECT COUNT(*) FROM daily_summaries")
+    cnt = int(cur.fetchone()[0] or 0)
+    if cnt == 0:
+        cur.execute("SELECT COUNT(*) FROM activities")
+        if int(cur.fetchone()[0] or 0) > 0:
+            conn.close()
+            rebuild_daily_summaries()
+            conn = _get_conn()
+            cur = conn.cursor()
+
+    clauses = []
+    params: List[Any] = []
+    if date_from:
+        clauses.append(f"date >= {p}")
+        params.append(date_from[:10])
+    if date_to:
+        clauses.append(f"date <= {p}")
+        params.append(date_to[:10])
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    cur.execute(f"SELECT * FROM daily_summaries {where_sql} ORDER BY date ASC", tuple(params))
+    rows = _rows_to_dicts(cur, cur.fetchall())
+    conn.close()
     return rows
+
+
+def get_data_health_report() -> Dict[str, Any]:
+    """Returns data integrity, source distribution, cache coverage, and anomaly counts."""
+    init_db()
+    conn = _get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM activities")
+    total = int(cur.fetchone()[0] or 0)
+    cur.execute("SELECT source, COUNT(*) FROM activities GROUP BY source")
+    by_source = {str(r[0] or "Desconocida"): int(r[1]) for r in cur.fetchall()}
+    cur.execute("SELECT COUNT(*) FROM activity_streams")
+    streams_cached = int(cur.fetchone()[0] or 0)
+    cur.execute("SELECT COUNT(*) FROM daily_summaries")
+    summaries_days = int(cur.fetchone()[0] or 0)
+    cur.execute("SELECT MIN(start_date), MAX(start_date) FROM activities")
+    min_d, max_d = cur.fetchone()
+    cur.execute("SELECT data_quality_json FROM activities WHERE data_quality_json IS NOT NULL")
+    anomaly_counts: Dict[str, int] = {}
+    for (dq_raw,) in cur.fetchall():
+        try:
+            dq = json.loads(dq_raw)
+            for anom in dq.get("anomalies", []):
+                anomaly_counts[anom] = anomaly_counts.get(anom, 0) + 1
+        except Exception:
+            pass
+    conn.close()
+    return {
+        "activities_total": total,
+        "by_source": by_source,
+        "streams_cached": streams_cached,
+        "daily_summaries_days": summaries_days,
+        "date_range": {"min": min_d, "max": max_d},
+        "anomalies": anomaly_counts,
+    }
+
+
+def get_all_activities(limit: int = 50, include_polyline: bool = True) -> List[Dict[str, Any]]:
+    return get_activities_paginated(limit=limit, offset=0, include_polyline=include_polyline)["activities"]
 
 
 def get_streamed_activity_ids() -> set:
@@ -765,7 +1105,7 @@ def recalculate_gear_and_prs() -> None:
     cur = conn.cursor()
     p = _ph(conn)
 
-    cur.execute("SELECT external_id, sport_type, distance_km, start_date FROM activities")
+    cur.execute("SELECT external_id, name, sport_type, distance_km, duration_min, start_date FROM activities")
     acts = _rows_to_dicts(cur, cur.fetchall())
 
     cur.execute("SELECT activity_id, chart_series_json FROM activity_streams")
