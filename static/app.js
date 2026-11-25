@@ -2214,7 +2214,19 @@ function renderTrainingTab(plan) {
        </div>`
     : "";
 
-  calEl.innerHTML = authNotice + plan.dias.map((d, idx) => {
+  const totalActiveDays = plan.dias.filter(d => d.tipo !== "Descanso" && !d.cancelado).length;
+  const doneDaysCount = plan.dias.filter(d => d.completado && d.tipo !== "Descanso").length;
+  const weekHeroHtml = `
+    <div class="stride-plan-week-hero">
+      <span class="stride-week-badge">${plan.semana_num || "S"}</span>
+      <div class="stride-week-meta">
+        <span class="stride-week-title">${planLabels[planType] || "BASE / MANTENIMIENTO"} · Esta semana</span>
+        <span class="stride-week-sub">${plan.semana_inicio || ""} – ${plan.semana_fin || ""} · ${doneDaysCount} de ${totalActiveDays} sesiones completadas</span>
+      </div>
+      ${plan.weekly_compliance ? `<span class="pill-tag" style="background:rgba(255,255,255,0.12); color:#FFFFFF; border:none;">${plan.weekly_compliance.overall_pct}%</span>` : ""}
+    </div>`;
+
+  calEl.innerHTML = authNotice + weekHeroHtml + plan.dias.map((d, idx) => {
     const isRest = d.tipo === "Descanso";
     const isFuerza = d.tipo === "Fuerza";
     const isBici = d.tipo === "Ciclismo";
@@ -2225,6 +2237,9 @@ function renderTrainingTab(plan) {
     const matchedLabel = Array.isArray(d.garmin_actividades) && d.garmin_actividades.length > 0
       ? `✓ Garmin (${d.garmin_actividades[0]})`
       : "✓ Garmin";
+    const dayAbbr = (d.dia || "").slice(0, 3).toUpperCase();
+    const dayNum = (d.fecha || "").slice(8, 10) || "—";
+    const dotCls = d.completado ? "is-done" : (d.es_hoy && !isCancelled ? "is-today" : "");
 
     let breakdownPreview = "";
     if (Array.isArray(d.phases) && d.phases.length > 0) {
@@ -2237,34 +2252,42 @@ function renderTrainingTab(plan) {
     }
 
     return `
-      <div class="training-day-card ${d.es_hoy && !isCancelled ? "is-today" : ""}" style="${isCancelled ? "opacity:0.65; background:#F4F4F6;" : ""}">
-        <div class="training-day-info" style="${!isRest && !isCancelled ? "cursor:pointer;" : ""}" ${!isRest && !isCancelled ? `onclick="startPlannedWorkout(${idx})"` : ""}>
-          <div class="training-day-head">
-            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-              <strong style="font-size:0.92rem; color:${d.es_hoy && !isCancelled ? "var(--primary-text)" : "var(--on-surface)"};">${d.dia}${d.es_hoy ? " • HOY" : ""}</strong>
-              <span class="body-xs tabular-num">${d.fecha}</span>
-              <span class="pill-tag ${badgeCls}">${d.tipo}</span>
-              ${d.opcional ? `<span class="pill-tag">OPCIONAL</span>` : ""}
-              ${isCancelled ? `<span class="pill-tag" style="background:#FEE2E2; color:#B91C1C;">CANCELADO</span>` : ""}
-            </div>
+      <div class="training-day-card ${d.es_hoy && !isCancelled ? "is-today" : ""}" style="${isCancelled ? "opacity:0.62; background:#F5F5F4;" : ""}">
+        <div class="stride-day-row-main">
+          <div class="stride-day-datecol">
+            <span class="stride-day-abbr" style="${d.es_hoy && !isCancelled ? "color:var(--primary-text);" : ""}">${dayAbbr}</span>
+            <span class="stride-day-num-col">${dayNum}</span>
+          </div>
+          <div class="stride-day-nodecol">
+            <span class="stride-timeline-dot ${dotCls}">${d.completado ? "✓" : ""}</span>
+          </div>
+          <div class="training-day-info" style="${!isRest && !isCancelled ? "cursor:pointer;" : ""}" ${!isRest && !isCancelled ? `onclick="startPlannedWorkout(${idx})"` : ""}>
+            <div class="training-day-head">
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <span style="font-weight:600; font-size:15px; color:var(--on-surface); ${isCancelled ? "text-decoration:line-through;" : ""}">${d.titulo}</span>
+                ${d.es_hoy && !isCancelled ? `<span class="pill-tag orange">HOY</span>` : ""}
+                <span class="pill-tag ${badgeCls}">${d.tipo}</span>
+                ${d.opcional ? `<span class="pill-tag">OPCIONAL</span>` : ""}
+                ${isCancelled ? `<span class="pill-tag" style="background:#FEE2E2; color:#B91C1C;">CANCELADO</span>` : ""}
+              </div>
               ${d.completado
                 ? `<span class="pill-tag" style="background:rgba(21,128,61,0.12); color:#15803D;">${matchedLabel}</span>`
                 : d.garmin_scheduled
-                  ? `<span class="pill-tag" style="background:rgba(21,128,61,0.10); color:#15803D;">📅 En Calendario Garmin</span>`
+                  ? `<span class="pill-tag" style="background:rgba(21,128,61,0.10); color:#15803D;">📅 En Garmin</span>`
                   : `<span class="body-xs tabular-num">${distInfo}${d.zona_objetivo ? ` • ${d.zona_objetivo}` : ""}</span>`}
+            </div>
+            <div class="body-xs" style="margin-top:2px; color:var(--text-secondary);">${d.detalle}</div>
+            ${breakdownPreview && !isCancelled ? `<div class="body-xs" style="margin-top:6px; padding:6px 10px; background:#F5F5F4; border-radius:10px; color:var(--text-primary); font-weight:500;">${breakdownPreview}</div>` : ""}
           </div>
-          <div style="font-weight:800; font-size:0.96rem; color:var(--on-surface); margin-top:4px; ${isCancelled ? "text-decoration:line-through;" : ""}">${d.titulo}</div>
-          <div class="body-xs" style="margin-top:2px;">${d.detalle}</div>
-          ${breakdownPreview && !isCancelled ? `<div class="body-xs" style="margin-top:6px; padding:6px 9px; background:#F4F4F6; border-radius:8px; color:var(--text-primary); font-weight:500;">${breakdownPreview}</div>` : ""}
         </div>
         ${hasActions ? `
           <div class="training-day-actions">
             ${isCancelled ? `
-              <button type="button" class="btn btn-ghost" style="padding:8px 12px; font-size:0.8rem;" onclick="toggleCancelPlannedDay('${d.fecha}', false)">Reactivar</button>
+              <button type="button" class="btn btn-ghost" style="padding:7px 12px; font-size:0.8rem;" onclick="toggleCancelPlannedDay('${d.fecha}', false)">Reactivar</button>
             ` : `
-              <button type="button" class="btn btn-primary" style="padding:8px 12px; font-size:0.8rem;" onclick="startPlannedWorkout(${idx})">Ver / Iniciar</button>
-              <button type="button" class="btn btn-ghost" style="padding:8px 12px; font-size:0.8rem;" onclick="sendPlannedDayToGarmin(${idx})">⌚ Enviar a Garmin</button>
-              ${!d.completado ? `<button type="button" class="btn btn-ghost" style="padding:8px 10px; font-size:0.78rem; color:#B91C1C;" onclick="toggleCancelPlannedDay('${d.fecha}', true)">Cancelar</button>` : ""}
+              <button type="button" class="btn btn-primary" style="padding:7px 13px; font-size:0.8rem;" onclick="startPlannedWorkout(${idx})">Ver / Iniciar</button>
+              <button type="button" class="btn btn-ghost" style="padding:7px 12px; font-size:0.8rem;" onclick="sendPlannedDayToGarmin(${idx})">⌚ Garmin</button>
+              ${!d.completado ? `<button type="button" class="btn btn-ghost" style="padding:7px 10px; font-size:0.78rem; color:#B91C1C;" onclick="toggleCancelPlannedDay('${d.fecha}', true)">Cancelar</button>` : ""}
             `}
           </div>
         ` : ""}
