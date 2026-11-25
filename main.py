@@ -2278,28 +2278,113 @@ def _build_cardio_phases(kind: str, dur_min: int) -> List[dict]:
     ]
 
 
+def _evaluate_day_real_vs_planned(
+    d_str: str,
+    today_str: str,
+    planned_tipo: str,
+    acts_on_day: List[dict],
+    is_cancelled: bool,
+) -> dict:
+    """Separa estrictamente lo planificado de lo realmente ejecutado en Garmin/activities."""
+    match_sport = "Carrera" if planned_tipo == "Carrera Objetivo" else planned_tipo
+    acts_matching = [a for a in acts_on_day if a.get("tipo") == match_sport]
+    acts_other = [a for a in acts_on_day if a.get("tipo") != match_sport]
+    actividades_reales = [
+        {
+            "nombre": a.get("nombre") or a.get("tipo"),
+            "tipo": a.get("tipo") or "Actividad",
+            "distancia_km": round(float(a.get("distancia_km") or 0), 2),
+            "duracion_min": round(float(a.get("duracion_minutos") or 0)),
+        }
+        for a in acts_on_day
+    ]
+    garmin_names = [f"{a['nombre']} ({a['tipo']})" for a in actividades_reales]
+
+    if planned_tipo == "Descanso":
+        if acts_on_day:
+            return {
+                "estado_dia": "extra",
+                "estado_label": "Extra / Fuera de plan",
+                "completado": True,
+                "actividades_reales": actividades_reales,
+                "garmin_actividades": garmin_names,
+            }
+        return {
+            "estado_dia": "descanso",
+            "estado_label": "Descanso",
+            "completado": False,
+            "actividades_reales": [],
+            "garmin_actividades": [],
+        }
+
+    if acts_matching:
+        return {
+            "estado_dia": "completado",
+            "estado_label": "Completado",
+            "completado": True,
+            "actividades_reales": actividades_reales,
+            "garmin_actividades": garmin_names,
+        }
+    if acts_other:
+        return {
+            "estado_dia": "sustituido",
+            "estado_label": "Realizado (otro deporte)",
+            "completado": False,
+            "actividades_reales": actividades_reales,
+            "garmin_actividades": garmin_names,
+        }
+    if is_cancelled:
+        return {
+            "estado_dia": "cancelado",
+            "estado_label": "Cancelado",
+            "completado": False,
+            "actividades_reales": [],
+            "garmin_actividades": [],
+        }
+    if d_str < today_str:
+        return {
+            "estado_dia": "no_realizado",
+            "estado_label": "No realizado",
+            "completado": False,
+            "actividades_reales": [],
+            "garmin_actividades": [],
+        }
+    return {
+        "estado_dia": "pendiente",
+        "estado_label": "Pendiente",
+        "completado": False,
+        "actividades_reales": [],
+        "garmin_actividades": [],
+    }
+
+
 def _construir_plan_semanal(history: List[dict], carrera_obj: Optional[dict]) -> dict:
     from datetime import date, timedelta
     today = date.today()
+    today_str = today.isoformat()
     monday = today - timedelta(days=today.weekday())
+    sunday = monday + timedelta(days=6)
     monday_str = monday.isoformat()
+    sunday_str = sunday.isoformat()
     metrics = _calcular_fase_y_tendencia(history, carrera_obj)
 
     plan_type = (database.get_setting("training_plan_type") or "mantenimiento").strip().lower()
     if plan_type not in ("mantenimiento", "10k", "21k", "ciclismo"):
         plan_type = "mantenimiento"
 
-    # Compute current week progress (Monday-Sunday) from real Garmin history
+    # Fuente única de carga: exclusivamente actividades reales efectuadas en Lunes-Domingo
     completed_by_date: dict = {}
     week_run_km = 0.0
     week_bike_km = 0.0
     week_strength_sessions = 0
+    week_total_min = 0.0
     for act in history:
         f_str = (act.get("fecha") or "")[:10]
         if f_str:
             completed_by_date.setdefault(f_str, []).append(act)
-            if f_str >= monday_str:
+            if monday_str <= f_str <= sunday_str:
                 tipo_a = act.get("tipo", "")
+                week_total_min += float(act.get("duracion_minutos") or 0)
                 if tipo_a == "Carrera":
                     week_run_km += float(act.get("distancia_km") or 0)
                 elif tipo_a == "Ciclismo":
@@ -2361,52 +2446,19 @@ def _construir_plan_semanal(history: List[dict], carrera_obj: Optional[dict]) ->
     except Exception:
         cancelled_dates = set()
 
-    # Track unallocated weekly activities by sport so off-schedule Garmin workouts also satisfy weekly sessions
-    unallocated_by_sport: dict = {"Carrera": [], "Ciclismo": [], "Fuerza": []}
-    for act in history:
-        f_str = (act.get("fecha") or "")[:10]
-        if f_str >= monday_str:
-            t_a = act.get("tipo", "")
-            if t_a in unallocated_by_sport:
-                unallocated_by_sport[t_a].append(act)
-
     dias = []
-    # Pass 1: exact date + matching sport first
-    exact_matches: dict = {}
     for item in template:
         d_date = monday + timedelta(days=item["dia_idx"])
         d_str = d_date.isoformat()
-        match_sport = item["tipo"]
-        acts_today = [a for a in completed_by_date.get(d_str, []) if a.get("tipo") == match_sport]
-        if acts_today:
-            exact_matches[d_str] = acts_today
-            for a in acts_today:
-                t_a = a.get("tipo", "")
-                if t_a in unallocated_by_sport and a in unallocated_by_sport[t_a]:
-                    unallocated_by_sport[t_a].remove(a)
-
-    for item in template:
-        d_date = monday + timedelta(days=item["dia_idx"])
-        d_str = d_date.isoformat()
-        acts_today = exact_matches.get(d_str, [])
+        acts_on_day = completed_by_date.get(d_str, [])
         is_race_day = (
             carrera_obj
             and carrera_obj.get("activo")
             and carrera_obj.get("fecha", "")[:10] == d_str
         )
         planned_tipo = "Carrera Objetivo" if is_race_day else item["tipo"]
-        match_sport = "Carrera" if planned_tipo == "Carrera Objetivo" else planned_tipo
-
-        matched_off_day = None
-        if not acts_today and match_sport in unallocated_by_sport and unallocated_by_sport[match_sport]:
-            matched_off_day = unallocated_by_sport[match_sport].pop(0)
-
-        is_completed = len(acts_today) > 0 or (matched_off_day is not None)
-        is_cancelled = (d_str in cancelled_dates) and not is_completed
-
-        garmin_names = [a.get("nombre") for a in acts_today]
-        if matched_off_day:
-            garmin_names.append(f"{matched_off_day.get('nombre')} ({matched_off_day.get('fecha')})")
+        is_cancelled = d_str in cancelled_dates
+        ev = _evaluate_day_real_vs_planned(d_str, today_str, planned_tipo, acts_on_day, is_cancelled)
 
         entry = {
             "dia": day_names[item["dia_idx"]],
@@ -2419,10 +2471,12 @@ def _construir_plan_semanal(history: List[dict], carrera_obj: Optional[dict]) ->
             "duracion_min": item["duracion_min"],
             "distancia_km": float(carrera_obj["distancia_km"]) if is_race_day else item["distancia_km"],
             "zona_objetivo": "Competición" if is_race_day else item["zona_objetivo"],
-            "completado": is_completed,
-            "completado_en_semana": matched_off_day is not None,
-            "cancelado": is_cancelled,
-            "garmin_actividades": garmin_names,
+            "completado": ev["completado"],
+            "estado_dia": ev["estado_dia"],
+            "estado_label": ev["estado_label"],
+            "actividades_reales": ev["actividades_reales"],
+            "cancelado": is_cancelled and not ev["completado"] and ev["estado_dia"] != "sustituido",
+            "garmin_actividades": ev["garmin_actividades"],
         }
         if "phases" in item:
             entry["phases"] = item["phases"]
@@ -2472,11 +2526,13 @@ def _construir_plan_semanal(history: List[dict], carrera_obj: Optional[dict]) ->
 
 
 def _refresh_locked_plan_progress(plan: dict, history: List[dict]) -> dict:
-    """Actualiza únicamente el estado de cumplimiento y cancelación sobre un plan semanal inamovible."""
+    """Actualiza únicamente la carga real efectuada y estados de cumplimiento sobre un plan semanal inamovible."""
     from datetime import date, timedelta
     today = date.today()
     today_str = today.isoformat()
-    monday_str = plan.get("semana_inicio") or (today - timedelta(days=today.weekday())).isoformat()
+    monday = today - timedelta(days=today.weekday())
+    monday_str = plan.get("semana_inicio") or monday.isoformat()
+    sunday_str = plan.get("semana_fin") or (monday + timedelta(days=6)).isoformat()
 
     try:
         raw_cancelled = database.get_setting("cancelled_plan_dates")
@@ -2488,12 +2544,14 @@ def _refresh_locked_plan_progress(plan: dict, history: List[dict]) -> dict:
     week_run_km = 0.0
     week_bike_km = 0.0
     week_strength_sessions = 0
+    week_total_min = 0.0
     for act in history:
         f_str = (act.get("fecha") or "")[:10]
         if f_str:
             completed_by_date.setdefault(f_str, []).append(act)
-            if f_str >= monday_str:
+            if monday_str <= f_str <= sunday_str:
                 tipo_a = act.get("tipo", "")
+                week_total_min += float(act.get("duracion_minutos") or 0)
                 if tipo_a == "Carrera":
                     week_run_km += float(act.get("distancia_km") or 0)
                 elif tipo_a == "Ciclismo":
@@ -2501,32 +2559,20 @@ def _refresh_locked_plan_progress(plan: dict, history: List[dict]) -> dict:
                 elif tipo_a == "Fuerza":
                     week_strength_sessions += 1
 
-    week_end_str = plan.get("semana_fin") or today_str
-    week_acts = [a for a in history if monday_str <= (a.get("fecha") or "")[:10] <= week_end_str]
-    used_week_ids: set = set()
-
     for entry in plan.get("dias", []):
         d_str = entry.get("fecha", "")
         entry["es_hoy"] = (d_str == today_str)
-        entry["cancelado"] = (d_str in cancelled_dates)
+        is_cancelled = (d_str in cancelled_dates)
         planned_tipo = entry.get("tipo", "")
-        acts_day = completed_by_date.get(d_str, [])
+        acts_on_day = completed_by_date.get(d_str, [])
+        ev = _evaluate_day_real_vs_planned(d_str, today_str, planned_tipo, acts_on_day, is_cancelled)
 
-        matched_off_day = None
-        if not acts_day and planned_tipo != "Descanso":
-            for wa in week_acts:
-                wa_id = str(wa.get("id") or f"{wa.get('fecha')}_{wa.get('nombre')}")
-                if wa_id not in used_week_ids and wa.get("tipo") == planned_tipo:
-                    matched_off_day = wa
-                    used_week_ids.add(wa_id)
-                    break
-
-        entry["completado"] = (len(acts_day) > 0) or (matched_off_day is not None)
-        entry["completado_en_semana"] = (matched_off_day is not None)
-        garmin_names = [f"{a.get('nombre')} ({a.get('tipo')})" for a in acts_day]
-        if matched_off_day:
-            garmin_names.append(f"{matched_off_day.get('nombre')} ({matched_off_day.get('fecha')})")
-        entry["garmin_actividades"] = garmin_names
+        entry["completado"] = ev["completado"]
+        entry["estado_dia"] = ev["estado_dia"]
+        entry["estado_label"] = ev["estado_label"]
+        entry["actividades_reales"] = ev["actividades_reales"]
+        entry["cancelado"] = is_cancelled and not ev["completado"] and ev["estado_dia"] != "sustituido"
+        entry["garmin_actividades"] = ev["garmin_actividades"]
 
     goals = plan.get("goals") or {}
     base_weekly_km = float(goals.get("goal_run_km") or plan.get("objetivo_km_carrera") or 20.0)

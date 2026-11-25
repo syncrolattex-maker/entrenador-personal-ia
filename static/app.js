@@ -2290,33 +2290,56 @@ function renderTrainingTab(plan) {
       breakdownPreview = d.ejercicios.map(ex => `${ex.nombre} ${ex.series}×${ex.repeticiones}`).join(" · ");
     }
 
+    const estadoDia = d.estado_dia || (d.completado ? "completado" : isCancelled ? "cancelado" : "pendiente");
+    const isNotDone = estadoDia === "no_realizado";
+    const isSubstituted = estadoDia === "sustituido";
+    const isExtra = estadoDia === "extra";
+    const reales = Array.isArray(d.actividades_reales) ? d.actividades_reales : [];
+    const realChipHtml = (isSubstituted || isExtra) && reales.length > 0
+      ? `<div style="margin-top:6px; padding:6px 10px; border-radius:10px; background:${isExtra ? "rgba(238,90,43,0.10)" : "rgba(0,119,204,0.10)"}; color:${isExtra ? "#C23B00" : "#0066B3"}; font-size:0.78rem; font-weight:600;">
+           Actividad real: ${reales.map(r => `${r.nombre} (${r.tipo}${r.distancia_km > 0 ? ` · ${r.distancia_km} km` : ""}${r.duracion_min > 0 ? ` · ${r.duracion_min} min` : ""})`).join(" + ")}
+         </div>`
+      : "";
+
+    let statusBadgeHtml = `<span class="body-xs tabular-num">${distInfo}${d.zona_objetivo ? ` • ${d.zona_objetivo}` : ""}</span>`;
+    if (estadoDia === "completado") {
+      statusBadgeHtml = `<span class="pill-tag" style="background:rgba(21,128,61,0.12); color:#15803D;">✓ Completado</span>`;
+    } else if (isSubstituted) {
+      statusBadgeHtml = `<span class="pill-tag" style="background:rgba(0,119,204,0.12); color:#0066B3;">Realizado (otro deporte)</span>`;
+    } else if (isExtra) {
+      statusBadgeHtml = `<span class="pill-tag" style="background:rgba(238,90,43,0.14); color:#C23B00;">Extra / Fuera de plan</span>`;
+    } else if (isNotDone) {
+      statusBadgeHtml = `<span class="pill-tag" style="background:#FEE2E2; color:#B91C1C;">No realizado (0 carga)</span>`;
+    } else if (d.garmin_scheduled) {
+      statusBadgeHtml = `<span class="pill-tag" style="background:rgba(21,128,61,0.10); color:#15803D;">Pendiente · 📅 Garmin</span>`;
+    } else if (!isRest && !isCancelled) {
+      statusBadgeHtml = `<span class="pill-tag">Pendiente</span>`;
+    }
+
     return `
-      <div class="training-day-card ${d.es_hoy && !isCancelled ? "is-today" : ""}" style="${isCancelled ? "opacity:0.62; background:#F5F5F4;" : ""}">
+      <div class="training-day-card ${d.es_hoy && !isCancelled ? "is-today" : ""}" style="${isCancelled || isNotDone ? "opacity:0.72; background:#F5F5F4;" : ""}">
         <div class="stride-day-row-main">
           <div class="stride-day-datecol">
             <span class="stride-day-abbr" style="${d.es_hoy && !isCancelled ? "color:var(--primary-text);" : ""}">${dayAbbr}</span>
             <span class="stride-day-num-col">${dayNum}</span>
           </div>
           <div class="stride-day-nodecol">
-            <span class="stride-timeline-dot ${dotCls}">${d.completado ? "✓" : ""}</span>
+            <span class="stride-timeline-dot ${dotCls}">${d.completado ? "✓" : isSubstituted ? "~" : isNotDone ? "×" : ""}</span>
           </div>
           <div class="training-day-info" style="${!isRest && !isCancelled ? "cursor:pointer;" : ""}" ${!isRest && !isCancelled ? `onclick="startPlannedWorkout(${idx})"` : ""}>
             <div class="training-day-head">
               <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                <span style="font-weight:600; font-size:15px; color:var(--on-surface); ${isCancelled ? "text-decoration:line-through;" : ""}">${d.titulo}</span>
+                <span style="font-weight:600; font-size:15px; color:var(--on-surface); ${isCancelled || isNotDone || isSubstituted ? "text-decoration:line-through; color:var(--text-secondary);" : ""}">${d.titulo}</span>
                 ${d.es_hoy && !isCancelled ? `<span class="pill-tag orange">HOY</span>` : ""}
                 <span class="pill-tag ${badgeCls}">${d.tipo}</span>
                 ${d.opcional ? `<span class="pill-tag">OPCIONAL</span>` : ""}
                 ${isCancelled ? `<span class="pill-tag" style="background:#FEE2E2; color:#B91C1C;">CANCELADO</span>` : ""}
               </div>
-              ${d.completado
-                ? `<span class="pill-tag" style="background:rgba(21,128,61,0.12); color:#15803D;">${matchedLabel}</span>`
-                : d.garmin_scheduled
-                  ? `<span class="pill-tag" style="background:rgba(21,128,61,0.10); color:#15803D;">📅 En Garmin</span>`
-                  : `<span class="body-xs tabular-num">${distInfo}${d.zona_objetivo ? ` • ${d.zona_objetivo}` : ""}</span>`}
+              ${statusBadgeHtml}
             </div>
             <div class="body-xs" style="margin-top:2px; color:var(--text-secondary);">${d.detalle}</div>
-            ${breakdownPreview && !isCancelled ? `<div class="body-xs" style="margin-top:6px; padding:6px 10px; background:#F5F5F4; border-radius:10px; color:var(--text-primary); font-weight:500;">${breakdownPreview}</div>` : ""}
+            ${realChipHtml}
+            ${breakdownPreview && !isCancelled && !isNotDone ? `<div class="body-xs" style="margin-top:6px; padding:6px 10px; background:#F5F5F4; border-radius:10px; color:var(--text-primary); font-weight:500;">${breakdownPreview}</div>` : ""}
           </div>
         </div>
         ${hasActions ? `
