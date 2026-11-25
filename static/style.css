@@ -1,33 +1,33 @@
 /* ==========================================================================
-   AARONFIT — STRIDE UI KIT (v81)
-   Geist Typography, Clean Light Surface (#F4F4F6 / #FFFFFF),
-   Dark Atmospheric Hero (#121214), Athletic Orange (#FF5500) & Floating Pill Dock
+   AARONFIT — STRIDE UI KIT EXACT FIGMA TOKENS (node 28:1281, v99)
+   Geist Typography, Warm Paper Light Surface (#F5F5F4 / #FFFFFF),
+   Hairline (#ECECEA), Ink (#111111) & Stride Orange (#EE5A2B)
    ========================================================================== */
 
 :root {
-  --background: #F4F4F6;
+  --background: #F5F5F4;
   --surface: #FFFFFF;
-  --surface-dim: #F7F7FA;
+  --surface-dim: #F5F5F4;
   --surface-bright: #FFFFFF;
-  --surface-dark: #121214;
-  --surface-container-lowest: #F4F4F6;
+  --surface-dark: #111111;
+  --surface-container-lowest: #F5F5F4;
   --surface-container-low: #FFFFFF;
   --surface-container: #FFFFFF;
-  --surface-container-high: #EFEFF3;
-  --surface-container-highest: #E5E5EA;
+  --surface-container-high: #F0F0EE;
+  --surface-container-highest: #ECECEA;
 
-  --on-surface: #111113;
-  --on-surface-variant: #6E6E78;
+  --on-surface: #111111;
+  --on-surface-variant: #6B6B6B;
 
-  /* Stride Athletic Orange */
-  --primary: #FF5500;
-  --primary-btn: #C83E00;
-  --primary-text: #C23B00;
-  --primary-on-dark: #FF7A33;
-  --primary-fixed-dim: #E04800;
+  /* Stride Exact Athletic Orange (#EE5A2B) */
+  --primary: #EE5A2B;
+  --primary-btn: #C2421A;
+  --primary-text: #C2421A;
+  --primary-on-dark: #EE5A2B;
+  --primary-fixed-dim: #C2421A;
   --on-primary: #FFFFFF;
-  --primary-container: rgba(255, 85, 0, 0.10);
-  --on-primary-container: #C23B00;
+  --primary-container: rgba(238, 90, 43, 0.10);
+  --on-primary-container: #C2421A;
 
   /* Subtle Secondary & Semantic (WCAG AA >= 4.5:1 on light surfaces) */
   --secondary: #0066B3;
@@ -35,25 +35,27 @@
   --success: #15803D;
   --runna-green: #15803D;
 
-  --text-primary: #111113;
-  --text-secondary: #5B5B66;
-  --text-muted: #5B5B66;
-  --outline: rgba(0, 0, 0, 0.06);
-  --border-glass: rgba(0, 0, 0, 0.06);
+  --text-primary: #111111;
+  --text-secondary: #6B6B6B;
+  --text-muted: #737373;
+  --outline: #ECECEA;
+  --border-glass: #ECECEA;
   --bg-glass: #FFFFFF;
 
   --font-hanken: 'Geist', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  --rounded-sm: 8px;
+  --rounded-sm: 12px;
   --rounded-default: 14px;
   --rounded-md: 16px;
   --rounded-lg: 20px;
-  --rounded-xl: 24px;
-  --rounded-full: 9999px;
+  --rounded-xl: 28px;
+  --rounded-full: 999px;
 
-  --card-shadow: 0 2px 10px rgba(0, 0, 0, 0.035);
-  --card-shadow-hover: 0 6px 20px rgba(0, 0, 0, 0.065);
+  --card-shadow: 0px 0px 0px 1px rgba(236, 236, 234, 1);
+  --card-shadow-hover: 0px 2px 8px 0px rgba(17, 17, 17, 0.10);
+  --dock-shadow: 0px 8px 24px 0px rgba(17, 17, 17, 0.06);
+  --hero-shadow: 0px 12px 28px 0px rgba(17, 17, 17, 0.14);
 }
 
 ::selection {
@@ -328,11 +330,11 @@ body {
    STRIDE LIGHT CARD SYSTEM (CLEAN WHITE, 20PX RADIUS, SUBTLE HAIRLINE)
    ========================================================================== */
 .glass-card {
-  background: #FFFFFF;
-  border: 1px solid rgba(0, 0, 0, 0.055);
-  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: var(--rounded-lg);
   box-shadow: var(--card-shadow);
-  padding: 18px;
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1192,12 +1194,10 @@ body {
   margin: 0 auto;
   height: 64px;
   padding: 6px;
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 9999px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.09);
+  background: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: var(--rounded-full);
+  box-shadow: var(--dock-shadow);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 4px;

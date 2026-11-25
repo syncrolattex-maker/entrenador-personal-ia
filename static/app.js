@@ -270,7 +270,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v98"; // Fix showSuccessBanner string messages & debounce timer
+    const APP_VERSION = "v99"; // Exact Stride Figma tokens from node 28:1281 (#EE5A2B, #F5F5F4, #ECECEA, #111111)
 
 
 
