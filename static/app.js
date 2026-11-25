@@ -2173,6 +2173,26 @@ function renderTrainingTab(plan) {
   setBar("goal-bike-progress-label", "goal-bike-bar", `${pBike.toFixed(1)} / ${gBike} km`, gBike > 0 ? (pBike / gBike) * 100 : 0);
   setBar("goal-strength-progress-label", "goal-strength-bar", `${pStr} / ${gStr} ses`, gStr > 0 ? (pStr / gStr) * 100 : 0);
 
+  // Populate Stride 10 · Progress, history & profile cards in Objetivos Semanales
+  const elTotKm = document.getElementById("goals-total-km");
+  const elTgtKm = document.getElementById("goals-target-km");
+  const elOverallBadge = document.getElementById("goals-overall-badge");
+  const elHeroRun = document.getElementById("goals-hero-run");
+  const elHeroBike = document.getElementById("goals-hero-bike");
+  const elHeroStr = document.getElementById("goals-hero-str");
+  const elAvgPace = document.getElementById("goals-avg-pace");
+  const elCompPct = document.getElementById("goals-compliance-pct");
+  const compPct = plan.weekly_compliance ? Number(plan.weekly_compliance.overall_pct || 0) : 0;
+
+  if (elTotKm) elTotKm.textContent = (pRun + pBike).toFixed(1);
+  if (elTgtKm) elTgtKm.textContent = `/ ${(gRun + gBike).toFixed(0)} km obj.`;
+  if (elOverallBadge) elOverallBadge.textContent = `${compPct}%`;
+  if (elHeroRun) elHeroRun.textContent = `${pRun.toFixed(1)} km`;
+  if (elHeroBike) elHeroBike.textContent = `${pBike.toFixed(1)} km`;
+  if (elHeroStr) elHeroStr.textContent = `${pStr} ses`;
+  if (elAvgPace) elAvgPace.textContent = (plan.metrics && plan.metrics.ritmo_medio_garmin) ? plan.metrics.ritmo_medio_garmin : "—";
+  if (elCompPct) elCompPct.textContent = `${compPct}%`;
+
   const inRun = document.getElementById("input-goal-run-km");
   const inBike = document.getElementById("input-goal-bike-km");
   const inStr = document.getElementById("input-goal-strength-ses");

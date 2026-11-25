@@ -17,7 +17,7 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=101">
+  <link rel="stylesheet" href="/style.css?v=102">
 
   <!-- Icons & Fonts (Geist & JetBrains Mono - Stride UI Kit) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -474,11 +474,62 @@
         </div>
 
         <div class="training-top-grid">
-          <!-- Bloque 2: Objetivos Semanales (Lunes–Domingo) -->
+          <!-- Bloque 2: Objetivos Semanales (Stride 10 · Progress, history & profile) -->
           <div class="glass-card" id="training-goals-card">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
               <h2 class="headline-sm" style="margin:0;">Objetivos Semanales (L–D)</h2>
               <span id="training-week-range" class="body-xs tabular-num">—</span>
+            </div>
+
+            <!-- Stride 10 · Progress / Weekly distance & Profile / Activity totals -->
+            <div class="stride-progress-hero">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                <div>
+                  <span class="stride-progress-kicker">VOLUMEN SEMANAL TOTAL</span>
+                  <div style="display:flex; align-items:baseline; gap:6px; margin-top:2px;">
+                    <span id="goals-total-km" class="tabular-num" style="font-size:2rem; font-weight:800; line-height:1; letter-spacing:-0.03em; color:#FFFFFF;">0.0</span>
+                    <span id="goals-target-km" class="body-xs tabular-num" style="color:rgba(255,255,255,0.72);">/ 55 km obj.</span>
+                  </div>
+                </div>
+                <span id="goals-overall-badge" class="stride-progress-pill tabular-num">0%</span>
+              </div>
+
+              <svg id="goals-weekly-spark-svg" viewBox="0 0 320 42" preserveAspectRatio="none" style="width:100%; height:42px; margin:4px 0 2px;">
+                <path d="M0 36 L52 30 L106 24 L160 28 L214 14 L268 18 L320 8" fill="none" stroke="#EE5A2B" stroke-width="2.4" stroke-linecap="round"/>
+              </svg>
+
+              <div class="stride-activity-totals">
+                <div class="stride-atotal-col">
+                  <span>CARRERA</span>
+                  <strong id="goals-hero-run" class="tabular-num">0.0 km</strong>
+                </div>
+                <div class="stride-atotal-col">
+                  <span>BICI</span>
+                  <strong id="goals-hero-bike" class="tabular-num">0.0 km</strong>
+                </div>
+                <div class="stride-atotal-col">
+                  <span>FUERZA</span>
+                  <strong id="goals-hero-str" class="tabular-num">0 ses</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Stride 10 · Progress / Pace & time (2-up white stat cards) -->
+            <div class="stride-pace-time-grid">
+              <div class="stride-pt-card">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span class="label-caps">RITMO MEDIO</span>
+                  <svg width="36" height="14" viewBox="0 0 36 14" fill="none"><path d="M2 10 L10 7 L18 9 L26 4 L34 6" stroke="#EE5A2B" stroke-width="2" stroke-linecap="round"/></svg>
+                </div>
+                <strong id="goals-avg-pace" class="tabular-num" style="font-size:1.15rem; color:var(--on-surface);">—</strong>
+              </div>
+              <div class="stride-pt-card">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span class="label-caps">CUMPLIMIENTO</span>
+                  <svg width="36" height="14" viewBox="0 0 36 14" fill="none"><path d="M2 11 L10 9 L18 6 L26 5 L34 2" stroke="#15803D" stroke-width="2" stroke-linecap="round"/></svg>
+                </div>
+                <strong id="goals-compliance-pct" class="tabular-num" style="font-size:1.15rem; color:var(--on-surface);">0%</strong>
+              </div>
             </div>
 
             <div class="training-goal-row">
@@ -1273,6 +1324,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=101"></script>
+  <script src="/app.js?v=102"></script>
 </body>
 </html>
