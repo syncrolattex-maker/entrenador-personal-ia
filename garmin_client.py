@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 import requests
@@ -650,11 +651,52 @@ def workout_to_fit_steps(workout: Dict[str, Any]) -> List[Dict[str, Any]]:
     return steps
 
 
+def _parse_garmin_target(phase: Dict[str, Any], is_run: bool, is_bike: bool) -> Dict[str, Any]:
+    """Converts phase target_pace (e.g. '4:45 - 5:00' or '180-210 W') into Garmin targetType + targetValueOne/Two."""
+    import re
+    tp = str(phase.get("target_pace") or "")
+    if is_run:
+        matches = re.findall(r"(\d+):(\d{2})", tp)
+        if len(matches) >= 2:
+            sec1 = int(matches[0][0]) * 60 + int(matches[0][1])
+            sec2 = int(matches[1][0]) * 60 + int(matches[1][1])
+            fast_sec, slow_sec = min(sec1, sec2), max(sec1, sec2)
+            if fast_sec > 0 and slow_sec > 0:
+                return {
+                    "targetType": {"workoutTargetTypeId": 6, "workoutTargetTypeKey": "pace.zone"},
+                    "targetValueOne": round(1000.0 / slow_sec, 3),   # m/s slower bound
+                    "targetValueTwo": round(1000.0 / fast_sec, 3),   # m/s faster bound
+                }
+    elif is_bike:
+        m_w = re.search(r"(\d+)\s*-\s*(\d+)\s*W", tp, re.IGNORECASE)
+        if m_w:
+            return {
+                "targetType": {"workoutTargetTypeId": 2, "workoutTargetTypeKey": "power.zone"},
+                "targetValueOne": float(m_w.group(1)),
+                "targetValueTwo": float(m_w.group(2)),
+            }
+    return {"targetType": {"workoutTargetTypeId": 1, "workoutTargetTypeKey": "no.target"}}
+
+
+def _infer_phase_type(phase: Dict[str, Any]) -> str:
+    raw = (phase.get("type") or "").upper().strip()
+    if raw in ("WARMUP", "COOLDOWN", "REST", "RECOVERY", "WORK", "INTERVAL"):
+        return "REST" if raw == "RECOVERY" else raw
+    name_l = (phase.get("name") or "").lower()
+    if any(k in name_l for k in ["calentamiento", "warmup", "warm-up", "inicio controlado"]):
+        return "WARMUP"
+    if any(k in name_l for k in ["enfriamiento", "cooldown", "cool-down", "vuelta a la calma", "soltar piernas"]):
+        return "COOLDOWN"
+    if any(k in name_l for k in ["recuperación", "recuperacion", "rest", "trote suave"]):
+        return "REST"
+    return "WORK"
+
+
 def _build_garmin_connect_workout_json(workout: Dict[str, Any]) -> Dict[str, Any]:
-    """Builds Garmin Connect workout JSON payload for garminconnect upload_workout."""
+    """Builds Garmin Connect workout JSON payload with proper Warmup/Repeat/Rest/Cooldown & Pace/Power targets."""
     tipo = workout.get("tipo_sesion", "Carrera")
-    is_run = tipo == "Carrera"
-    is_bike = tipo == "Ciclismo"
+    is_run = tipo in ("Carrera", "Carrera Objetivo")
+    is_bike = tipo in ("Ciclismo", "Bici")
     is_cardio = is_run or is_bike
     sport_key = "running" if is_run else "cycling" if is_bike else "strength_training"
     sport_id = 1 if is_run else 2 if is_bike else 5
@@ -663,20 +705,58 @@ def _build_garmin_connect_workout_json(workout: Dict[str, Any]) -> Dict[str, Any
     order = 1
 
     if is_cardio:
-        for p in workout.get("phases", []):
-            p_type = (p.get("type") or "INTERVAL").upper()
-            step_type_id = 1 if p_type == "WARMUP" else 2 if p_type == "COOLDOWN" else 4 if p_type == "REST" else 3
-            step_type_key = "warmup" if p_type == "WARMUP" else "cooldown" if p_type == "COOLDOWN" else "rest" if p_type == "REST" else "interval"
-            workout_steps.append({
+        phases = workout.get("phases", [])
+        # Build step DTO helper
+        def _make_step(p: Dict[str, Any], s_order: int, forced_type: Optional[str] = None) -> Dict[str, Any]:
+            pt = forced_type or _infer_phase_type(p)
+            step_type_id = 1 if pt == "WARMUP" else 2 if pt == "COOLDOWN" else 4 if pt == "REST" else 3
+            step_type_key = "warmup" if pt == "WARMUP" else "cooldown" if pt == "COOLDOWN" else "recovery" if pt == "REST" else "interval"
+            tgt = _parse_garmin_target(p, is_run=is_run, is_bike=is_bike)
+            step = {
                 "type": "ExecutableStepDTO",
-                "stepOrder": order,
+                "stepOrder": s_order,
                 "stepType": {"stepTypeId": step_type_id, "stepTypeKey": step_type_key},
                 "endCondition": {"conditionTypeId": 2, "conditionTypeKey": "time"},
                 "endConditionValue": float(p.get("duration_seconds") or 300),
-                "targetType": {"workoutTargetTypeId": 1, "workoutTargetTypeKey": "no.target"},
+                "targetType": tgt["targetType"],
                 "description": p.get("name", "Fase"),
-            })
+            }
+            if "targetValueOne" in tgt:
+                step["targetValueOne"] = tgt["targetValueOne"]
+                step["targetValueTwo"] = tgt["targetValueTwo"]
+            return step
+
+        # Group repeated WORK + REST pairs into a clean Garmin RepeatGroupDTO when applicable
+        i = 0
+        while i < len(phases):
+            pt = _infer_phase_type(phases[i])
+            if pt == "WORK" and i + 1 < len(phases) and _infer_phase_type(phases[i + 1]) == "REST":
+                # Count consecutive WORK+REST pairs
+                pairs = []
+                j = i
+                while j + 1 < len(phases) and _infer_phase_type(phases[j]) == "WORK" and _infer_phase_type(phases[j + 1]) == "REST":
+                    pairs.append((phases[j], phases[j + 1]))
+                    j += 2
+                if len(pairs) >= 2:
+                    work_p, rest_p = pairs[0]
+                    work_step = _make_step(work_p, 1, "WORK")
+                    work_step["description"] = re.sub(r"\s*\d+/\d+$", "", work_step["description"]).strip()
+                    rest_step = _make_step(rest_p, 2, "REST")
+                    rest_step["description"] = re.sub(r"\s*\d+/\d+$", "", rest_step["description"]).strip()
+                    workout_steps.append({
+                        "type": "RepeatGroupDTO",
+                        "stepOrder": order,
+                        "numberOfIterations": len(pairs),
+                        "smartRepeat": False,
+                        "stepType": {"stepTypeId": 6, "stepTypeKey": "repeat"},
+                        "workoutSteps": [work_step, rest_step],
+                    })
+                    order += 1
+                    i = j
+                    continue
+            workout_steps.append(_make_step(phases[i], order))
             order += 1
+            i += 1
     else:
         for ex in workout.get("ejercicios", []):
             series = int(ex.get("series") or 3)

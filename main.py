@@ -2243,38 +2243,38 @@ def _build_cardio_phases(kind: str, dur_min: int) -> List[dict]:
         reps = 4 if main_s >= 1200 else 3
         work_s = int((main_s / reps) * 0.65)
         rest_s = max(60, int((main_s / reps) * 0.35))
-        phases = [{"name": "Calentamiento Z1-Z2", "duration_seconds": wu, "target_pace": "6:00 - 6:20", "zone": "Z2"}]
+        phases = [{"name": "Calentamiento Z1-Z2", "type": "WARMUP", "duration_seconds": wu, "target_pace": "6:00 - 6:20", "zone": "Z2"}]
         for i in range(reps):
-            phases.append({"name": f"Intervalo Tempo {i+1}/{reps}", "duration_seconds": work_s, "target_pace": "4:45 - 5:00", "zone": "Z4"})
-            phases.append({"name": f"Trote Recuperación {i+1}/{reps}", "duration_seconds": rest_s, "target_pace": "6:20 - 6:45", "zone": "Z1"})
-        phases.append({"name": "Enfriamiento Suave", "duration_seconds": cd, "target_pace": "6:15 - 6:40", "zone": "Z1"})
+            phases.append({"name": f"Intervalo Tempo {i+1}/{reps}", "type": "WORK", "duration_seconds": work_s, "target_pace": "4:45 - 5:00", "zone": "Z4"})
+            phases.append({"name": f"Trote Recuperación {i+1}/{reps}", "type": "REST", "duration_seconds": rest_s, "target_pace": "6:20 - 6:45", "zone": "Z1"})
+        phases.append({"name": "Enfriamiento Suave", "type": "COOLDOWN", "duration_seconds": cd, "target_pace": "6:15 - 6:40", "zone": "Z1"})
         return phases
     if kind == "bici":
         wu = 600
         cd = 480
         main_s = max(900, total_s - wu - cd)
         return [
-            {"name": "Calentamiento Cadencia Alta", "duration_seconds": wu, "target_pace": "90 rpm", "zone": "Z1-Z2"},
-            {"name": "Bloque Aeróbico Sostenido", "duration_seconds": main_s, "target_pace": "180-210 W", "zone": "Z2-Z3"},
-            {"name": "Soltar Piernas", "duration_seconds": cd, "target_pace": "85 rpm", "zone": "Z1"},
+            {"name": "Calentamiento Cadencia Alta", "type": "WARMUP", "duration_seconds": wu, "target_pace": "90 rpm", "zone": "Z1-Z2"},
+            {"name": "Bloque Aeróbico Sostenido", "type": "WORK", "duration_seconds": main_s, "target_pace": "180-210 W", "zone": "Z2-Z3"},
+            {"name": "Soltar Piernas", "type": "COOLDOWN", "duration_seconds": cd, "target_pace": "85 rpm", "zone": "Z1"},
         ]
     if kind == "larga":
         wu = 480
         cd = 300
         main_s = max(900, total_s - wu - cd)
         return [
-            {"name": "Inicio Controlado Z2", "duration_seconds": wu, "target_pace": "5:50 - 6:10", "zone": "Z2"},
-            {"name": "Rodaje Aeróbico Principal", "duration_seconds": main_s, "target_pace": "5:25 - 5:45", "zone": "Z2-Z3"},
-            {"name": "Vuelta a la Calma", "duration_seconds": cd, "target_pace": "6:05 - 6:25", "zone": "Z1"},
+            {"name": "Inicio Controlado Z2", "type": "WARMUP", "duration_seconds": wu, "target_pace": "5:50 - 6:10", "zone": "Z2"},
+            {"name": "Rodaje Aeróbico Principal", "type": "WORK", "duration_seconds": main_s, "target_pace": "5:25 - 5:45", "zone": "Z2-Z3"},
+            {"name": "Vuelta a la Calma", "type": "COOLDOWN", "duration_seconds": cd, "target_pace": "6:05 - 6:25", "zone": "Z1"},
         ]
     # Rodaje base / activación
     wu = 360
     cd = 240
     main_s = max(600, total_s - wu - cd)
     return [
-        {"name": "Calentamiento Z1-Z2", "duration_seconds": wu, "target_pace": "5:55 - 6:15", "zone": "Z2"},
-        {"name": "Rodaje Base Constante", "duration_seconds": main_s, "target_pace": "5:30 - 5:50", "zone": "Z2"},
-        {"name": "Enfriamiento", "duration_seconds": cd, "target_pace": "6:10 - 6:30", "zone": "Z1"},
+        {"name": "Calentamiento Z1-Z2", "type": "WARMUP", "duration_seconds": wu, "target_pace": "5:55 - 6:15", "zone": "Z2"},
+        {"name": "Rodaje Base Constante", "type": "WORK", "duration_seconds": main_s, "target_pace": "5:30 - 5:50", "zone": "Z2"},
+        {"name": "Enfriamiento", "type": "COOLDOWN", "duration_seconds": cd, "target_pace": "6:10 - 6:30", "zone": "Z1"},
     ]
 
 
