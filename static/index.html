@@ -17,7 +17,7 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=103">
+  <link rel="stylesheet" href="/style.css?v=104">
 
   <!-- Icons & Fonts (Geist & JetBrains Mono - Stride UI Kit) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -295,6 +295,55 @@
         <div class="greeting-header">
           <h1 class="greeting-title">Entrenamiento y Summit</h1>
           <p class="body-sm-muted">Curva Fitness & Freshness (90 días), Training Log, PRs e historial real de Garmin</p>
+        </div>
+
+        <!-- Stride 12 · Plan Explorations Top Summary Row -->
+        <div class="stride-summit-explorations-row" id="summit-explorations-row">
+          <!-- 12 · Exploration / Dark volume -->
+          <div class="stride-exp-dark-card">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+              <div>
+                <span class="stride-progress-kicker">VOLUMEN 14 DÍAS</span>
+                <div style="display:flex; align-items:baseline; gap:6px; margin-top:2px;">
+                  <span id="summit-exp-vol-km" class="tabular-num" style="font-size:2rem; font-weight:800; line-height:1; letter-spacing:-0.03em; color:#FFFFFF;">0.0</span>
+                  <span style="font-size:0.85rem; color:rgba(255,255,255,0.72);">km</span>
+                </div>
+              </div>
+              <span id="summit-exp-vol-delta" class="stride-progress-pill tabular-num">—</span>
+            </div>
+            <div id="summit-exp-vol-svg" style="width:100%; height:48px;"></div>
+          </div>
+
+          <!-- 12 · Exploration / Effort breakdown -->
+          <div class="glass-card stride-exp-light-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span class="label-caps">DISTRIBUCIÓN DE ESFUERZO</span>
+              <span id="summit-exp-eff-total" class="body-xs tabular-num">—</span>
+            </div>
+            <div id="summit-exp-eff-bar" class="stride-eff-bar"></div>
+            <div id="summit-exp-eff-legend" class="stride-eff-legend"></div>
+          </div>
+
+          <!-- 12 · Exploration / Weekly ring -->
+          <div class="glass-card stride-exp-light-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span class="label-caps">ANILLO SEMANAL</span>
+              <span id="summit-exp-ring-status" class="body-xs tabular-num">—</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:14px; margin-top:4px;">
+              <div style="position:relative; width:72px; height:72px; flex-shrink:0; display:flex; align-items:center; justify-content:center;">
+                <svg viewBox="0 0 80 80" style="width:72px; height:72px; transform:rotate(-90deg);">
+                  <circle cx="40" cy="40" r="32" fill="none" stroke="#ECECEA" stroke-width="7"/>
+                  <circle id="summit-exp-ring-arc" cx="40" cy="40" r="32" fill="none" stroke="#EE5A2B" stroke-width="7" stroke-linecap="round" stroke-dasharray="201" stroke-dashoffset="201"/>
+                </svg>
+                <span id="summit-exp-ring-pct" class="tabular-num" style="position:absolute; font-size:0.95rem; font-weight:800; color:var(--on-surface);">0%</span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
+                <strong id="summit-exp-ring-rem" class="tabular-num" style="font-size:1.05rem; color:var(--on-surface);">—</strong>
+                <span id="summit-exp-ring-sub" class="body-xs">Objetivo semanal</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Summit Wide Desktop Grid -->
@@ -1324,6 +1373,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=103"></script>
+  <script src="/app.js?v=104"></script>
 </body>
 </html>

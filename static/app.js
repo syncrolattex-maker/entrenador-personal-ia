@@ -3652,11 +3652,116 @@ async function loadSummitAnalytics() {
     _summitData = await res.json();
     renderTrainingLogBubbles("Todo");
     renderFitnessFreshnessChart(_summitData.fitness_curve || []);
+    renderSummitExplorations(_summitData);
     renderPersonalRecords(_summitData.personal_records || []);
     renderOfficialRecords(_summitData.official_records || []);
     loadSegmentsList();
   } catch (e) {
     console.warn("Summit analytics load failed:", e);
+  }
+}
+
+function renderSummitExplorations(summit) {
+  if (!summit) return;
+  const days = Array.isArray(summit.training_log) ? summit.training_log : [];
+  const last14 = days.slice(-14);
+  const prev14 = days.slice(-28, -14);
+
+  let km14 = 0, kmPrev14 = 0;
+  let minRun = 0, minBike = 0, minStr = 0;
+
+  last14.forEach(d => {
+    (d.entries || []).forEach(e => {
+      km14 += Number(e.km || 0);
+      if (e.sport_type === "Carrera") minRun += Number(e.min || 0);
+      else if (e.sport_type === "Ciclismo") minBike += Number(e.min || 0);
+      else if (e.sport_type === "Fuerza") minStr += Number(e.min || 0);
+    });
+  });
+  prev14.forEach(d => {
+    (d.entries || []).forEach(e => { kmPrev14 += Number(e.km || 0); });
+  });
+
+  const elVolKm = document.getElementById("summit-exp-vol-km");
+  const elVolDelta = document.getElementById("summit-exp-vol-delta");
+  const elVolSvg = document.getElementById("summit-exp-vol-svg");
+  if (elVolKm) elVolKm.textContent = km14.toFixed(1);
+  if (elVolDelta) {
+    if (kmPrev14 > 0) {
+      const pct = Math.round(((km14 - kmPrev14) / kmPrev14) * 100);
+      elVolDelta.textContent = `${pct >= 0 ? "+" : ""}${pct}%`;
+    } else {
+      elVolDelta.textContent = "14 días";
+    }
+  }
+  if (elVolSvg && last14.length > 1) {
+    const dayKms = last14.map(d => (d.entries || []).reduce((s, e) => s + Number(e.km || 0), 0));
+    const maxK = Math.max(1, ...dayKms);
+    const W = 280, H = 48, pad = 4;
+    const pts = dayKms.map((v, i) => {
+      const x = pad + (i / (dayKms.length - 1)) * (W - pad * 2);
+      const y = H - pad - (v / maxK) * (H - pad * 2);
+      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(" ");
+    const area = `${pts} L${W - pad},${H - pad} L${pad},${H - pad} Z`;
+    elVolSvg.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%; height:100%;">
+        <defs>
+          <linearGradient id="expDarkGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#EE5A2B" stop-opacity="0.45"/>
+            <stop offset="100%" stop-color="#EE5A2B" stop-opacity="0.02"/>
+          </linearGradient>
+        </defs>
+        <path d="${area}" fill="url(#expDarkGrad)"/>
+        <path d="${pts}" fill="none" stroke="#EE5A2B" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+    `;
+  }
+
+  // Effort breakdown (Carrera / Ciclismo / Fuerza)
+  const totalMin = Math.max(1, minRun + minBike + minStr);
+  const pRun = Math.round((minRun / totalMin) * 100);
+  const pBike = Math.round((minBike / totalMin) * 100);
+  const pStr = Math.max(0, 100 - pRun - pBike);
+  const elEffTot = document.getElementById("summit-exp-eff-total");
+  const elEffBar = document.getElementById("summit-exp-eff-bar");
+  const elEffLeg = document.getElementById("summit-exp-eff-legend");
+  if (elEffTot) elEffTot.textContent = `${Math.round(minRun + minBike + minStr)} min`;
+  if (elEffBar) {
+    elEffBar.innerHTML = (minRun + minBike + minStr) > 0
+      ? `
+        ${pRun > 0 ? `<div style="width:${pRun}%; background:#15803D;"></div>` : ""}
+        ${pBike > 0 ? `<div style="width:${pBike}%; background:#0077CC;"></div>` : ""}
+        ${pStr > 0 ? `<div style="width:${pStr}%; background:#EE5A2B;"></div>` : ""}
+      `
+      : `<div style="width:100%; background:#ECECEA;"></div>`;
+  }
+  if (elEffLeg) {
+    elEffLeg.innerHTML = `
+      <span><strong style="color:#15803D;">●</strong> Carrera ${pRun}%</span>
+      <span><strong style="color:#0077CC;">●</strong> Ciclismo ${pBike}%</span>
+      <span><strong style="color:#C83E00;">●</strong> Fuerza ${pStr}%</span>
+    `;
+  }
+
+  // Weekly ring from _latestWeeklyPlan
+  const plan = _latestWeeklyPlan;
+  const elRingArc = document.getElementById("summit-exp-ring-arc");
+  const elRingPct = document.getElementById("summit-exp-ring-pct");
+  const elRingRem = document.getElementById("summit-exp-ring-rem");
+  const elRingSub = document.getElementById("summit-exp-ring-sub");
+  const elRingSt = document.getElementById("summit-exp-ring-status");
+  if (plan && plan.weekly_compliance) {
+    const pct = Math.min(100, Math.max(0, Number(plan.weekly_compliance.overall_pct || 0)));
+    const circ = 201;
+    if (elRingArc) elRingArc.style.strokeDashoffset = (circ - (pct / 100) * circ).toFixed(1);
+    if (elRingPct) elRingPct.textContent = `${pct}%`;
+    const gRun = Number((plan.goals && plan.goals.goal_run_km) || plan.objetivo_km_carrera || 20);
+    const pRunKm = Number((plan.week_progress && plan.week_progress.run_km) || 0);
+    const remKm = Math.max(0, gRun - pRunKm).toFixed(1);
+    if (elRingRem) elRingRem.textContent = remKm > 0 ? `Faltan ${remKm} km` : "Objetivo cumplido";
+    if (elRingSub) elRingSub.textContent = `${pRunKm.toFixed(1)} / ${gRun} km carrera`;
+    if (elRingSt) elRingSt.textContent = plan.plan_type ? plan.plan_type.toUpperCase() : "ACTIVO";
   }
 }
 
