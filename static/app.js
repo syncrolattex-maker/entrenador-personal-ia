@@ -3698,6 +3698,7 @@ async function loadSummitAnalytics() {
     renderPersonalRecords(_summitData.personal_records || []);
     renderOfficialRecords(_summitData.official_records || []);
     loadSegmentsList();
+    loadAnalyticsOverviewAndAI();
   } catch (e) {
     console.warn("Summit analytics load failed:", e);
   }
@@ -5322,4 +5323,251 @@ function renderHrAnalysisSubview(act) {
       <div class="split-bar-track"><div style="height:100%; width:${z.pct}%; background:${z.color}; border-radius:999px;"></div></div>
     </div>
   `).join("");
+}
+
+
+// ============================================================
+// FASE 3 & 4: MOTOR ANALÍTICO + INTERPRETACIÓN IA (GEMINI)
+// ============================================================
+let _analyticsOverviewData = null;
+let _analyticsPeriodKey = "week";
+
+function _escHtml(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function _formatDeltaPct(pct, unitSuffix = "%") {
+  if (pct === null || pct === undefined || Number.isNaN(Number(pct))) {
+    return { text: "Sin base previa", cls: "" };
+  }
+  const n = Number(pct);
+  const sign = n > 0 ? "+" : "";
+  return {
+    text: `${sign}${n.toFixed(1)}${unitSuffix} vs anterior`,
+    cls: n > 0 ? "pos" : n < 0 ? "neg" : ""
+  };
+}
+
+async function loadAnalyticsOverviewAndAI(forceRefresh = false) {
+  const refreshBtn = document.getElementById("summit-ai-refresh-btn");
+  if (refreshBtn && forceRefresh) {
+    refreshBtn.disabled = true;
+    refreshBtn.textContent = "Actualizando...";
+  }
+
+  try {
+    const overviewRes = await fetch("/api/analytics/overview?days=730");
+    if (overviewRes.ok) {
+      _analyticsOverviewData = await overviewRes.json();
+      renderAnalyticsComparisons(_analyticsPeriodKey);
+      renderAerobicEfficiencyCard(_analyticsOverviewData.aerobic_efficiency);
+      renderProfileRunnerStats(_analyticsOverviewData);
+    }
+  } catch (e) {
+    console.warn("Analytics overview load failed:", e);
+  }
+
+  try {
+    const aiUrl = forceRefresh
+      ? "/api/analytics/ai-interpretation?days=730&refresh=1"
+      : "/api/analytics/ai-interpretation?days=730";
+    const aiRes = await fetch(aiUrl);
+    if (aiRes.status === 401) {
+      renderAIAuthRequired();
+    } else if (aiRes.ok) {
+      const aiPayload = await aiRes.json();
+      renderAIInterpretationCards(aiPayload);
+    }
+  } catch (e) {
+    console.warn("AI interpretation load failed:", e);
+  } finally {
+    if (refreshBtn) {
+      refreshBtn.disabled = false;
+      refreshBtn.textContent = "Actualizar";
+    }
+  }
+}
+
+function selectAnalyticsPeriod(periodKey, btnEl) {
+  _analyticsPeriodKey = periodKey;
+  const pills = document.querySelectorAll("#summit-period-pills .stride-period-pill");
+  pills.forEach(p => p.classList.remove("active"));
+  if (btnEl) btnEl.classList.add("active");
+  renderAnalyticsComparisons(periodKey);
+}
+
+function renderAnalyticsComparisons(periodKey) {
+  const grid = document.getElementById("summit-comp-grid");
+  const subtitle = document.getElementById("summit-comp-subtitle");
+  if (!grid || !_analyticsOverviewData || !_analyticsOverviewData.comparisons) return;
+
+  const comp = _analyticsOverviewData.comparisons[periodKey];
+  if (!comp || !comp.current) {
+    grid.innerHTML = `<div class="body-sm-muted">Sin datos reales para este periodo.</div>`;
+    return;
+  }
+
+  const c = comp.current;
+  const d = comp.deltas || {};
+  if (subtitle) {
+    const qualityTag = comp.sample_quality === "reliable" ? "Muestra comparable" : "Muestra parcial";
+    subtitle.textContent = `${comp.label} • ${c.activities_count || 0} actividades • ${qualityTag}`;
+  }
+
+  const kmDelta = _formatDeltaPct(d.distance_pct);
+  const durDelta = _formatDeltaPct(d.duration_pct);
+  const elevDelta = _formatDeltaPct(d.elevation_gain_pct);
+  const effDelta = _formatDeltaPct(d.relative_effort_pct);
+
+  const hoursVal = ((Number(c.duration_min || 0)) / 60).toFixed(1);
+  grid.innerHTML = `
+    <div class="stride-comp-box">
+      <span class="stride-comp-label">Distancia</span>
+      <strong class="stride-comp-val tabular-num">${Number(c.distance_km || 0).toFixed(1)} km</strong>
+      <span class="stride-comp-delta ${kmDelta.cls}">${_escHtml(kmDelta.text)}</span>
+    </div>
+    <div class="stride-comp-box">
+      <span class="stride-comp-label">Tiempo activo</span>
+      <strong class="stride-comp-val tabular-num">${hoursVal} h</strong>
+      <span class="stride-comp-delta ${durDelta.cls}">${_escHtml(durDelta.text)}</span>
+    </div>
+    <div class="stride-comp-box">
+      <span class="stride-comp-label">Desnivel +</span>
+      <strong class="stride-comp-val tabular-num">${Math.round(Number(c.elevation_gain_m || 0))} m</strong>
+      <span class="stride-comp-delta ${elevDelta.cls}">${_escHtml(elevDelta.text)}</span>
+    </div>
+    <div class="stride-comp-box">
+      <span class="stride-comp-label">Esfuerzo rel.</span>
+      <strong class="stride-comp-val tabular-num">${Math.round(Number(c.relative_effort || 0))}</strong>
+      <span class="stride-comp-delta ${effDelta.cls}">${_escHtml(effDelta.text)}</span>
+    </div>
+  `;
+}
+
+function renderAerobicEfficiencyCard(eff) {
+  const badge = document.getElementById("summit-eff-badge");
+  const metricsEl = document.getElementById("summit-eff-metrics");
+  const conclusionEl = document.getElementById("summit-eff-conclusion");
+  const homeEffEl = document.getElementById("home-ai-efficiency-pill");
+  if (!eff) return;
+
+  const rec = eff.recent_period || {};
+  const base = eff.baseline_period || {};
+
+  if (badge) {
+    if (eff.status === "insufficient_sample") {
+      badge.textContent = "Muestra insuf.";
+      badge.className = "pill-tag";
+    } else {
+      const pct = Number(eff.ef_change_pct || 0);
+      badge.textContent = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}% EF`;
+      badge.className = pct >= 2.5 ? "pill-tag green tabular-num" : "pill-tag orange tabular-num";
+    }
+  }
+
+  if (homeEffEl) {
+    if (eff.status === "insufficient_sample") {
+      homeEffEl.textContent = "Eficiencia 6s vs 6s: muestra insuficiente";
+    } else {
+      const pct = Number(eff.ef_change_pct || 0);
+      homeEffEl.textContent = `Eficiencia 6s vs 6s: ${pct >= 0 ? "+" : ""}${pct.toFixed(1)}% (${rec.mean_pace_str || "--"} @ ${rec.mean_hr || "--"} ppm)`;
+    }
+  }
+
+  if (metricsEl) {
+    metricsEl.innerHTML = `
+      <div class="stride-eff-window-box">
+        <span class="stride-comp-label">Últimas 6 semanas (${rec.count || 0} car.)</span>
+        <strong class="tabular-num" style="font-size:1rem; color:#111111;">${_escHtml(rec.mean_pace_str || "--")} /km</strong>
+        <span class="body-xs tabular-num" style="color:#5B5B66;">${rec.mean_hr ? `${rec.mean_hr} ppm` : "Sin FC"} • EF ${rec.mean_ef ?? "--"}</span>
+      </div>
+      <div class="stride-eff-window-box">
+        <span class="stride-comp-label">6 semanas previas (${base.count || 0} car.)</span>
+        <strong class="tabular-num" style="font-size:1rem; color:#111111;">${_escHtml(base.mean_pace_str || "--")} /km</strong>
+        <span class="body-xs tabular-num" style="color:#5B5B66;">${base.mean_hr ? `${base.mean_hr} ppm` : "Sin FC"} • EF ${base.mean_ef ?? "--"}</span>
+      </div>
+    `;
+  }
+
+  if (conclusionEl) {
+    conclusionEl.textContent = eff.conclusion || "Sin conclusiones disponibles.";
+  }
+}
+
+function renderAIAuthRequired() {
+  const homeBadge = document.getElementById("home-ai-mode-badge");
+  const homeSummary = document.getElementById("home-ai-summary");
+  const summitBody = document.getElementById("summit-ai-body");
+  if (homeBadge) homeBadge.textContent = "Garmin requerido";
+  if (homeSummary) homeSummary.textContent = "Conecta tu cuenta de Garmin Connect en Perfil para desbloquear el análisis IA de tu historial real.";
+  if (summitBody) summitBody.innerHTML = `<p class="stride-ai-summary">Conecta Garmin Connect en Perfil para generar la interpretación inteligente con Gemini.</p>`;
+}
+
+function renderAIInterpretationCards(payload) {
+  const interp = (payload && payload.interpretation) || {};
+  const modeLabel = interp.source_mode === "gemini" ? "Gemini Live" : "Motor Determinista";
+
+  const homeBadge = document.getElementById("home-ai-mode-badge");
+  const homeSummary = document.getElementById("home-ai-summary");
+  if (homeBadge) homeBadge.textContent = modeLabel;
+  if (homeSummary) homeSummary.textContent = interp.resumen_estado_deportivo || "Sin resumen disponible.";
+
+  const summitBody = document.getElementById("summit-ai-body");
+  if (!summitBody) return;
+
+  const strengths = Array.isArray(interp.puntos_fuertes) ? interp.puntos_fuertes : [];
+  const improvements = Array.isArray(interp.aspectos_a_mejorar) ? interp.aspectos_a_mejorar : [];
+  const periods = Array.isArray(interp.periodos_evaluados) ? interp.periodos_evaluados : [];
+
+  summitBody.innerHTML = `
+    <div class="stride-ai-section">
+      <div class="stride-ai-section-title">Estado deportivo • ${_escHtml(modeLabel)}</div>
+      <p class="stride-ai-summary">${_escHtml(interp.resumen_estado_deportivo || "")}</p>
+    </div>
+    <div class="stride-ai-section">
+      <div class="stride-ai-section-title">Evolución &amp; Eficiencia</div>
+      <p class="stride-ai-summary">${_escHtml(interp.evolucion || "")}</p>
+      <p class="stride-ai-summary" style="margin-top:6px;">${_escHtml(interp.eficiencia || "")}</p>
+    </div>
+    <div class="stride-ai-section">
+      <div class="stride-ai-section-title">Carga &amp; Recuperación (Cálculo AaronFit)</div>
+      <p class="stride-ai-summary">${_escHtml(interp.carga || "")}</p>
+    </div>
+    ${strengths.length ? `
+    <div class="stride-ai-section">
+      <div class="stride-ai-section-title">Puntos fuertes</div>
+      <ul class="stride-ai-list">${strengths.map(s => `<li>${_escHtml(s)}</li>`).join("")}</ul>
+    </div>` : ""}
+    ${improvements.length ? `
+    <div class="stride-ai-section">
+      <div class="stride-ai-section-title">Aspectos a vigilar</div>
+      <ul class="stride-ai-list">${improvements.map(s => `<li>${_escHtml(s)}</li>`).join("")}</ul>
+    </div>` : ""}
+    <div class="stride-ai-footer">
+      <span class="stride-ai-meta">${_escHtml(interp.conclusion || "")}</span>
+      ${periods.length ? `<span class="stride-ai-badge">${_escHtml(periods.join(" · "))}</span>` : ""}
+    </div>
+  `;
+}
+
+function renderProfileRunnerStats(overview) {
+  if (!overview || !overview.comparisons || !overview.comparisons.months_12) return;
+  const c12 = overview.comparisons.months_12.current || {};
+  const scope = overview.data_scope || {};
+
+  const elScope = document.getElementById("profile-stats-scope");
+  const elKm = document.getElementById("profile-rs-km");
+  const elHours = document.getElementById("profile-rs-hours");
+  const elElev = document.getElementById("profile-rs-elev");
+  const elEffort = document.getElementById("profile-rs-effort");
+
+  if (elScope) elScope.textContent = `${scope.activities_analyzed || c12.activities_count || 0} act. totales`;
+  if (elKm) elKm.textContent = `${Number(c12.distance_km || 0).toFixed(1)} km`;
+  if (elHours) elHours.textContent = `${(Number(c12.duration_min || 0) / 60).toFixed(1)} h`;
+  if (elElev) elElev.textContent = `${Math.round(Number(c12.elevation_gain_m || 0))} m`;
+  if (elEffort) elEffort.textContent = `${Math.round(Number(c12.relative_effort || 0))}`;
 }

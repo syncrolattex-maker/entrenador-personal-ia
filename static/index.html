@@ -17,7 +17,7 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=108">
+  <link rel="stylesheet" href="/style.css?v=109">
 
   <!-- Icons & Fonts (Geist & JetBrains Mono - Stride UI Kit) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -283,6 +283,19 @@
               </div>
             </div>
 
+            <!-- Stride · Análisis IA (Gemini) Resumen en Inicio -->
+            <div id="home-ai-card" class="stride-exp-dark-card">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <span class="label-caps" style="color:#FF7A33;">ANÁLISIS IA · GEMINI</span>
+                <span id="home-ai-mode-badge" class="stride-ai-badge">Conectando...</span>
+              </div>
+              <p id="home-ai-summary" class="stride-ai-summary">Analizando tu histórico real de Garmin Connect para resumir tu estado actual...</p>
+              <div class="stride-ai-footer">
+                <span id="home-ai-efficiency-pill" class="stride-ai-meta">Eficiencia 6s vs 6s: --</span>
+                <button type="button" class="stride-ai-link-btn" onclick="switchTab('tab-metrics')">Ver análisis completo →</button>
+              </div>
+            </div>
+
           </aside>
 
         </div>
@@ -341,6 +354,60 @@
               <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
                 <strong id="summit-exp-ring-rem" class="tabular-num" style="font-size:1.05rem; color:var(--on-surface);">—</strong>
                 <span id="summit-exp-ring-sub" class="body-xs">Objetivo semanal</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stride Analytics Engine + Interpretación IA (Fase 3 & 4) -->
+        <div id="summit-analytics-panel" class="stride-analytics-panel">
+          <!-- Period Comparison Card -->
+          <div class="glass-card stride-comp-card">
+            <div class="stride-comp-header">
+              <div>
+                <span class="label-caps" style="color:var(--primary-btn);">MOTOR ANALÍTICO · GARMIN REAL</span>
+                <h2 class="headline-sm" style="margin:2px 0 0;">Comparativa por Periodos</h2>
+              </div>
+              <div id="summit-period-pills" class="stride-period-pills">
+                <button type="button" class="stride-period-pill active" onclick="selectAnalyticsPeriod('week', this)">Semana</button>
+                <button type="button" class="stride-period-pill" onclick="selectAnalyticsPeriod('month', this)">Mes</button>
+                <button type="button" class="stride-period-pill" onclick="selectAnalyticsPeriod('months_3', this)">3M</button>
+                <button type="button" class="stride-period-pill" onclick="selectAnalyticsPeriod('months_6', this)">6M</button>
+                <button type="button" class="stride-period-pill" onclick="selectAnalyticsPeriod('months_12', this)">12M</button>
+              </div>
+            </div>
+            <div id="summit-comp-subtitle" class="body-sm-muted" style="font-size:0.82rem;">Cargando comparativa de periodos...</div>
+            <div id="summit-comp-grid" class="stride-comp-grid">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Eficiencia Aeróbica (6s vs 6s) + Interpretación IA (Gemini) -->
+          <div class="stride-ai-eff-grid">
+            <div id="summit-efficiency-card" class="glass-card stride-eff-card">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <div>
+                  <span class="label-caps" style="color:var(--text-secondary);">CÁLCULO AARONFIT (NO GARMIN)</span>
+                  <h2 class="headline-sm" style="margin:2px 0 0;">Eficiencia Aeróbica (6s vs 6s)</h2>
+                </div>
+                <span id="summit-eff-badge" class="pill-tag tabular-num">--</span>
+              </div>
+              <div id="summit-eff-metrics" class="stride-eff-metrics-row">
+                <!-- Populated by JS -->
+              </div>
+              <p id="summit-eff-conclusion" class="body-sm-muted" style="font-size:0.84rem; line-height:1.45;">Cargando análisis de eficiencia aeróbica...</p>
+            </div>
+
+            <div id="summit-ai-card" class="stride-exp-dark-card stride-ai-detail-card">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <div>
+                  <span class="label-caps" style="color:#FF7A33;">ENTRENADOR IA · GEMINI</span>
+                  <h2 class="headline-sm" style="margin:2px 0 0; color:#FFFFFF;">Interpretación del Rendimiento</h2>
+                </div>
+                <button type="button" id="summit-ai-refresh-btn" class="stride-ai-refresh-btn" onclick="loadAnalyticsOverviewAndAI(true)">Actualizar</button>
+              </div>
+              <div id="summit-ai-body" class="stride-ai-body">
+                <p class="stride-ai-summary">Generando lectura inteligente de tu evolución, eficiencia y carga...</p>
               </div>
             </div>
           </div>
@@ -669,6 +736,32 @@
               <div class="p-stat-box figma-stat-lavender">
                 <span class="label-caps">EDAD</span>
                 <span class="p-stat-val tabular-num">43 AÑOS</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stride 17 · Profile Runner Stats (Datos reales 12M) -->
+          <div id="profile-runner-stats-card" class="stride-exp-dark-card" style="width:100%; text-align:left;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+              <span class="label-caps" style="color:#FF7A33;">RUNNER STATS · ÚLTIMOS 12 MESES</span>
+              <span id="profile-stats-scope" class="stride-ai-badge">-- act.</span>
+            </div>
+            <div id="profile-runner-stats-grid" class="stride-runner-stats-grid">
+              <div class="stride-rs-cell">
+                <span class="stride-rs-label">DISTANCIA</span>
+                <strong id="profile-rs-km" class="stride-rs-val tabular-num">-- km</strong>
+              </div>
+              <div class="stride-rs-cell">
+                <span class="stride-rs-label">TIEMPO ACTIVO</span>
+                <strong id="profile-rs-hours" class="stride-rs-val tabular-num">-- h</strong>
+              </div>
+              <div class="stride-rs-cell">
+                <span class="stride-rs-label">DESNIVEL</span>
+                <strong id="profile-rs-elev" class="stride-rs-val tabular-num">-- m</strong>
+              </div>
+              <div class="stride-rs-cell">
+                <span class="stride-rs-label">ESFUERZO REL.</span>
+                <strong id="profile-rs-effort" class="stride-rs-val tabular-num">--</strong>
               </div>
             </div>
           </div>
@@ -1368,6 +1461,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=108"></script>
+  <script src="/app.js?v=109"></script>
 </body>
 </html>

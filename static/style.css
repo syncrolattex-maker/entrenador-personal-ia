@@ -3391,3 +3391,250 @@ body {
   font-size: 11px;
   color: var(--text-secondary);
 }
+
+
+/* ============================================================
+   STRIDE ANALYTICS ENGINE & AI INTERPRETATION (FASE 3 & 4)
+   ============================================================ */
+.stride-analytics-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.stride-comp-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stride-comp-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.stride-period-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.stride-period-pill {
+  border: 1px solid #E2E2DE;
+  background: #F6F6F4;
+  color: #111111;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.stride-period-pill.active,
+.stride-period-pill:hover {
+  background: #111111;
+  color: #FFFFFF;
+  border-color: #111111;
+}
+
+.stride-comp-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 768px) {
+  .stride-comp-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+}
+
+.stride-comp-box {
+  background: #F8F8F6;
+  border: 1px solid #E8E8E4;
+  border-radius: 16px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stride-comp-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #5B5B66;
+  text-transform: uppercase;
+}
+
+.stride-comp-val {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #111111;
+}
+
+.stride-comp-delta {
+  font-size: 12px;
+  font-weight: 700;
+  color: #5B5B66;
+}
+
+.stride-comp-delta.pos { color: #166534; }
+.stride-comp-delta.neg { color: #9A3412; }
+
+.stride-ai-eff-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 1024px) {
+  .stride-ai-eff-grid {
+    grid-template-columns: 1fr 1.25fr;
+  }
+}
+
+.stride-eff-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stride-eff-metrics-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.stride-eff-window-box {
+  background: #F8F8F6;
+  border: 1px solid #E8E8E4;
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.stride-ai-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.stride-ai-summary {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #F3F3F5;
+  margin: 0;
+}
+
+.stride-ai-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.stride-ai-meta {
+  font-size: 12px;
+  font-weight: 600;
+  color: #D1D5DB;
+}
+
+.stride-ai-link-btn {
+  background: #C83E00;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.stride-ai-link-btn:hover {
+  background: #DF4600;
+}
+
+.stride-ai-refresh-btn {
+  background: rgba(255, 255, 255, 0.14);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.stride-ai-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stride-ai-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 10px;
+}
+
+.stride-ai-section-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #FF7A33;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.stride-ai-list {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #F3F3F5;
+}
+
+.stride-runner-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.stride-rs-cell {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.stride-rs-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #D1D5DB;
+  letter-spacing: 0.04em;
+}
+
+.stride-rs-val {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #FFFFFF;
+}
