@@ -18,6 +18,8 @@ import garmin_client
 import strava_client
 import fit_encoder
 import database
+import analytics_engine
+import ai_coach
 
 # ── ExerciseDB RapidAPI (AscendAPI) ──────────────────────────────────────────
 EXERCISEDB_KEY  = os.getenv("EXERCISEDB_KEY", "")
@@ -2202,7 +2204,7 @@ def _calcular_fase_y_tendencia(history: List[dict], carrera_obj: Optional[dict])
             if tipo == "Carrera":
                 km_run_prev += dist
 
-    avg_pace_str = "5:35 min/km"
+    avg_pace_str = "—"
     if paces_sec:
         avg_s = sum(paces_sec) / len(paces_sec)
         avg_pace_str = f"{int(avg_s // 60)}:{int(avg_s % 60):02d} min/km"
@@ -2210,7 +2212,7 @@ def _calcular_fase_y_tendencia(history: List[dict], carrera_obj: Optional[dict])
     if min_prev > 0:
         pct = round(((min_14 - min_prev) / min_prev) * 100)
     else:
-        pct = 12 if min_14 > 0 else 0
+        pct = 0
 
     if pct >= 5:
         tendencia_label = f"En Ascenso (+{pct}%)"
@@ -3194,19 +3196,23 @@ async def api_export_activity_gpx(external_id: str):
 
 @app.get("/api/analytics/summit")
 async def api_summit_analytics():
-    from datetime import date, datetime, timedelta
-    acts = database.get_all_activities(limit=100, include_polyline=False)
-    if not acts and garmin_client.is_garmin_connected():
+    from datetime import date, timedelta
+    today = date.today()
+    start_84 = today - timedelta(days=83)
+    start_warmup = (today - timedelta(days=180)).isoformat()
+
+    # Read precomputed daily_summaries + lightweight activities projection (zero polylines/streams)
+    summaries = database.get_daily_summaries(date_from=start_warmup, date_to=today.isoformat())
+    recent_acts = database.get_activities_for_analytics(days=90)
+    if not recent_acts and garmin_client.is_garmin_connected():
         fresh = garmin_client.get_garmin_history(limit=30)
         if fresh:
             database.upsert_activities(fresh)
-            acts = database.get_all_activities(limit=100, include_polyline=False)
+            summaries = database.get_daily_summaries(date_from=start_warmup, date_to=today.isoformat())
+            recent_acts = database.get_activities_for_analytics(days=90)
 
-    today = date.today()
-    # 1. Training Log (last 84 days = 12 weeks)
-    start_84 = today - timedelta(days=83)
     daily_load: dict = {}
-    for a in acts:
+    for a in recent_acts:
         d_str = (a.get("start_date") or "")[:10]
         if not d_str:
             continue
@@ -3231,39 +3237,61 @@ async def api_summit_analytics():
             "total_min": round(sum(e["min"] for e in entries)),
         })
 
-    # 2. Fitness & Freshness 90-day curve (Banister EWMA CTL/ATL/TSB powered by real Relative Effort TRIMP)
-    ctl, atl = 18.0, 18.0
-    fitness_curve = []
-    start_90 = today - timedelta(days=89)
-    for i in range(90):
-        d = start_90 + timedelta(days=i)
-        ds = d.isoformat()
-        entries = daily_load.get(ds, [])
-        day_tss = sum(
-            float(e["relative_effort"])
-            if e.get("relative_effort") is not None
-            else e["min"] * (1.25 if e["sport_type"] == "Carrera" else 0.9 if e["sport_type"] == "Ciclismo" else 0.7)
-            for e in entries
-        )
-        ctl = ctl + (day_tss - ctl) / 42.0
-        atl = atl + (day_tss - atl) / 7.0
-        tsb = ctl - atl
-        fitness_curve.append({
-            "date": ds,
-            "ctl": round(ctl, 1),
-            "atl": round(atl, 1),
-            "tsb": round(tsb, 1),
-        })
+    # 2. Fitness & Freshness 90-day curve via decoupled analytics_engine (zero artificial seed)
+    ewma = analytics_engine.compute_training_load_ewma(summaries, ref_date=today, output_days=90)
 
     all_prs = database.get_personal_records()
     gps_prs = [p for p in all_prs if int(p.get("is_official") or 0) == 0]
     official_prs = [p for p in all_prs if int(p.get("is_official") or 0) == 1]
     return {
         "training_log": training_log,
-        "fitness_curve": fitness_curve,
+        "fitness_curve": ewma["curve"],
+        "load_meta": {
+            "source": ewma["source"],
+            "sample_quality": ewma["sample_quality"],
+            "active_days": ewma["active_days"],
+        },
         "personal_records": gps_prs,
         "official_records": official_prs,
     }
+
+
+@app.get("/api/analytics/overview")
+async def api_analytics_overview(days: int = 730):
+    safe_days = max(30, min(1825, days))
+    acts = database.get_activities_for_analytics(days=safe_days)
+    summaries = database.get_daily_summaries()
+    hr_streams = database.get_cached_hr_zones(limit=200)
+    return analytics_engine.build_ai_ready_analytics_snapshot(acts, summaries, hr_streams)
+
+
+@app.get("/api/analytics/efficiency")
+async def api_analytics_efficiency(recent_days: int = 42, baseline_days: int = 42):
+    acts = database.get_activities_for_analytics(days=recent_days + baseline_days + 30)
+    return analytics_engine.compute_aerobic_efficiency(acts, recent_days=recent_days, baseline_days=baseline_days)
+
+
+@app.get("/api/analytics/ai-interpretation")
+async def api_analytics_ai_interpretation(days: int = 730, refresh: bool = False):
+    if not garmin_client.is_garmin_connected():
+        raise HTTPException(status_code=401, detail="Garmin Connect no está vinculado todavía.")
+    safe_days = max(30, min(1825, days))
+    acts = database.get_activities_for_analytics(days=safe_days)
+    summaries = database.get_daily_summaries()
+    hr_streams = database.get_cached_hr_zones(limit=200)
+    snapshot = analytics_engine.build_ai_ready_analytics_snapshot(acts, summaries, hr_streams)
+    interpretation = ai_coach.generate_analytics_interpretation(snapshot, use_cache=not refresh)
+    return {
+        "status": "ok",
+        "interpretation": interpretation,
+        "snapshot_scope": snapshot.get("data_scope"),
+    }
+
+
+@app.get("/api/analytics/compare")
+async def api_analytics_compare(start_a: str, end_a: str, start_b: str, end_b: str, label: str = "Periodo personalizado"):
+    acts = database.get_activities_for_analytics(days=1095)
+    return analytics_engine.compare_periods(acts, start_a[:10], end_a[:10], start_b[:10], end_b[:10], label=label)
 
 
 class GearCreatePayload(BaseModel):

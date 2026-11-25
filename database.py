@@ -615,6 +615,11 @@ def rebuild_daily_summaries(date_from: Optional[str] = None) -> int:
         )
     conn.commit()
     conn.close()
+    try:
+        import ai_coach
+        ai_coach.invalidate_ai_cache()
+    except Exception:
+        pass
     return len(by_day)
 
 
@@ -877,16 +882,17 @@ def get_activities_paginated(
         params.append(f"{date_to[:10]}Z")
 
     where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-    cur.execute(f"SELECT COUNT(*) FROM activities {where_sql}", tuple(params))
-    total_count = int(cur.fetchone()[0] or 0)
-
     cols = f"{_ACT_COLS_NO_POLY}, polyline_json" if include_polyline else _ACT_COLS_NO_POLY
     cur.execute(
-        f"SELECT {cols} FROM activities {where_sql} ORDER BY start_date DESC LIMIT {p} OFFSET {p}",
+        f"SELECT {cols}, COUNT(*) OVER() AS _total_count FROM activities {where_sql} ORDER BY start_date DESC LIMIT {p} OFFSET {p}",
         tuple(params + [limit, offset]),
     )
     rows = _rows_to_dicts(cur, cur.fetchall())
     conn.close()
+
+    total_count = int(rows[0]["_total_count"]) if rows else 0
+    for r in rows:
+        r.pop("_total_count", None)
 
     for r in rows:
         if include_polyline and r.get("polyline_json"):
@@ -938,7 +944,38 @@ def get_daily_summaries(date_from: Optional[str] = None, date_to: Optional[str] 
     return rows
 
 
-def get_data_health_report() -> Dict[str, Any]:
+def get_activities_for_analytics(days: int = 730) -> List[Dict[str, Any]]:
+    """Lightweight projection (no polylines or raw payloads) for analytics_engine."""
+    from datetime import timedelta
+    init_db()
+    cutoff = (date.today() - timedelta(days=days)).isoformat()
+    conn = _get_conn()
+    cur = conn.cursor()
+    p = _ph(conn)
+    cur.execute(
+        f"SELECT external_id, source, sport_type, name, start_date, distance_km, duration_min, "
+        f"elevation_gain, elevation_loss, avg_hr, max_hr, relative_effort, avg_cadence, avg_power_w "
+        f"FROM activities WHERE start_date >= {p} ORDER BY start_date DESC",
+        (cutoff,),
+    )
+    rows = _rows_to_dicts(cur, cur.fetchall())
+    conn.close()
+    return rows
+
+
+def get_cached_hr_zones(limit: int = 150) -> List[Dict[str, Any]]:
+    """Returns cached hr_zones_json rows from activity_streams without loading chart_series."""
+    init_db()
+    conn = _get_conn()
+    cur = conn.cursor()
+    p = _ph(conn)
+    cur.execute(
+        f"SELECT activity_id, hr_zones_json FROM activity_streams WHERE hr_zones_json IS NOT NULL LIMIT {p}",
+        (limit,),
+    )
+    rows = _rows_to_dicts(cur, cur.fetchall())
+    conn.close()
+    return rows
     """Returns data integrity, source distribution, cache coverage, and anomaly counts."""
     init_db()
     conn = _get_conn()
