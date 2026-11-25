@@ -10,14 +10,14 @@ import json
 import httpx
 import requests
 from dotenv import load_dotenv
+load_dotenv()
+
 from google import genai
 from google.genai import types
 import garmin_client
 import strava_client
 import fit_encoder
 import database
-
-load_dotenv()
 
 # ── ExerciseDB RapidAPI (AscendAPI) ──────────────────────────────────────────
 EXERCISEDB_KEY  = os.getenv("EXERCISEDB_KEY", "")
