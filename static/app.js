@@ -270,7 +270,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v86"; // Fix checkCacheIntegrity element check after removing #selection-card
+    const APP_VERSION = "v96"; // Cap /entrenamiento Garmin history list to 5 items (avoid overwrite from renderMetricsTab)
 
 
 
@@ -2712,14 +2712,14 @@ function renderMetricsTab(history, coachText) {
       .catch(() => {});
   }
 
-  if (elMetricsHistoryList) {
+  if (elMetricsHistoryList && !elMetricsHistoryList.dataset.feedLoaded) {
     if (!history || history.length === 0) {
       elMetricsHistoryList.innerHTML = `<p class="body-sm-muted" style="text-align:center; padding: 20px 0;">No hay actividades sincronizadas en Garmin Connect todavía.</p>`;
       return;
     }
 
     let html = "";
-    history.forEach(act => {
+    history.slice(0, 5).forEach(act => {
       const isFuerza = act.tipo === "Fuerza";
       const borderClass = isFuerza ? "fuerza" : "carrera";
       const tagClass = isFuerza ? "lime" : "cyan";
@@ -3993,7 +3993,10 @@ async function loadActivitiesFeed(limit = _feedLimit) {
       : "";
 
     if (feedEl) feedEl.innerHTML = feedHtml + loadMoreBtn;
-    if (listEl) listEl.innerHTML = listHtml;
+    if (listEl) {
+      listEl.dataset.feedLoaded = "1";
+      listEl.innerHTML = listHtml;
+    }
 
     // Render interactive Leaflet Voyager maps for activities with GPS polylines
     _feedMapInstances.forEach(m => { try { m.remove(); } catch (e) {} });
