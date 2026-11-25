@@ -3365,6 +3365,8 @@ async function importGarminTokens() {
       showSuccessBanner("✅ ¡Tokens OAuth de Garmin importados! Sincronizando calendario...");
       await checkGarminStatus();
       await initApp();
+      await syncWeeklyPlanToGarmin();
+      await loadWeeklyPlanAndRaceGoal();
     } else {
       showSuccessBanner(`⚠️ ${data.message || "Error importando tokens."}`);
     }
