@@ -517,20 +517,22 @@ body {
   color: var(--secondary);
 }
 
-/* Buttons & Inputs (Stride 1:1 pill buttons & 14px soft inputs) */
+/* Stride 02 · Buttons & Controls (207:148) */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 18px;
-  border-radius: var(--rounded-full);
+  min-height: 44px;
+  padding: 11px 20px;
+  border-radius: 9999px;
   font-family: var(--font-hanken);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 0.9rem;
+  letter-spacing: -0.01em;
   cursor: pointer;
   border: none;
-  transition: background-color 0.15s ease, opacity 0.15s ease;
+  transition: background-color 0.15s ease, transform 0.12s ease, opacity 0.15s ease;
 }
 
 .btn:disabled {
@@ -541,41 +543,69 @@ body {
 .btn:active:not(:disabled),
 .selection-btn:active,
 .strava-chip-btn:active {
-  transform: scale(0.985);
+  transform: scale(0.98);
 }
 
+/* Primary (Stride #111111 Pill) */
 .btn-primary {
-  background: var(--primary-btn);
+  background: #111111;
   color: #FFFFFF;
 }
 
 .btn-primary:hover:not(:disabled) {
+  background: #27272A;
+}
+
+/* Inverse (White Pill on Dark Surfaces) */
+.btn-inverse {
+  background: #FFFFFF;
+  color: #111111;
+}
+
+.btn-inverse:hover:not(:disabled) {
+  background: #F5F5F4;
+}
+
+/* Accent (Stride Orange Pill) */
+.btn-accent {
+  background: var(--primary-btn);
+  color: #FFFFFF;
+}
+
+.btn-accent:hover:not(:disabled) {
   background: #A93300;
 }
 
+/* Secondary (Soft Neutral Pill) */
 .btn-ghost {
-  background: #FFFFFF;
-  color: var(--text-primary);
-  border: 1px solid #E5E5EA;
+  background: #F5F5F4;
+  color: #111111;
+  border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .btn-ghost:hover:not(:disabled) {
-  background: #F7F7FA;
+  background: #ECECEA;
 }
 
+/* Chips & Segmented Pills */
 .strava-chip-btn {
   background: #FFFFFF;
-  color: var(--text-primary);
-  border: 1px solid #E5E5EA;
-  border-radius: 999px;
-  font-weight: 700;
+  color: #111111;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 9999px;
+  font-family: var(--font-hanken);
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
+.strava-chip-btn:hover {
+  background: #F5F5F4;
+}
+
 .strava-chip-btn.active {
-  background: var(--primary-btn);
-  border-color: var(--primary-btn);
+  background: #111111;
+  border-color: #111111;
   color: #FFFFFF;
 }
 
@@ -1699,19 +1729,20 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: var(--primary-btn);
+    background: #111111;
     color: #FFFFFF;
     border: none;
-    border-radius: 6px;
-    padding: 7px 14px;
+    border-radius: 9999px;
+    padding: 8px 16px;
     font-family: var(--font-hanken);
     font-weight: 700;
     font-size: 0.82rem;
     cursor: pointer;
+    transition: background-color 0.15s ease;
   }
 
   .desktop-sync-btn:hover {
-    background: #A93300;
+    background: #27272A;
   }
 
   .app-container {
