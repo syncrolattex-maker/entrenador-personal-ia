@@ -17,7 +17,7 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=109">
+  <link rel="stylesheet" href="/style.css?v=110">
 
   <!-- Icons & Fonts (Geist & JetBrains Mono - Stride UI Kit) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -41,9 +41,9 @@
         <!-- Desktop Horizontal Navigation (>= 1024px) -->
         <nav class="desktop-nav" aria-label="Navegación principal">
           <a href="/inicio" class="nav-tab-btn desktop-nav-btn active" data-target="tab-dashboard" onclick="navigateTo(event, '/inicio', 'tab-dashboard')">Inicio</a>
-          <a href="/entrenamiento" class="nav-tab-btn desktop-nav-btn" data-target="tab-metrics" onclick="navigateTo(event, '/entrenamiento', 'tab-metrics')">Entrenamiento</a>
           <a href="/plan" class="nav-tab-btn desktop-nav-btn" data-target="tab-training" onclick="navigateTo(event, '/plan', 'tab-training')">Plan</a>
-          <a href="/perfil" class="nav-tab-btn desktop-nav-btn" data-target="tab-profile" onclick="navigateTo(event, '/perfil', 'tab-profile')">Perfil</a>
+          <a href="/historial" class="nav-tab-btn desktop-nav-btn" data-target="tab-history" onclick="navigateTo(event, '/historial', 'tab-history')">Historial</a>
+          <a href="/analisis" class="nav-tab-btn desktop-nav-btn" data-target="tab-metrics" onclick="navigateTo(event, '/analisis', 'tab-metrics')">Análisis</a>
         </nav>
       </div>
 
@@ -52,10 +52,10 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
           <span>Sincronizar Garmin</span>
         </button>
-        <div class="athlete-pill">
+        <a href="/perfil" class="nav-tab-btn athlete-pill" data-target="tab-profile" onclick="navigateTo(event, '/perfil', 'tab-profile')" title="Perfil y configuración" style="text-decoration:none;">
           <span class="athlete-dot"></span>
           <span class="label-caps" style="color: var(--on-surface);">AARÓN</span>
-        </div>
+        </a>
       </div>
     </div>
   </header>
@@ -172,6 +172,46 @@
               </svg>
             </div>
 
+            <!-- Stride 12 · Estado Deportivo & Interpretación IA (Gemini) -->
+            <div id="home-ai-card" class="stride-exp-dark-card stride-home-ai-featured">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                <div>
+                  <span class="label-caps" style="color:#FF7A33;">ESTADO DEPORTIVO &amp; IA GEMINI</span>
+                  <h2 class="headline-sm" style="margin:2px 0 0; color:#FFFFFF;">Lectura de tu Rendimiento</h2>
+                </div>
+                <span id="home-ai-mode-badge" class="stride-ai-badge">Conectando...</span>
+              </div>
+
+              <!-- KPIs reales de Carga y Eficiencia (Cálculo AaronFit) -->
+              <div class="stride-home-kpi-strip" aria-label="Indicadores calculados por AaronFit">
+                <div class="stride-home-kpi-pill">
+                  <span class="stride-home-kpi-label">FORMA (CTL)</span>
+                  <strong id="home-ctl-val" class="stride-home-kpi-val tabular-num">--</strong>
+                </div>
+                <div class="stride-home-kpi-pill">
+                  <span class="stride-home-kpi-label">FATIGA (ATL)</span>
+                  <strong id="home-atl-val" class="stride-home-kpi-val tabular-num">--</strong>
+                </div>
+                <div class="stride-home-kpi-pill">
+                  <span class="stride-home-kpi-label">FRESCURA (TSB)</span>
+                  <strong id="home-tsb-val" class="stride-home-kpi-val tabular-num">--</strong>
+                </div>
+                <div class="stride-home-kpi-pill">
+                  <span class="stride-home-kpi-label">EFICIENCIA 6S</span>
+                  <strong id="home-ef-val" class="stride-home-kpi-val tabular-num">--</strong>
+                </div>
+              </div>
+
+              <p id="home-ai-summary" class="stride-ai-summary">Analizando tu histórico real de Garmin Connect para resumir tu estado actual...</p>
+              <p id="home-ai-trend" class="stride-ai-trend" style="display:none;"></p>
+              <div id="home-ai-highlights" class="stride-home-ai-highlights" style="display:none;"></div>
+
+              <div class="stride-ai-footer">
+                <span id="home-ai-efficiency-pill" class="stride-ai-meta">Cálculo propio AaronFit · Basado en datos Garmin</span>
+                <a href="/analisis" class="stride-ai-link-btn" style="text-decoration:none;" onclick="navigateTo(event, '/analisis', 'tab-metrics')">Ver análisis completo →</a>
+              </div>
+            </div>
+
             <!-- Stride "Up next" (Próximos entrenos) -->
             <div id="stride-up-next-wrap" class="stride-up-next-wrap" style="display: none;">
               <div class="stride-section-head">
@@ -185,10 +225,13 @@
             <div id="dashboard-feed-wrap" class="dashboard-feed-wrap">
               <div class="feed-section-header">
                 <h2 class="headline-sm" style="margin:0;">Actividades recientes</h2>
-                <button type="button" class="strava-chip-btn" style="font-size:0.74rem; padding:5px 11px; display:inline-flex; align-items:center; gap:5px;" onclick="syncGarminNow()">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                  <span>Sincronizar</span>
-                </button>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <a href="/historial" class="stride-section-link" onclick="navigateTo(event, '/historial', 'tab-history')">Ver historial →</a>
+                  <button type="button" class="strava-chip-btn" style="font-size:0.74rem; padding:5px 11px; display:inline-flex; align-items:center; gap:5px;" onclick="syncGarminNow()">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    <span>Sincronizar</span>
+                  </button>
+                </div>
               </div>
               <div id="dashboard-activities-feed" class="activities-feed-list"></div>
             </div>
@@ -283,21 +326,21 @@
               </div>
             </div>
 
-            <!-- Stride · Análisis IA (Gemini) Resumen en Inicio -->
-            <div id="home-ai-card" class="stride-exp-dark-card">
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-                <span class="label-caps" style="color:#FF7A33;">ANÁLISIS IA · GEMINI</span>
-                <span id="home-ai-mode-badge" class="stride-ai-badge">Conectando...</span>
-              </div>
-              <p id="home-ai-summary" class="stride-ai-summary">Analizando tu histórico real de Garmin Connect para resumir tu estado actual...</p>
-              <div class="stride-ai-footer">
-                <span id="home-ai-efficiency-pill" class="stride-ai-meta">Eficiencia 6s vs 6s: --</span>
-                <button type="button" class="stride-ai-link-btn" onclick="switchTab('tab-metrics')">Ver análisis completo →</button>
-              </div>
-            </div>
-
           </aside>
 
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- TAB: HISTORIAL DE ACTIVIDADES (FASE 3 - Run History)              -->
+      <!-- ================================================================= -->
+      <section id="tab-history" class="tab-view">
+        <div class="greeting-header">
+          <h1 class="greeting-title">Historial de Actividades</h1>
+          <p class="body-sm-muted">Actividades sincronizadas de Garmin Connect. Selecciona cualquier sesión para ver su ruta GPS y gráficas detalladas.</p>
+        </div>
+        <div id="history-tab-feed-wrap" class="glass-card">
+          <p class="body-sm-muted">Cargando historial de actividades...</p>
         </div>
       </section>
 
@@ -872,14 +915,14 @@
         <span class="tab-label">Plan</span>
       </a>
 
-      <a href="/entrenamiento" class="nav-tab-btn" data-target="tab-metrics" onclick="navigateTo(event, '/entrenamiento', 'tab-metrics')">
-        <svg class="tab-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-        <span class="tab-label">Progreso</span>
+      <a href="/historial" class="nav-tab-btn" data-target="tab-history" onclick="navigateTo(event, '/historial', 'tab-history')">
+        <svg class="tab-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span class="tab-label">Historial</span>
       </a>
 
-      <a href="/perfil" class="nav-tab-btn" data-target="tab-profile" onclick="navigateTo(event, '/perfil', 'tab-profile')">
-        <svg class="tab-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        <span class="tab-label">Perfil</span>
+      <a href="/analisis" class="nav-tab-btn" data-target="tab-metrics" onclick="navigateTo(event, '/analisis', 'tab-metrics')">
+        <svg class="tab-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span class="tab-label">Análisis</span>
       </a>
     </nav>
 
@@ -1461,6 +1504,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=109"></script>
+  <script src="/app.js?v=110"></script>
 </body>
 </html>

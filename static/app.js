@@ -2642,15 +2642,18 @@ const ROUTE_TO_TAB = {
   "/": "tab-dashboard",
   "/inicio": "tab-dashboard",
   "/entrenamiento": "tab-metrics",
+  "/analisis": "tab-metrics",
   "/entrenamientos": "tab-training",
   "/plan": "tab-training",
+  "/historial": "tab-history",
   "/perfil": "tab-profile"
 };
 
 const TAB_TO_ROUTE = {
   "tab-dashboard": "/inicio",
-  "tab-metrics": "/entrenamiento",
+  "tab-metrics": "/analisis",
   "tab-training": "/plan",
+  "tab-history": "/historial",
   "tab-profile": "/perfil"
 };
 
@@ -4242,7 +4245,8 @@ async function loadActivitiesFeed(limit = _feedPageSize, offset = 0, append = fa
       const elevVal = `+${Math.round(a.elevation_gain || 0)} m`;
       const hasPoly = Array.isArray(a.polyline) && a.polyline.length > 2;
 
-      feedHtml += `
+      if (idx < 5) {
+        feedHtml += `
         <article class="glass-card strava-feed-card" onclick="openActivityDetail('${a.external_id}')">
           <div class="strava-feed-header">
             <div class="strava-feed-meta">
@@ -4271,6 +4275,7 @@ async function loadActivitiesFeed(limit = _feedPageSize, offset = 0, append = fa
           ${hasPoly ? `<div id="feed-minimap-${idx}" class="activity-feed-map"></div>` : ""}
         </article>
       `;
+      }
 
       if (idx < 5) {
         listHtml += `
@@ -5363,6 +5368,7 @@ async function loadAnalyticsOverviewAndAI(forceRefresh = false) {
     const overviewRes = await fetch("/api/analytics/overview?days=730");
     if (overviewRes.ok) {
       _analyticsOverviewData = await overviewRes.json();
+      renderHomeTrainingLoad(_analyticsOverviewData.training_load, _analyticsOverviewData.aerobic_efficiency);
       renderAnalyticsComparisons(_analyticsPeriodKey);
       renderAerobicEfficiencyCard(_analyticsOverviewData.aerobic_efficiency);
       renderProfileRunnerStats(_analyticsOverviewData);
@@ -5507,14 +5513,68 @@ function renderAIAuthRequired() {
   if (summitBody) summitBody.innerHTML = `<p class="stride-ai-summary">Conecta Garmin Connect en Perfil para generar la interpretación inteligente con Gemini.</p>`;
 }
 
+function renderHomeTrainingLoad(loadObj, effObj) {
+  const latest = (loadObj && loadObj.latest) || {};
+  const elCtl = document.getElementById("home-ctl-val");
+  const elAtl = document.getElementById("home-atl-val");
+  const elTsb = document.getElementById("home-tsb-val");
+  const elEf = document.getElementById("home-ef-val");
+
+  if (elCtl) elCtl.textContent = latest.ctl !== undefined && latest.ctl !== null ? Number(latest.ctl).toFixed(1) : "--";
+  if (elAtl) elAtl.textContent = latest.atl !== undefined && latest.atl !== null ? Number(latest.atl).toFixed(1) : "--";
+  if (elTsb) {
+    if (latest.tsb !== undefined && latest.tsb !== null) {
+      const tsbNum = Number(latest.tsb);
+      elTsb.textContent = `${tsbNum > 0 ? "+" : ""}${tsbNum.toFixed(1)}`;
+    } else {
+      elTsb.textContent = "--";
+    }
+  }
+  if (elEf) {
+    if (effObj && effObj.status !== "insufficient_sample" && effObj.ef_change_pct !== null && effObj.ef_change_pct !== undefined) {
+      const pct = Number(effObj.ef_change_pct);
+      elEf.textContent = `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`;
+    } else {
+      elEf.textContent = "Insuf.";
+    }
+  }
+}
+
 function renderAIInterpretationCards(payload) {
   const interp = (payload && payload.interpretation) || {};
   const modeLabel = interp.source_mode === "gemini" ? "Gemini Live" : "Motor Determinista";
 
   const homeBadge = document.getElementById("home-ai-mode-badge");
   const homeSummary = document.getElementById("home-ai-summary");
+  const homeTrend = document.getElementById("home-ai-trend");
+  const homeHighlights = document.getElementById("home-ai-highlights");
+
   if (homeBadge) homeBadge.textContent = modeLabel;
   if (homeSummary) homeSummary.textContent = interp.resumen_estado_deportivo || "Sin resumen disponible.";
+  if (homeTrend) {
+    const trendTxt = interp.evolucion || interp.eficiencia || "";
+    if (trendTxt) {
+      homeTrend.textContent = trendTxt;
+      homeTrend.style.display = "block";
+    } else {
+      homeTrend.style.display = "none";
+    }
+  }
+  if (homeHighlights) {
+    const chips = [];
+    if (Array.isArray(interp.puntos_fuertes) && interp.puntos_fuertes.length > 0) {
+      chips.push(`✓ ${interp.puntos_fuertes[0]}`);
+    }
+    if (Array.isArray(interp.aspectos_a_mejorar) && interp.aspectos_a_mejorar.length > 0) {
+      chips.push(`• ${interp.aspectos_a_mejorar[0]}`);
+    }
+    if (chips.length > 0) {
+      homeHighlights.innerHTML = chips.map(c => `<span class="stride-home-ai-chip">${_escHtml(c)}</span>`).join("");
+      homeHighlights.style.display = "flex";
+    } else {
+      homeHighlights.style.display = "none";
+    }
+  }
 
   const summitBody = document.getElementById("summit-ai-body");
   if (!summitBody) return;

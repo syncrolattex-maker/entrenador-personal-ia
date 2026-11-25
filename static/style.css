@@ -3638,3 +3638,86 @@ body {
   font-weight: 800;
   color: #FFFFFF;
 }
+
+/* ============================================================
+   CENTRO DE CONTROL (FASE 1): ESTADO DEPORTIVO + IA GEMINI
+   ============================================================ */
+.athlete-pill,
+.athlete-pill.nav-tab-btn {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.athlete-pill:hover,
+.athlete-pill.active {
+  border-color: #111111;
+  background: #F4F4F1;
+}
+
+.stride-home-ai-featured {
+  gap: 12px;
+}
+
+.stride-home-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .stride-home-kpi-strip {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.stride-home-kpi-pill {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stride-home-kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #D1D5DB;
+  letter-spacing: 0.04em;
+}
+
+.stride-home-kpi-val {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #FFFFFF;
+}
+
+.stride-ai-trend {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #D1D5DB;
+  margin: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 8px;
+}
+
+.stride-home-ai-highlights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.stride-home-ai-chip {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: #F3F3F5;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  padding: 6px 10px;
+}

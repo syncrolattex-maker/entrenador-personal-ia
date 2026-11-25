@@ -3398,6 +3398,8 @@ os.makedirs("static", exist_ok=True)
 @app.get("/entrenamiento")
 @app.get("/entrenamientos")
 @app.get("/plan")
+@app.get("/historial")
+@app.get("/analisis")
 @app.get("/perfil")
 @app.get("/actividad/{external_id}")
 async def serve_spa_routes(external_id: Optional[str] = None):
