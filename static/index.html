@@ -17,7 +17,7 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=99">
+  <link rel="stylesheet" href="/style.css?v=100">
 
   <!-- Icons & Fonts (Geist & JetBrains Mono - Stride UI Kit) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -607,6 +607,14 @@
               <button type="button" id="btn-garmin-login" class="btn btn-primary" onclick="connectGarminAccount()">
                 Activar Envío al Reloj Garmin
               </button>
+              <details style="margin-top:4px; font-size:0.78rem; color:var(--text-secondary);">
+                <summary style="cursor:pointer; font-weight:600;">¿Error 401 desde Vercel? Importar token OAuth local</summary>
+                <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+                  <code style="font-size:0.7rem; background:var(--surface-dim); padding:6px 8px; border-radius:8px; word-break:break-all;">python -c "import garth; garth.login('EMAIL','PASS'); print(garth.client.dumps())"</code>
+                  <textarea id="garmin-token-import-input" class="strava-input" rows="2" placeholder="Pega aquí la salida de garth.client.dumps()..."></textarea>
+                  <button type="button" class="btn btn-ghost" onclick="importGarminTokens()">Importar Token OAuth</button>
+                </div>
+              </details>
             </div>
           </div>
 
@@ -1265,6 +1273,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=99"></script></script>
+  <script src="/app.js?v=100"></script></script></script>
 </body>
 </html>

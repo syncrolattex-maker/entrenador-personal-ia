@@ -299,7 +299,13 @@ def start_garmin_login(email: str, password: str) -> Dict[str, Any]:
             _save_garth_dumps_to_db(client.dumps())
             return {"status": "connected", "message": "Garmin Connect vinculado correctamente."}
         except Exception as e:
-            return {"status": "error", "message": f"Error de login Garmin: {str(e)}"}
+            err_msg = str(e)
+            if "401" in err_msg:
+                return {
+                    "status": "error",
+                    "message": "Garmin SSO devolvió 401 Unauthorized (verifica tu email/contraseña o bloqueó la IP de Vercel). Usa 'Importar Token OAuth' debajo.",
+                }
+            return {"status": "error", "message": f"Error de login Garmin: {err_msg}"}
 
     if not HAS_GARMINCONNECT:
         return {"status": "error", "message": "Instala garth o usa GARMIN_PERSONAL_API_KEY (GCDC_...)."}
@@ -339,6 +345,24 @@ def complete_garmin_mfa(mfa_code: str) -> Dict[str, Any]:
         return {"status": "connected", "message": "Garmin Connect autenticado y tokens guardados."}
     except Exception as e:
         return {"status": "error", "message": f"Código MFA inválido o expirado: {str(e)}"}
+
+
+def import_garth_tokens(token_str: str) -> Dict[str, Any]:
+    """Validates and persists a garth.dumps() token string (generated locally) into DB."""
+    if not HAS_GARTH:
+        return {"status": "error", "message": "garth no está instalado en el servidor."}
+    clean = (token_str or "").strip()
+    if not clean:
+        return {"status": "error", "message": "Pega el token OAuth exportado."}
+    try:
+        client = garth.Client()
+        client.loads(clean)
+        TOKEN_DIR.mkdir(parents=True, exist_ok=True)
+        client.dump(str(TOKEN_DIR))
+        _save_garth_dumps_to_db(client.dumps())
+        return {"status": "connected", "message": "Tokens OAuth de Garmin importados y guardados."}
+    except Exception as e:
+        return {"status": "error", "message": f"Token OAuth inválido: {str(e)}"}
 
 
 def is_garmin_connected() -> bool:

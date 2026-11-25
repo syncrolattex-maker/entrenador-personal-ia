@@ -270,7 +270,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v99"; // Exact Stride Figma tokens from node 28:1281 (#EE5A2B, #F5F5F4, #ECECEA, #111111)
+    const APP_VERSION = "v100"; // Add Garmin OAuth local token import fallback for Vercel 401 SSO blocks
 
 
 
@@ -3301,6 +3301,32 @@ async function connectGarminAccount() {
     showSuccessBanner("⚠️ Error de red conectando con Garmin.");
   } finally {
     if (btn) btn.textContent = "Conectar Garmin Connect";
+  }
+}
+
+async function importGarminTokens() {
+  const inp = document.getElementById("garmin-token-import-input");
+  const tokens = inp ? inp.value.trim() : "";
+  if (!tokens) {
+    showSuccessBanner("⚠️ Pega el token OAuth generado en tu PC.");
+    return;
+  }
+  try {
+    const res = await fetch("/api/garmin/import-tokens", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tokens })
+    });
+    const data = await res.json();
+    if (data.status === "connected") {
+      showSuccessBanner("✅ ¡Tokens OAuth de Garmin importados! Sincronizando calendario...");
+      await checkGarminStatus();
+      await initApp();
+    } else {
+      showSuccessBanner(`⚠️ ${data.message || "Error importando tokens."}`);
+    }
+  } catch (e) {
+    showSuccessBanner("⚠️ Error de red importando tokens de Garmin.");
   }
 }
 

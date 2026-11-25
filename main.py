@@ -1980,6 +1980,23 @@ async def garmin_login(payload: GarminLoginPayload):
             print(f"[Garmin] Auto-sync after login warning: {e}")
     return res
 
+class GarminTokenImportPayload(BaseModel):
+    tokens: str
+
+
+@app.post("/api/garmin/import-tokens")
+async def garmin_import_tokens(payload: GarminTokenImportPayload):
+    res = garmin_client.import_garth_tokens(payload.tokens)
+    if isinstance(res, dict) and res.get("status") == "connected":
+        try:
+            state_data = _load_plan_state()
+            history = await get_intervals_history()
+            _get_or_create_locked_weekly_plan(history, state_data.get("carrera_objetivo"), force_rebuild=False)
+        except Exception as e:
+            print(f"[Garmin] Auto-sync after token import warning: {e}")
+    return res
+
+
 @app.post("/api/garmin/mfa")
 async def garmin_mfa(payload: GarminMfaPayload):
     res = garmin_client.complete_garmin_mfa(payload.code)
