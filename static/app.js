@@ -270,7 +270,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v96"; // Cap /entrenamiento Garmin history list to 5 items (avoid overwrite from renderMetricsTab)
+    const APP_VERSION = "v97"; // Stride 1:1 pill buttons, 14px soft inputs/stat boxes & tabular-nums
 
 
 
