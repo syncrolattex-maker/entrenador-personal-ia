@@ -1959,7 +1959,7 @@ async def garmin_set_key(payload: GarminKeyPayload):
 @app.get("/api/garmin/status")
 async def garmin_status():
     connected = garmin_client.is_garmin_connected()
-    write_connected = any(garmin_client.TOKEN_DIR.glob("*.json")) if garmin_client.HAS_GARMINCONNECT else False
+    write_connected = garmin_client.has_garmin_write_session()
     profile = garmin_client.get_garmin_athlete_profile() if connected else {}
     return {
         "connected": connected,

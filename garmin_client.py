@@ -7,6 +7,13 @@ from pathlib import Path
 from typing import Optional, Dict, List, Any
 
 try:
+    import garth
+    HAS_GARTH = True
+except ImportError:
+    garth = None  # type: ignore
+    HAS_GARTH = False
+
+try:
     from garminconnect import Garmin
     HAS_GARMINCONNECT = True
 except ImportError:
@@ -175,6 +182,68 @@ def has_garmin_write_session() -> bool:
     return bool(os.getenv("GARMIN_EMAIL", "").strip() and os.getenv("GARMIN_PASSWORD", "").strip())
 
 
+def _save_garth_dumps_to_db(dumps_str: str) -> None:
+    try:
+        import database
+        if dumps_str:
+            database.set_setting("garmin_oauth_tokens_json", dumps_str)
+    except Exception as e:
+        print(f"[Garmin] Save garth dumps to DB warning: {e}")
+
+
+def _get_garth_client() -> Optional[Any]:
+    """Returns an authenticated garth.Client using DB/disk OAuth tokens or env credentials (pure Python, Vercel-safe)."""
+    if not HAS_GARTH:
+        return None
+    TOKEN_DIR.mkdir(parents=True, exist_ok=True)
+    # 1. Try restoring garth dumps or JSON files from DB
+    try:
+        import database
+        raw = database.get_setting("garmin_oauth_tokens_json")
+        if raw:
+            client = garth.Client()
+            try:
+                # Try garth.dumps() format first
+                client.loads(raw)
+                return client
+            except Exception:
+                # Fallback: dict of {filename: content}
+                payload = json.loads(raw)
+                if isinstance(payload, dict) and payload:
+                    for fname, content in payload.items():
+                        if isinstance(fname, str) and fname.endswith(".json") and isinstance(content, str):
+                            (TOKEN_DIR / Path(fname).name).write_text(content, encoding="utf-8")
+    except Exception as e:
+        print(f"[Garmin] Garth DB restore warning: {e}")
+
+    if any(TOKEN_DIR.glob("*.json")):
+        try:
+            client = garth.Client()
+            client.load(str(TOKEN_DIR))
+            return client
+        except Exception as e:
+            print(f"[Garmin] Garth disk token load failed: {e}")
+
+    # 2. Fallback to GARMIN_EMAIL & GARMIN_PASSWORD env vars
+    email = os.getenv("GARMIN_EMAIL", "").strip()
+    password = os.getenv("GARMIN_PASSWORD", "").strip()
+    if email and password:
+        try:
+            client = garth.Client()
+            res_type, client_state = client.login(email, password, return_on_mfa=True)
+            if res_type == "needs_mfa":
+                _pending_mfa["client"] = client
+                _pending_mfa["state"] = client_state
+                _pending_mfa["mode"] = "garth"
+                return None
+            client.dump(str(TOKEN_DIR))
+            _save_garth_dumps_to_db(client.dumps())
+            return client
+        except Exception as e:
+            print(f"[Garmin] Garth env credential login failed: {e}")
+    return None
+
+
 def get_garmin_client() -> Optional[Any]:
     """Returns an authenticated Garmin client using saved tokens or .env credentials."""
     if not HAS_GARMINCONNECT:
@@ -215,9 +284,25 @@ def get_garmin_client() -> Optional[Any]:
 
 
 def start_garmin_login(email: str, password: str) -> Dict[str, Any]:
-    """Starts a Garmin Connect login flow. Supports 2FA/MFA."""
+    """Starts a Garmin Connect login flow using garth (pure Python) or garminconnect. Supports 2FA/MFA."""
+    if HAS_GARTH:
+        TOKEN_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            client = garth.Client()
+            res_type, client_state = client.login(email, password, return_on_mfa=True)
+            if res_type == "needs_mfa":
+                _pending_mfa["client"] = client
+                _pending_mfa["state"] = client_state
+                _pending_mfa["mode"] = "garth"
+                return {"status": "needs_mfa", "message": "Introduce el código 2FA enviado por Garmin."}
+            client.dump(str(TOKEN_DIR))
+            _save_garth_dumps_to_db(client.dumps())
+            return {"status": "connected", "message": "Garmin Connect vinculado correctamente."}
+        except Exception as e:
+            return {"status": "error", "message": f"Error de login Garmin: {str(e)}"}
+
     if not HAS_GARMINCONNECT:
-        return {"status": "error", "message": "Usa GARMIN_PERSONAL_API_KEY (GCDC_...) en entorno serverless."}
+        return {"status": "error", "message": "Instala garth o usa GARMIN_PERSONAL_API_KEY (GCDC_...)."}
     TOKEN_DIR.mkdir(parents=True, exist_ok=True)
     try:
         client = Garmin(email=email, password=password, return_on_mfa=True)
@@ -225,6 +310,7 @@ def start_garmin_login(email: str, password: str) -> Dict[str, Any]:
         if res_type == "needs_mfa":
             _pending_mfa["client"] = client
             _pending_mfa["state"] = client_state
+            _pending_mfa["mode"] = "garminconnect"
             return {"status": "needs_mfa", "message": "Introduce el código 2FA enviado por Garmin."}
         client.garth.dump(str(TOKEN_DIR))
         _save_tokens_to_db()
@@ -237,13 +323,18 @@ def complete_garmin_mfa(mfa_code: str) -> Dict[str, Any]:
     """Completes a pending Garmin MFA login and persists OAuth tokens."""
     client = _pending_mfa.get("client")
     state = _pending_mfa.get("state")
+    mode = _pending_mfa.get("mode", "garminconnect")
     if not client or not state:
         return {"status": "error", "message": "No hay sesión MFA pendiente."}
     try:
         client.resume_login(state, mfa_code.strip())
         TOKEN_DIR.mkdir(parents=True, exist_ok=True)
-        client.garth.dump(str(TOKEN_DIR))
-        _save_tokens_to_db()
+        if mode == "garth":
+            client.dump(str(TOKEN_DIR))
+            _save_garth_dumps_to_db(client.dumps())
+        else:
+            client.garth.dump(str(TOKEN_DIR))
+            _save_tokens_to_db()
         _pending_mfa.clear()
         return {"status": "connected", "message": "Garmin Connect autenticado y tokens guardados."}
     except Exception as e:
@@ -251,7 +342,7 @@ def complete_garmin_mfa(mfa_code: str) -> Dict[str, Any]:
 
 
 def is_garmin_connected() -> bool:
-    return bool(get_saved_personal_key()) or any(TOKEN_DIR.glob("*.json"))
+    return bool(get_saved_personal_key()) or has_garmin_write_session()
 
 
 def get_garmin_history(limit: int = 30) -> List[dict]:
@@ -621,17 +712,53 @@ def _build_garmin_connect_workout_json(workout: Dict[str, Any]) -> Dict[str, Any
 def send_workout_to_garmin_watch(workout: Dict[str, Any]) -> Dict[str, Any]:
     """
     Uploads and schedules the workout to Garmin Connect and pushes it to the watch
-    when an OAuth session is active. Otherwise returns fit_ready so the user gets
-    a native Garmin .FIT file.
+    when an OAuth session is active (via garth or garminconnect). Otherwise returns needs_garmin_login.
     """
+    payload = _build_garmin_connect_workout_json(workout)
+    target_date = str(workout.get("fecha") or date.today().isoformat())[:10]
+
+    # 1. Pure Python garth OAuth client (works on Vercel serverless)
+    g_client = _get_garth_client()
+    if g_client:
+        try:
+            uploaded = g_client.connectapi("/workout-service/workout", method="POST", json=payload)
+            workout_id = uploaded.get("workoutId") if isinstance(uploaded, dict) else None
+            if workout_id:
+                try:
+                    g_client.connectapi(
+                        f"/workout-service/schedule/{workout_id}",
+                        method="POST",
+                        json={"date": target_date},
+                    )
+                except Exception as sched_err:
+                    print(f"[Garmin Garth] Schedule workout warning: {sched_err}")
+                return {
+                    "status": "sent",
+                    "method": "garmin_direct",
+                    "workout_id": workout_id,
+                    "scheduled_date": target_date,
+                    "message": f"¡Entrenamiento enviado y programado en tu reloj Garmin ({target_date})!",
+                }
+            return {
+                "status": "error",
+                "method": "garmin_direct",
+                "message": f"Garmin Connect no devolvió workoutId al subir la sesión ({uploaded}).",
+            }
+        except Exception as e:
+            print(f"[Garmin Garth] Direct workout upload failed: {e}")
+            return {
+                "status": "error",
+                "method": "garmin_direct",
+                "message": f"Error al subir/programar en Garmin Connect: {str(e)}",
+            }
+
+    # 2. Fallback to garminconnect if installed
     client = get_garmin_client()
     if client:
         try:
-            payload = _build_garmin_connect_workout_json(workout)
             uploaded = client.upload_workout(payload)
             workout_id = uploaded.get("workoutId") if isinstance(uploaded, dict) else None
             if workout_id:
-                target_date = str(workout.get("fecha") or date.today().isoformat())[:10]
                 try:
                     client.schedule_workout(workout_id, target_date)
                 except Exception as sched_err:
