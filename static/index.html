@@ -17,7 +17,7 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=104">
+  <link rel="stylesheet" href="/style.css?v=105">
 
   <!-- Icons & Fonts (Geist & JetBrains Mono - Stride UI Kit) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -354,7 +354,10 @@
               <h2 class="headline-sm" style="margin:0;">Fitness & Freshness (90 días)</h2>
               <span id="fitness-legend" class="body-xs tabular-num" style="color:var(--text-secondary);">Forma (CTL) • Fatiga (ATL) • Frescura (TSB)</span>
             </div>
-            <div id="summit-fitness-svg-wrap" style="width:100%; height:175px;"></div>
+            <div style="position:relative; width:100%;">
+              <div id="fitness-tooltip" class="detail-chart-tooltip" style="display:none;"></div>
+              <div id="summit-fitness-svg-wrap" style="width:100%; height:185px; touch-action:none;"></div>
+            </div>
             <div id="fitness-plain-summary" class="fitness-plain-summary"></div>
           </div>
 
@@ -543,9 +546,7 @@
                 <span id="goals-overall-badge" class="stride-progress-pill tabular-num">0%</span>
               </div>
 
-              <svg id="goals-weekly-spark-svg" viewBox="0 0 320 42" preserveAspectRatio="none" style="width:100%; height:42px; margin:4px 0 2px;">
-                <path d="M0 36 L52 30 L106 24 L160 28 L214 14 L268 18 L320 8" fill="none" stroke="#EE5A2B" stroke-width="2.4" stroke-linecap="round"/>
-              </svg>
+              <div id="goals-weekly-spark-svg" style="width:100%; height:44px; margin:4px 0 2px;"></div>
 
               <div class="stride-activity-totals">
                 <div class="stride-atotal-col">
@@ -566,17 +567,11 @@
             <!-- Stride 10 · Progress / Pace & time (2-up white stat cards) -->
             <div class="stride-pace-time-grid">
               <div class="stride-pt-card">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                  <span class="label-caps">RITMO MEDIO</span>
-                  <svg width="36" height="14" viewBox="0 0 36 14" fill="none"><path d="M2 10 L10 7 L18 9 L26 4 L34 6" stroke="#EE5A2B" stroke-width="2" stroke-linecap="round"/></svg>
-                </div>
+                <span class="label-caps">RITMO MEDIO</span>
                 <strong id="goals-avg-pace" class="tabular-num" style="font-size:1.15rem; color:var(--on-surface);">—</strong>
               </div>
               <div class="stride-pt-card">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                  <span class="label-caps">CUMPLIMIENTO</span>
-                  <svg width="36" height="14" viewBox="0 0 36 14" fill="none"><path d="M2 11 L10 9 L18 6 L26 5 L34 2" stroke="#15803D" stroke-width="2" stroke-linecap="round"/></svg>
-                </div>
+                <span class="label-caps">CUMPLIMIENTO</span>
                 <strong id="goals-compliance-pct" class="tabular-num" style="font-size:1.15rem; color:var(--on-surface);">0%</strong>
               </div>
             </div>
@@ -1373,6 +1368,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=104"></script>
+  <script src="/app.js?v=105"></script>
 </body>
 </html>

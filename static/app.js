@@ -2193,6 +2193,25 @@ function renderTrainingTab(plan) {
   if (elAvgPace) elAvgPace.textContent = (plan.metrics && plan.metrics.ritmo_medio_garmin) ? plan.metrics.ritmo_medio_garmin : "—";
   if (elCompPct) elCompPct.textContent = `${compPct}%`;
 
+  const elWeeklySpark = document.getElementById("goals-weekly-spark-svg");
+  if (elWeeklySpark && Array.isArray(plan.dias) && plan.dias.length > 0) {
+    const dayVals = plan.dias.map(d => Number(d.distancia_km || (d.duracion_min ? d.duracion_min * 0.15 : 0)));
+    const maxD = Math.max(...dayVals, 0);
+    if (maxD <= 0) {
+      elWeeklySpark.innerHTML = `<div class="body-xs" style="color:rgba(255,255,255,0.65); padding-top:10px;">Sin volumen planificado esta semana.</div>`;
+    } else {
+      const bars = plan.dias.map((d, i) => {
+        const v = dayVals[i];
+        const h = Math.max(4, Math.round((v / maxD) * 34));
+        const x = 6 + i * 45;
+        const y = 40 - h;
+        const fill = d.completado ? "#EE5A2B" : "rgba(255,255,255,0.28)";
+        return `<rect x="${x}" y="${y}" width="32" height="${h}" rx="4" fill="${fill}"><title>${d.dia}: ${d.distancia_km || 0} km</title></rect>`;
+      }).join("");
+      elWeeklySpark.innerHTML = `<svg viewBox="0 0 320 44" preserveAspectRatio="none" style="width:100%; height:44px;">${bars}</svg>`;
+    }
+  }
+
   const inRun = document.getElementById("input-goal-run-km");
   const inBike = document.getElementById("input-goal-bike-km");
   const inStr = document.getElementById("input-goal-strength-ses");
@@ -3694,28 +3713,32 @@ function renderSummitExplorations(summit) {
       elVolDelta.textContent = "14 días";
     }
   }
-  if (elVolSvg && last14.length > 1) {
-    const dayKms = last14.map(d => (d.entries || []).reduce((s, e) => s + Number(e.km || 0), 0));
-    const maxK = Math.max(1, ...dayKms);
-    const W = 280, H = 48, pad = 4;
-    const pts = dayKms.map((v, i) => {
-      const x = pad + (i / (dayKms.length - 1)) * (W - pad * 2);
-      const y = H - pad - (v / maxK) * (H - pad * 2);
-      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(" ");
-    const area = `${pts} L${W - pad},${H - pad} L${pad},${H - pad} Z`;
-    elVolSvg.innerHTML = `
-      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%; height:100%;">
-        <defs>
-          <linearGradient id="expDarkGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#EE5A2B" stop-opacity="0.45"/>
-            <stop offset="100%" stop-color="#EE5A2B" stop-opacity="0.02"/>
-          </linearGradient>
-        </defs>
-        <path d="${area}" fill="url(#expDarkGrad)"/>
-        <path d="${pts}" fill="none" stroke="#EE5A2B" stroke-width="2.2" stroke-linecap="round"/>
-      </svg>
-    `;
+  if (elVolSvg) {
+    if (km14 <= 0 || last14.length < 2) {
+      elVolSvg.innerHTML = `<div class="body-xs" style="color:rgba(255,255,255,0.65); padding-top:12px;">Sin datos de volumen en los últimos 14 días.</div>`;
+    } else {
+      const dayKms = last14.map(d => (d.entries || []).reduce((s, e) => s + Number(e.km || 0), 0));
+      const maxK = Math.max(0.5, ...dayKms);
+      const W = 280, H = 48, pad = 4;
+      const pts = dayKms.map((v, i) => {
+        const x = pad + (i / (dayKms.length - 1)) * (W - pad * 2);
+        const y = H - pad - (v / maxK) * (H - pad * 2);
+        return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(" ");
+      const area = `${pts} L${W - pad},${H - pad} L${pad},${H - pad} Z`;
+      elVolSvg.innerHTML = `
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%; height:100%;">
+          <defs>
+            <linearGradient id="expDarkGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#EE5A2B" stop-opacity="0.45"/>
+              <stop offset="100%" stop-color="#EE5A2B" stop-opacity="0.02"/>
+            </linearGradient>
+          </defs>
+          <path d="${area}" fill="url(#expDarkGrad)"/>
+          <path d="${pts}" fill="none" stroke="#EE5A2B" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+      `;
+    }
   }
 
   // Effort breakdown (Carrera / Ciclismo / Fuerza)
@@ -3874,6 +3897,14 @@ function renderTrainingLogBubbles(sportFilter) {
   if (!grid || !_summitData || !_summitData.training_log) return;
 
   const days = _summitData.training_log;
+  const hasAny = days.some(item => {
+    const f = sportFilter === "Todo" ? (item.entries || []) : (item.entries || []).filter(e => e.sport_type === sportFilter);
+    return f.some(e => (e.min || 0) > 0);
+  });
+  if (!days.length || !hasAny) {
+    grid.innerHTML = `<div class="body-sm-muted" style="padding:18px 8px; text-align:center;">Sin datos de entrenamientos en las últimas 12 semanas${sportFilter !== "Todo" ? ` (${sportFilter})` : ""}.</div>`;
+    return;
+  }
   const todayIso = new Date().toISOString().slice(0, 10);
   const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
@@ -3923,14 +3954,22 @@ function renderTrainingLogBubbles(sportFilter) {
 function renderFitnessFreshnessChart(curve) {
   const wrap = document.getElementById("summit-fitness-svg-wrap");
   const summaryEl = document.getElementById("fitness-plain-summary");
-  if (!wrap || curve.length === 0) return;
+  const tooltipEl = document.getElementById("fitness-tooltip");
+  if (!wrap) return;
 
-  const W = 440, H = 155, padL = 32, padR = 10, padT = 12, padB = 22;
+  const hasData = Array.isArray(curve) && curve.length >= 2 && curve.some(p => p.ctl > 0 || p.atl > 0);
+  if (!hasData) {
+    wrap.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center;" class="body-sm-muted">Sin datos de carga (CTL / ATL / TSB) en los últimos 90 días.</div>`;
+    if (summaryEl) summaryEl.innerHTML = "";
+    return;
+  }
+
+  const W = 480, H = 175, padL = 42, padR = 14, padT = 16, padB = 26;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
   const allVals = curve.flatMap(p => [p.ctl, p.atl, p.tsb]);
-  const minV = Math.min(...allVals, -15);
-  const maxV = Math.max(...allVals, 35);
+  const minV = Math.min(...allVals, -10);
+  const maxV = Math.max(...allVals, 20);
   const range = (maxV - minV) || 1;
 
   const toPath = (key) => curve.map((pt, i) => {
@@ -3940,25 +3979,74 @@ function renderFitnessFreshnessChart(curve) {
   }).join(" ");
 
   const zeroY = padT + plotH - ((0 - minV) / range) * plotH;
-  const midV = Math.round((minV + maxV) / 2);
   const last = curve[curve.length - 1];
+  const midPt = curve[Math.floor((curve.length - 1) / 2)];
+  const fmtD = (iso) => (iso || "").slice(5).split("-").reverse().join("/");
 
   wrap.innerHTML = `
-    <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:100%;">
+    <svg id="fitness-svg-el" viewBox="0 0 ${W} ${H}" style="width:100%; height:100%; cursor:crosshair; display:block;">
       <line x1="${padL}" y1="${padT}" x2="${W - padR}" y2="${padT}" stroke="#E5E5EA" stroke-dasharray="3 3"/>
       <line x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${W - padR}" y2="${zeroY.toFixed(1)}" stroke="#CBD5E1" stroke-dasharray="4 3"/>
       <line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" stroke="#E5E5EA"/>
-      <text x="${padL - 5}" y="${padT + 4}" text-anchor="end" font-size="9.5" fill="#5B5B66">${Math.round(maxV)}</text>
+      <text x="${padL - 5}" y="${padT + 4}" text-anchor="end" font-size="9.5" fill="#5B5B66">${Math.round(maxV)} pts</text>
       <text x="${padL - 5}" y="${zeroY + 3}" text-anchor="end" font-size="9.5" fill="#5B5B66">0</text>
       <text x="${padL - 5}" y="${padT + plotH}" text-anchor="end" font-size="9.5" fill="#5B5B66">${Math.round(minV)}</text>
-      <text x="${padL}" y="${H - 5}" text-anchor="start" font-size="9.5" fill="#5B5B66">Hace 90 días</text>
-      <text x="${padL + plotW / 2}" y="${H - 5}" text-anchor="middle" font-size="9.5" fill="#5B5B66">Hace 45 días</text>
-      <text x="${W - padR}" y="${H - 5}" text-anchor="end" font-size="9.5" fill="#5B5B66">Hoy</text>
-      <path d="${toPath('atl')}" fill="none" stroke="#FC5200" stroke-width="1.9" opacity="0.9"/>
+      <text x="${padL}" y="${H - 6}" text-anchor="start" font-size="9.5" fill="#5B5B66">${fmtD(curve[0].date) || "-90d"}</text>
+      <text x="${padL + plotW / 2}" y="${H - 6}" text-anchor="middle" font-size="9.5" fill="#5B5B66">${fmtD(midPt.date) || "-45d"}</text>
+      <text x="${W - padR}" y="${H - 6}" text-anchor="end" font-size="9.5" fill="#5B5B66">${fmtD(last.date) || "Hoy"}</text>
+      <path d="${toPath('atl')}" fill="none" stroke="#EE5A2B" stroke-width="1.9" opacity="0.9"/>
       <path d="${toPath('ctl')}" fill="none" stroke="#0077CC" stroke-width="2.4"/>
-      <path d="${toPath('tsb')}" fill="none" stroke="#16A34A" stroke-width="1.8" stroke-dasharray="3 2"/>
+      <path d="${toPath('tsb')}" fill="none" stroke="#15803D" stroke-width="1.8" stroke-dasharray="3 2"/>
+      <line id="fitness-crosshair" x1="0" y1="${padT}" x2="0" y2="${padT + plotH}" stroke="#111111" stroke-width="1.2" stroke-dasharray="3 2" style="display:none;"/>
+      <circle id="fitness-dot-ctl" cx="0" cy="0" r="3.5" fill="#0077CC" stroke="#FFFFFF" stroke-width="1.5" style="display:none;"/>
     </svg>
   `;
+
+  const svgEl = document.getElementById("fitness-svg-el");
+  const crosshair = document.getElementById("fitness-crosshair");
+  const dotCtl = document.getElementById("fitness-dot-ctl");
+  if (svgEl) {
+    const scrubFitness = (clientX) => {
+      const rect = svgEl.getBoundingClientRect();
+      if (!rect.width) return;
+      const svgX = ((clientX - rect.left) / rect.width) * W;
+      const clampedX = Math.max(padL, Math.min(padL + plotW, svgX));
+      const frac = (clampedX - padL) / plotW;
+      const idx = Math.min(curve.length - 1, Math.max(0, Math.round(frac * (curve.length - 1))));
+      const pt = curve[idx];
+      const ptX = padL + (idx / Math.max(1, curve.length - 1)) * plotW;
+      const ptY = padT + plotH - ((pt.ctl - minV) / range) * plotH;
+
+      if (crosshair) {
+        crosshair.setAttribute("x1", ptX.toFixed(1));
+        crosshair.setAttribute("x2", ptX.toFixed(1));
+        crosshair.style.display = "block";
+      }
+      if (dotCtl) {
+        dotCtl.setAttribute("cx", ptX.toFixed(1));
+        dotCtl.setAttribute("cy", ptY.toFixed(1));
+        dotCtl.style.display = "block";
+      }
+      if (tooltipEl) {
+        tooltipEl.innerHTML = `
+          <span style="font-weight:700;">${pt.date || ""}</span> ·
+          <span style="color:#60A5FA;">CTL ${pt.ctl}</span> ·
+          <span style="color:#FF7A33;">ATL ${pt.atl}</span> ·
+          <span style="color:#4ADE80;">TSB ${pt.tsb > 0 ? `+${pt.tsb}` : pt.tsb}</span>
+        `;
+        tooltipEl.style.display = "flex";
+      }
+    };
+    svgEl.addEventListener("mousemove", (e) => scrubFitness(e.clientX));
+    svgEl.addEventListener("touchstart", (e) => { if (e.touches && e.touches[0]) scrubFitness(e.touches[0].clientX); }, { passive: true });
+    svgEl.addEventListener("touchmove", (e) => { if (e.touches && e.touches[0]) scrubFitness(e.touches[0].clientX); }, { passive: true });
+    svgEl.addEventListener("mouseleave", () => {
+      if (crosshair) crosshair.style.display = "none";
+      if (dotCtl) dotCtl.style.display = "none";
+      if (tooltipEl) tooltipEl.style.display = "none";
+    });
+  }
+
   const legend = document.getElementById("fitness-legend");
   if (legend && last) {
     legend.innerHTML = `<span style="color:#0077CC; font-weight:700;">Forma ${last.ctl}</span> • <span style="color:#C23B00; font-weight:700;">Fatiga ${last.atl}</span> • <span style="color:#15803D; font-weight:700;">Frescura ${last.tsb}</span>`;
@@ -4379,6 +4467,29 @@ function toggleChartLayer(layerKey) {
   if (_currentDetailActivity) renderStravaDetailChart(_currentDetailActivity.chart_series || {});
 }
 
+function _cleanAndSmoothSeries(rawArr, windowSize = 5, minValid = null, maxValid = null) {
+  if (!Array.isArray(rawArr) || rawArr.length === 0) return [];
+  const filtered = rawArr.map(v => {
+    if (v === null || v === undefined || isNaN(v)) return null;
+    const n = Number(v);
+    if (minValid !== null && n < minValid) return null;
+    if (maxValid !== null && n > maxValid) return null;
+    return n;
+  });
+  const half = Math.floor(windowSize / 2);
+  return filtered.map((v, i) => {
+    if (v === null) return null;
+    let sum = 0, cnt = 0;
+    for (let k = Math.max(0, i - half); k <= Math.min(filtered.length - 1, i + half); k++) {
+      if (filtered[k] !== null) {
+        sum += filtered[k];
+        cnt++;
+      }
+    }
+    return cnt > 0 ? (sum / cnt) : null;
+  });
+}
+
 function renderStravaDetailChart(series) {
   const act = _currentDetailActivity || { chart_series: series || {} };
   const chartCard = document.getElementById("detail-chart-card");
@@ -4389,24 +4500,32 @@ function renderStravaDetailChart(series) {
 
   const cs = series || act.chart_series || {};
   const dists = cs.dist_km || [];
-  const elevs = (cs.elevation_m || []).filter(v => v !== null && v !== undefined);
-  const paces = (cs.pace_sec || []).filter(v => v !== null && v !== undefined && v > 120 && v < 1200);
-  const hrs = (cs.hr || []).filter(v => v !== null && v !== undefined);
-  const cads = (cs.cadence || []).filter(v => v !== null && v !== undefined);
-  const temps = (cs.temp_c || []).filter(v => v !== null && v !== undefined);
+
+  // Rolling average (5-7 pts) + spike filter (pace 2:30/km to 12:00/km)
+  const smoothElev = _cleanAndSmoothSeries(cs.elevation_m || [], 5, -200, 6000);
+  const smoothPace = _cleanAndSmoothSeries(cs.pace_sec || [], 5, 150, 720);
+  const smoothHr = _cleanAndSmoothSeries(cs.hr || [], 3, 40, 230);
+  const smoothCad = _cleanAndSmoothSeries(cs.cadence || [], 3, 40, 240);
+  const cleanTemp = _cleanAndSmoothSeries(cs.temp_c || [], 3, -30, 60);
+
+  const elevs = smoothElev.filter(v => v !== null);
+  const paces = smoothPace.filter(v => v !== null);
+  const hrs = smoothHr.filter(v => v !== null);
+  const cads = smoothCad.filter(v => v !== null);
+  const temps = cleanTemp.filter(v => v !== null);
 
   const avg = (arr) => arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length) : null;
   const avgPaceSec = avg(paces);
-  const avgPaceStr = avgPaceSec ? `${Math.floor(avgPaceSec / 60)}:${String(Math.round(avgPaceSec % 60)).padStart(2, "0")} /km` : (act.avg_pace_str || "—");
-  const avgHrVal = avg(hrs) ? `${Math.round(avg(hrs))} ppm` : (act.avg_hr ? `${Math.round(act.avg_hr)} ppm` : "—");
-  const avgCadVal = avg(cads) ? `${Math.round(avg(cads))} ppm` : (act.avg_cadence ? `${act.avg_cadence} ppm` : "—");
-  const avgTempVal = avg(temps) !== null ? `${avg(temps).toFixed(1)} °C` : (act.avg_temp_c !== null && act.avg_temp_c !== undefined ? `${Number(act.avg_temp_c).toFixed(1)} °C` : "—");
+  const avgPaceStr = avgPaceSec ? `${Math.floor(avgPaceSec / 60)}:${String(Math.round(avgPaceSec % 60)).padStart(2, "0")} /km` : (act.avg_pace_str || "Sin datos");
+  const avgHrVal = avg(hrs) ? `${Math.round(avg(hrs))} ppm` : (act.avg_hr ? `${Math.round(act.avg_hr)} ppm` : "Sin datos");
+  const avgCadVal = avg(cads) ? `${Math.round(avg(cads))} ppm` : (act.avg_cadence ? `${act.avg_cadence} ppm` : "Sin datos");
+  const avgTempVal = avg(temps) !== null ? `${avg(temps).toFixed(1)} °C` : (act.avg_temp_c !== null && act.avg_temp_c !== undefined ? `${Number(act.avg_temp_c).toFixed(1)} °C` : "Sin datos");
 
   const streamsMeta = [
-    { key: "pace", label: "Ritmo", avg: avgPaceStr, color: "#0077CC", data: cs.pace_sec || [], invert: true },
-    { key: "hr", label: "Frecuencia cardíaca", avg: avgHrVal, color: "#E53935", data: cs.hr || [], invert: false },
-    { key: "cadence", label: "Cadencia", avg: avgCadVal, color: "#8E24AA", data: cs.cadence || [], invert: false },
-    { key: "temp", label: "Temperatura", avg: avgTempVal, color: "#FB8C00", data: cs.temp_c || [], invert: false }
+    { key: "pace", label: "Ritmo", avg: avgPaceStr, color: "#0077CC", data: smoothPace, invert: true, unit: "min/km" },
+    { key: "hr", label: "Frecuencia cardíaca", avg: avgHrVal, color: "#E53935", data: smoothHr, invert: false, unit: "ppm" },
+    { key: "cadence", label: "Cadencia", avg: avgCadVal, color: "#8E24AA", data: smoothCad, invert: false, unit: "ppm" },
+    { key: "temp", label: "Temperatura", avg: avgTempVal, color: "#FB8C00", data: cleanTemp, invert: false, unit: "°C" }
   ];
 
   togglesEl.innerHTML = streamsMeta.map(s => {
@@ -4427,19 +4546,19 @@ function renderStravaDetailChart(series) {
 
   if (!dists || dists.length < 4) {
     if (chartCard) chartCard.style.display = "flex";
-    chartSvg.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center;" class="body-xs">Sin series temporales detalladas para esta actividad.</div>`;
+    chartSvg.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center;" class="body-xs">Sin datos de telemetría GPS en esta sesión.</div>`;
     return;
   }
 
   const W = 680, H = 220;
-  const padL = 42, padR = 12, padT = 14, padB = 26;
+  const padL = 44, padR = 52, padT = 14, padB = 26;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
   const maxDist = Math.max(0.1, Number(dists[dists.length - 1] || act.distance_km || 1));
 
   const buildCoords = (rawArr, invert = false) => {
     const valid = rawArr.filter(v => v !== null && v !== undefined);
-    if (valid.length < 3) return { path: "", coords: [] };
+    if (valid.length < 3) return { path: "", coords: [], mn: 0, mx: 0 };
     const mn = Math.min(...valid), mx = Math.max(...valid), rng = (mx - mn) || 1;
     const coords = new Array(rawArr.length).fill(null);
     const pts = [];
@@ -4451,10 +4570,10 @@ function renderStravaDetailChart(series) {
       coords[i] = { x, y, v };
       pts.push(`${pts.length === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`);
     });
-    return { path: pts.join(" "), coords };
+    return { path: pts.join(" "), coords, mn, mx };
   };
 
-  const elevRes = buildCoords(cs.elevation_m || [], false);
+  const elevRes = buildCoords(smoothElev, false);
   const elevLine = elevRes.path;
   const elevArea = elevLine
     ? `${elevLine} L${(padL + plotW).toFixed(1)},${(padT + plotH).toFixed(1)} L${padL.toFixed(1)},${(padT + plotH).toFixed(1)} Z`
@@ -4493,6 +4612,21 @@ function renderStravaDetailChart(series) {
     splitBandSvg = `<rect x="${x1.toFixed(1)}" y="${padT}" width="${Math.max(4, x2 - x1).toFixed(1)}" height="${plotH}" fill="rgba(255, 85, 0, 0.14)" stroke="rgba(255, 85, 0, 0.45)" stroke-width="1"/>`;
   }
 
+  // Right Y-axis for active primary stream (Pace inverted: fast on top, slow at bottom; or HR in ppm)
+  let rightAxisSvg = "";
+  const activeStream = streamsMeta.find(s => _detailStreamState[s.key] && s.data.filter(v => v !== null).length >= 3);
+  if (activeStream) {
+    const aRes = buildCoords(activeStream.data, activeStream.invert);
+    const topVal = activeStream.invert ? aRes.mn : aRes.mx;
+    const botVal = activeStream.invert ? aRes.mx : aRes.mn;
+    const fmtAxisVal = (v) => activeStream.key === "pace" ? _fmtSecMS(v) : activeStream.key === "temp" ? `${v.toFixed(1)}°` : `${Math.round(v)}`;
+    rightAxisSvg = `
+      <text x="${W - padR + 5}" y="${padT + 4}" text-anchor="start" font-size="9.5" fill="${activeStream.color}" font-family="Geist, sans-serif">${fmtAxisVal(topVal)}</text>
+      <text x="${W - padR + 5}" y="${padT + plotH / 2 + 3}" text-anchor="start" font-size="9" fill="${activeStream.color}" font-family="Geist, sans-serif">${activeStream.unit}</text>
+      <text x="${W - padR + 5}" y="${padT + plotH}" text-anchor="start" font-size="9.5" fill="${activeStream.color}" font-family="Geist, sans-serif">${fmtAxisVal(botVal)}</text>
+    `;
+  }
+
   const overlays = streamsMeta
     .filter(s => _detailStreamState[s.key])
     .map(s => {
@@ -4510,6 +4644,7 @@ function renderStravaDetailChart(series) {
         </linearGradient>
       </defs>
       ${gridSvg}
+      ${rightAxisSvg}
       ${splitBandSvg}
       ${elevArea ? `<path d="${elevArea}" fill="url(#strideElevGrad)"/>` : ""}
       ${elevLine ? `<path d="${elevLine}" fill="none" stroke="#8A8A94" stroke-width="1.5"/>` : ""}
@@ -5030,24 +5165,41 @@ function renderPaceAnalysisSubview(act) {
   }).join("");
 }
 
+function _normalizeZonePercentages(zones) {
+  if (!Array.isArray(zones) || zones.length === 0) return [];
+  const rawSum = zones.reduce((s, z) => s + Number(z.pct || 0), 0);
+  if (rawSum <= 0) return zones.map(z => ({ ...z, pct: 0 }));
+  const exact = zones.map(z => (Number(z.pct || 0) / rawSum) * 100);
+  const floored = exact.map(v => Math.floor(v));
+  let rem = 100 - floored.reduce((a, b) => a + b, 0);
+  const order = exact.map((v, i) => ({ i, frac: v - floored[i] })).sort((a, b) => b.frac - a.frac);
+  for (let k = 0; k < rem && k < order.length; k++) {
+    floored[order[k].i] += 1;
+  }
+  return zones.map((z, i) => ({ ...z, pct: floored[i] }));
+}
+
 function renderPaceDistributionSubview(paceDist) {
   const listEl = document.getElementById("detail-pace-dist-list");
   const lblEl = document.getElementById("detail-pace-threshold-label");
   if (!listEl) return;
 
-  if (!paceDist || !Array.isArray(paceDist.zones)) {
-    listEl.innerHTML = `<p class="body-xs">Sin datos de ritmo por segundo disponibles.</p>`;
+  const rawZones = (paceDist && Array.isArray(paceDist.zones)) ? paceDist.zones : [];
+  const hasTime = rawZones.some(z => Number(z.pct || 0) > 0);
+  if (rawZones.length === 0 || !hasTime) {
+    listEl.innerHTML = `<p class="body-xs">Sin datos de distribución de ritmo en esta sesión.</p>`;
     return;
   }
+  const zones = _normalizeZonePercentages(rawZones);
   if (lblEl && paceDist.threshold_pace_str) {
     lblEl.textContent = `Umbral: ${paceDist.threshold_pace_str}`;
   }
 
-  listEl.innerHTML = paceDist.zones.map(z => `
+  listEl.innerHTML = zones.map(z => `
     <div class="pace-dist-row">
       <div>
         <strong style="display:block; color:var(--on-surface);">${z.zone}</strong>
-        <span class="body-xs" style="font-size:0.68rem;">${z.range_str}</span>
+        <span class="body-xs" style="font-size:11px;">${z.range_str}</span>
       </div>
       <div class="split-bar-track" style="height:12px;">
         <div style="height:100%; width:${z.pct}%; background:${z.color}; border-radius:999px;"></div>
@@ -5065,12 +5217,17 @@ function renderHrAnalysisSubview(act) {
   const hrSvg = document.getElementById("detail-hr-curve-svg");
   if (!zonesCard || !zonesList) return;
 
-  const zones = act.hr_zones || [];
-  if (zones.length === 0) {
-    zonesCard.style.display = "none";
+  const rawZones = act.hr_zones || [];
+  const hasHrZones = rawZones.some(z => Number(z.pct || 0) > 0);
+  if (rawZones.length === 0 || !hasHrZones) {
+    zonesCard.style.display = "flex";
+    if (hrSvg) { hrSvg.innerHTML = ""; hrSvg.style.height = "auto"; }
+    if (driftBadge) driftBadge.textContent = "Desacoplamiento: —";
+    zonesList.innerHTML = `<p class="body-xs">Sin datos de frecuencia cardíaca en esta sesión.</p>`;
     return;
   }
   zonesCard.style.display = "flex";
+  const zones = _normalizeZonePercentages(rawZones);
 
   const hrAnalysis = act.hr_analysis || {};
   if (driftBadge) {
@@ -5084,27 +5241,38 @@ function renderHrAnalysisSubview(act) {
   }
 
   if (hrSvg) {
-    const hrs = ((act.chart_series || {}).hr || []).filter(v => v !== null && v !== undefined && v > 40);
+    const cs = act.chart_series || {};
+    const dists = cs.dist_km || [];
+    const hrs = _cleanAndSmoothSeries(cs.hr || [], 3, 40, 230).filter(v => v !== null);
     if (hrs.length >= 6) {
-      const W = 560, H = 120, pad = 8;
+      const W = 560, H = 140, padL = 42, padR = 12, padT = 10, padB = 22;
+      const plotW = W - padL - padR;
+      const plotH = H - padT - padB;
       const mn = Math.min(...hrs, 100), mx = Math.max(...hrs, 180), rng = (mx - mn) || 1;
+      const maxD = dists.length ? Number(dists[dists.length - 1] || act.distance_km || 0) : 0;
       const pathPts = hrs.map((h, i) => {
-        const x = pad + (i / (hrs.length - 1)) * (W - pad * 2);
-        const y = H - pad - ((h - mn) / rng) * (H - pad * 2);
+        const x = padL + (i / (hrs.length - 1)) * plotW;
+        const y = padT + plotH - ((h - mn) / rng) * plotH;
         return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
       }).join(" ");
+      hrSvg.style.height = "140px";
       hrSvg.innerHTML = `
-        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%; height:100%; border:1px solid #E5E5EA; border-radius:8px; overflow:hidden;">
-          <rect x="0" y="0" width="${W}" height="${H * 0.2}" fill="rgba(255,23,68,0.08)"/>
-          <rect x="0" y="${H * 0.2}" width="${W}" height="${H * 0.2}" fill="rgba(255,152,0,0.08)"/>
-          <rect x="0" y="${H * 0.4}" width="${W}" height="${H * 0.2}" fill="rgba(0,230,118,0.08)"/>
-          <rect x="0" y="${H * 0.6}" width="${W}" height="${H * 0.2}" fill="rgba(0,174,239,0.08)"/>
-          <rect x="0" y="${H * 0.8}" width="${W}" height="${H * 0.2}" fill="rgba(100,116,139,0.08)"/>
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%; height:100%; border:1px solid #E5E5EA; border-radius:10px; background:#FFFFFF;">
+          <rect x="${padL}" y="${padT}" width="${plotW}" height="${plotH * 0.2}" fill="rgba(255,23,68,0.08)"/>
+          <rect x="${padL}" y="${padT + plotH * 0.2}" width="${plotW}" height="${plotH * 0.2}" fill="rgba(255,152,0,0.08)"/>
+          <rect x="${padL}" y="${padT + plotH * 0.4}" width="${plotW}" height="${plotH * 0.2}" fill="rgba(0,230,118,0.08)"/>
+          <rect x="${padL}" y="${padT + plotH * 0.6}" width="${plotW}" height="${plotH * 0.2}" fill="rgba(0,174,239,0.08)"/>
+          <rect x="${padL}" y="${padT + plotH * 0.8}" width="${plotW}" height="${plotH * 0.2}" fill="rgba(100,116,139,0.08)"/>
+          <text x="${padL - 5}" y="${padT + 8}" text-anchor="end" font-size="9.5" fill="#5B5B66">${Math.round(mx)} ppm</text>
+          <text x="${padL - 5}" y="${padT + plotH / 2 + 3}" text-anchor="end" font-size="9.5" fill="#5B5B66">${Math.round((mn + mx) / 2)}</text>
+          <text x="${padL - 5}" y="${padT + plotH}" text-anchor="end" font-size="9.5" fill="#5B5B66">${Math.round(mn)} ppm</text>
+          <text x="${padL}" y="${H - 5}" text-anchor="start" font-size="9.5" fill="#5B5B66">0 km</text>
+          <text x="${W - padR}" y="${H - 5}" text-anchor="end" font-size="9.5" fill="#5B5B66">${maxD > 0 ? `${maxD.toFixed(1)} km` : "Fin"}</text>
           <path d="${pathPts}" fill="none" stroke="#E53935" stroke-width="2.2" stroke-linecap="round"/>
         </svg>
       `;
     } else {
-      hrSvg.innerHTML = "";
+      hrSvg.innerHTML = `<div class="body-xs" style="padding:8px 0;">Sin curva continua de frecuencia cardíaca en esta sesión.</div>`;
       hrSvg.style.height = "auto";
     }
   }
