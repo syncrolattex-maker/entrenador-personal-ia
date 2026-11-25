@@ -270,7 +270,7 @@ async function initApp() {
     if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
 
     // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v97"; // Stride 1:1 pill buttons, 14px soft inputs/stat boxes & tabular-nums
+    const APP_VERSION = "v98"; // Fix showSuccessBanner string messages & debounce timer
 
 
 
@@ -2054,16 +2054,21 @@ function updateProgress(forceComplete = false) {
 // ============================================================
 // SUCCESS BANNER
 // ============================================================
+let _successBannerTimer = null;
+
 function showSuccessBanner(completado, synced = false) {
+  if (!elSuccessBanner || !elSuccessText) return;
   elSuccessBanner.style.display = "flex";
-  if (completado) {
-    const syncMsg = synced ? " Registrado en Intervals.icu ✅" : "";
+  if (typeof completado === "string") {
+    elSuccessText.textContent = completado;
+  } else if (completado) {
+    const syncMsg = synced ? " Registrado en Garmin/DB ✅" : "";
     elSuccessText.innerHTML = `💪 <strong>¡Sesión guardada!</strong>${syncMsg} Tu próxima rutina está lista.`;
   } else {
     elSuccessText.innerHTML = `🧘 <strong>Día de descanso registrado.</strong> Sin culpas. Tu entrenamiento te espera mañana.`;
   }
-  window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-  setTimeout(hideSuccessBanner, 6000);
+  if (_successBannerTimer) clearTimeout(_successBannerTimer);
+  _successBannerTimer = setTimeout(hideSuccessBanner, 5000);
 }
 
 function hideSuccessBanner() { elSuccessBanner.style.display = "none"; }
