@@ -1,0 +1,1159 @@
+/* ==========================================================================
+   AARONFIT — GOOGLE STITCH DESIGN SYSTEM ("Kinetic Precision" / Stride)
+   Project: projects/9210415846705469464
+   Aislamiento de estilos: cargado inmediatamente después de style.css
+   ========================================================================== */
+
+:root {
+  /* 1. Paleta de Superficies y Fondos (Warm Paper Light + Dark Ember Hero) */
+  --stitch-bg: #F5F5F4;
+  --stitch-bg-alt: #FBF9F8;
+  --stitch-surface: #FFFFFF;
+  --stitch-surface-low: #F5F3F3;
+  --stitch-surface-container: #EFEDED;
+  --stitch-surface-high: #E9E8E7;
+  --stitch-surface-dim: #DBDAD9;
+  --stitch-surface-dark: #141416;
+  --stitch-hero-gradient: radial-gradient(circle at 85% 15%, #662E19 0%, #201715 50%, #151415 100%);
+
+  /* 2. Bordes / Hairlines */
+  --stitch-border: #ECECEA;
+  --stitch-border-strong: #DCDCD8;
+  --stitch-outline-variant: #E2BFB5;
+
+  /* 3. Textos */
+  --stitch-text-primary: #111111;
+  --stitch-text-ink: #1B1C1C;
+  --stitch-text-secondary: #6B6B6B;
+  --stitch-text-muted: #78716C;
+  --stitch-text-on-dark-muted: #A3A3A3;
+
+  /* 4. Acento Principal y Estados Semánticos */
+  --stitch-accent: #EE5A2B;
+  --stitch-accent-hover: #C2421A;
+  --stitch-accent-deep: #AB2F00;
+  --stitch-accent-soft: rgba(238, 90, 43, 0.10);
+  --stitch-accent-glow: rgba(238, 90, 43, 0.28);
+
+  --stitch-success: #15803D;
+  --stitch-success-soft: rgba(21, 128, 61, 0.12);
+  --stitch-warning: #B45309;
+  --stitch-warning-soft: rgba(180, 83, 9, 0.12);
+  --stitch-danger: #BA1A1A;
+  --stitch-danger-soft: #FFDAD6;
+  --stitch-info: #0066B3;
+  --stitch-info-soft: rgba(0, 102, 179, 0.10);
+
+  /* 5. Tipografía */
+  --stitch-font-sans: 'Geist', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --stitch-font-mono: 'JetBrains Mono', monospace;
+
+  /* Escala de tamaños */
+  --stitch-text-xs: 0.75rem;     /* 12px */
+  --stitch-text-sm: 0.8125rem;   /* 13px */
+  --stitch-text-base: 0.9375rem; /* 15px */
+  --stitch-text-lg: 1.125rem;    /* 18px */
+  --stitch-text-xl: 1.5rem;      /* 24px */
+  --stitch-text-2xl: 2rem;       /* 32px */
+  --stitch-text-hero: 2.5rem;    /* 40px */
+
+  /* 6. Border Radius */
+  --stitch-radius-sm: 12px;
+  --stitch-radius-md: 16px;
+  --stitch-radius-row: 18px;
+  --stitch-radius-card: 26px;
+  --stitch-radius-hero: 28px;
+  --stitch-radius-xl: 32px;
+  --stitch-radius-pill: 9999px;
+
+  /* 7. Sombras y Elevación */
+  --stitch-shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.04), 0 1px 4px -1px rgba(0, 0, 0, 0.02);
+  --stitch-shadow-card-hover: 0 8px 24px -4px rgba(17, 17, 17, 0.08);
+  --stitch-shadow-hero: 0 12px 28px rgba(17, 17, 17, 0.14);
+  --stitch-shadow-pill: 0 2px 8px -2px rgba(0, 0, 0, 0.08), 0 1px 3px -1px rgba(0, 0, 0, 0.04);
+
+  /* 8. Espaciados */
+  --stitch-space-xs: 8px;
+  --stitch-space-sm: 12px;
+  --stitch-space-md: 16px;
+  --stitch-space-lg: 20px;
+  --stitch-space-xl: 24px;
+}
+
+/* Alineación tabular estricta en todas las métricas deportivas */
+.tabular-num,
+.metric-xl,
+.p-stat-val,
+.status-val,
+.split-row,
+.detail-big-stat strong,
+.stride-day-num,
+.stride-day-num-col,
+.stride-home-kpi-val,
+.stride-comp-val,
+.stride-eff-val,
+.pace-analysis-row,
+.pace-dist-row,
+.detail-split-row,
+.strava-feed-metric strong,
+#summit-exp-vol-km,
+#summit-exp-ring-pct,
+#summit-exp-ring-rem,
+#goals-total-km,
+#goals-target-km,
+#goal-run-progress-label,
+#goal-bike-progress-label,
+#goal-strength-progress-label {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   FASE 2A — ENTRENAMIENTOS (#tab-training)
+   ========================================================================== */
+
+#tab-training {
+  gap: 20px;
+}
+
+/* 1. Cabecera semanal (.stride-plan-week-hero & .stride-week-badge) */
+#tab-training .stride-plan-week-hero {
+  background: var(--stitch-hero-gradient);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--stitch-radius-row);
+  padding: 14px 16px;
+  min-height: 64px;
+  gap: 12px;
+  box-shadow: var(--stitch-shadow-hero);
+}
+
+#tab-training .stride-week-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--stitch-radius-pill);
+  background: linear-gradient(135deg, #FFA45B 0%, var(--stitch-accent) 100%);
+  color: #FFFFFF;
+  font-family: var(--stitch-font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+#tab-training .stride-week-title {
+  font-family: var(--stitch-font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+#tab-training .stride-week-sub {
+  font-family: var(--stitch-font-sans);
+  font-size: 13px;
+  color: var(--stitch-text-on-dark-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 2. Selector de Plan Activo (#training-plan-selector-card & .training-plan-pill) */
+#training-plan-selector-card {
+  background: var(--stitch-surface);
+  border: 1px solid var(--stitch-border);
+  border-radius: var(--stitch-radius-card);
+  box-shadow: var(--stitch-shadow-card);
+  padding: 20px;
+}
+
+#training-plan-selector-card .training-plan-pill {
+  background: var(--stitch-bg);
+  border: 1px solid var(--stitch-border);
+  border-radius: 14px;
+  color: var(--stitch-text-primary);
+  font-family: var(--stitch-font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 12px;
+  min-height: 44px;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#training-plan-selector-card .training-plan-pill:hover:not(.active) {
+  border-color: var(--stitch-border-strong);
+  background: var(--stitch-surface-low);
+}
+
+#training-plan-selector-card .training-plan-pill.active {
+  background: var(--stitch-text-primary);
+  border-color: var(--stitch-text-primary);
+  color: #FFFFFF;
+  font-weight: 600;
+  box-shadow: var(--stitch-shadow-pill);
+}
+
+/* 3. Objetivos Semanales (#training-goals-card & .stride-progress-hero) */
+#training-goals-card {
+  background: var(--stitch-surface);
+  border: 1px solid var(--stitch-border);
+  border-radius: var(--stitch-radius-hero);
+  box-shadow: var(--stitch-shadow-card);
+  padding: 20px;
+}
+
+#training-goals-card .stride-progress-hero {
+  background: var(--stitch-hero-gradient);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--stitch-radius-hero);
+  padding: 18px 20px;
+  box-shadow: var(--stitch-shadow-hero);
+}
+
+#training-goals-card .stride-progress-kicker {
+  color: var(--stitch-text-on-dark-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+#goals-total-km {
+  font-family: var(--stitch-font-sans);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #FFFFFF;
+}
+
+#goals-target-km {
+  font-family: var(--stitch-font-mono);
+  font-size: 12px;
+  color: var(--stitch-text-on-dark-muted);
+}
+
+#goals-overall-badge {
+  background: rgba(238, 90, 43, 0.18);
+  color: #FFFFFF;
+  border: 1px solid rgba(238, 90, 43, 0.45);
+  font-family: var(--stitch-font-mono);
+  font-weight: 700;
+}
+
+#training-goals-card .stride-atotal-col strong,
+#training-goals-card .stride-pt-card strong {
+  font-family: var(--stitch-font-mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+#training-goals-card .stride-pt-card {
+  background: var(--stitch-bg);
+  border: 1px solid var(--stitch-border);
+  border-radius: var(--stitch-radius-md);
+  padding: 12px 14px;
+}
+
+#training-goals-card .progress-bar-wrap {
+  height: 8px;
+  background: var(--stitch-surface-high);
+  border-radius: var(--stitch-radius-pill);
+  overflow: hidden;
+}
+
+#training-goals-card .progress-fill.orange {
+  background: var(--stitch-accent);
+  border-radius: var(--stitch-radius-pill);
+}
+
+#training-goals-card .progress-fill.blue {
+  background: var(--stitch-info);
+  border-radius: var(--stitch-radius-pill);
+}
+
+#goal-run-progress-label,
+#goal-bike-progress-label,
+#goal-strength-progress-label {
+  font-family: var(--stitch-font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--stitch-text-primary);
+}
+
+/* 4. Tarjetas diarias Lunes-Domingo (.training-day-card & 4 estados) */
+#tab-training #training-calendar-card {
+  background: var(--stitch-surface);
+  border: 1px solid var(--stitch-border);
+  border-radius: var(--stitch-radius-card);
+  box-shadow: var(--stitch-shadow-card);
+  padding: 20px;
+}
+
+#tab-training .training-day-card {
+  background: var(--stitch-surface);
+  border: 1px solid var(--stitch-border);
+  border-radius: var(--stitch-radius-row);
+  padding: 14px 16px;
+  gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+#tab-training .training-day-card:hover {
+  border-color: var(--stitch-border-strong);
+}
+
+/* Hoy: borde sutil --stitch-accent sin recargar sombras ni degradados */
+#tab-training .training-day-card.is-today {
+  background: var(--stitch-surface);
+  border: 1.5px solid var(--stitch-accent);
+  box-shadow: none;
+}
+
+#tab-training .training-day-card.is-today .stride-day-abbr {
+  color: var(--stitch-accent-hover);
+  font-weight: 700;
+}
+
+#tab-training .stride-day-datecol {
+  width: 40px;
+  flex-shrink: 0;
+}
+
+#tab-training .stride-day-abbr {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--stitch-text-secondary);
+}
+
+#tab-training .stride-day-num-col {
+  font-family: var(--stitch-font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--stitch-text-primary);
+}
+
+#tab-training .stride-timeline-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--stitch-radius-pill);
+  background: #C9C9C6;
+}
+
+#tab-training .stride-timeline-dot.is-today {
+  width: 12px;
+  height: 12px;
+  background: var(--stitch-accent);
+  box-shadow: 0 0 0 4px var(--stitch-accent-soft);
+}
+
+#tab-training .stride-timeline-dot.is-done {
+  width: 16px;
+  height: 16px;
+  background: var(--stitch-success);
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#tab-training .stride-timeline-dot.is-other {
+  width: 16px;
+  height: 16px;
+  background: var(--stitch-info);
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#tab-training .stride-timeline-dot.is-missed {
+  width: 14px;
+  height: 14px;
+  background: var(--stitch-surface-high);
+  color: var(--stitch-text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Estado 4: No realizado / 0 carga (atenuado pero 100% legible, sin tachar) */
+#tab-training .training-day-card.state-missed {
+  background: var(--stitch-surface-low);
+  border-color: var(--stitch-border);
+  opacity: 0.82;
+}
+
+#tab-training .training-day-card.state-missed .training-day-title {
+  color: var(--stitch-text-secondary);
+  text-decoration: none;
+}
+
+/* Badges sobrios de los 4 estados de carga real */
+.stitch-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: var(--stitch-radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.stitch-status-badge.is-done {
+  background: var(--stitch-success-soft);
+  color: var(--stitch-success);
+}
+
+.stitch-status-badge.is-other {
+  background: var(--stitch-info-soft);
+  color: var(--stitch-info);
+}
+
+.stitch-status-badge.is-extra {
+  background: var(--stitch-accent-soft);
+  color: var(--stitch-accent-hover);
+}
+
+.stitch-status-badge.is-pending {
+  background: var(--stitch-bg);
+  color: var(--stitch-text-secondary);
+  border: 1px solid var(--stitch-border);
+}
+
+.stitch-status-badge.is-missed {
+  background: var(--stitch-surface-high);
+  color: var(--stitch-text-muted);
+}
+
+/* 5. Responsive (< 1024px sin overflow horizontal / >= 1024px grid amplio) */
+#tab-training .stride-day-row-main,
+#tab-training .training-day-info {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#tab-training .training-day-actions {
+  max-width: 100%;
+}
+
+@media (max-width: 1023px) {
+  #tab-training,
+  #tab-training .glass-card,
+  #tab-training .training-weekly-calendar {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  #tab-training .training-day-actions {
+    padding-left: 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  #tab-training .training-top-grid {
+    gap: 24px;
+  }
+  #tab-training .training-day-card {
+    padding: 16px 18px;
+  }
+}
+
+/* ==========================================================================
+   FASE 2B — SUMMIT / ANÁLISIS (#tab-metrics)
+   ========================================================================== */
+
+#tab-metrics {
+  gap: 20px;
+}
+
+/* Limpieza determinista: ocultar tarjeta de Coach IA en Summit */
+#summit-ai-card {
+  display: none !important;
+}
+
+#tab-metrics .stride-ai-eff-grid {
+  grid-template-columns: 1fr !important;
+}
+
+/* 1. Tarjetas de Exploración y Comparativa */
+#tab-metrics .stride-summit-explorations-row {
+  gap: 16px;
+}
+
+#tab-metrics .stride-exp-dark-card {
+  background: var(--stitch-hero-gradient);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--stitch-radius-hero);
+  box-shadow: var(--stitch-shadow-hero);
+  padding: 20px;
+}
+
+#tab-metrics .stride-exp-light-card,
+#tab-metrics .stride-comp-card,
+#tab-metrics .stride-eff-card,
+#tab-metrics #summit-fitness-card,
+#tab-metrics #summit-training-log-card,
+#tab-metrics #summit-prs-card,
+#tab-metrics #summit-official-prs-card,
+#tab-metrics #summit-segments-card,
+#tab-metrics #garmin-wellness-card {
+  background: var(--stitch-surface);
+  border: 1px solid var(--stitch-border);
+  border-radius: var(--stitch-radius-card);
+  box-shadow: var(--stitch-shadow-card);
+  padding: 20px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+#tab-metrics .stride-eff-bar {
+  height: 10px;
+  border-radius: var(--stitch-radius-pill);
+  background: var(--stitch-surface-high);
+}
+
+#tab-metrics .stride-analytics-panel {
+  gap: 18px;
+}
+
+#tab-metrics .stride-comp-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+#tab-metrics .stride-comp-box,
+#tab-metrics .stride-eff-window-box {
+  background: var(--stitch-bg);
+  border: 1px solid var(--stitch-border);
+  border-radius: var(--stitch-radius-row);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+#tab-metrics .stride-comp-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--stitch-text-secondary);
+}
+
+#tab-metrics .stride-comp-val,
+#tab-metrics .stride-eff-window-box strong {
+  font-family: var(--stitch-font-mono);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--stitch-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+#tab-metrics .stride-comp-delta {
+  font-family: var(--stitch-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Selector de periodos (.stride-period-pills) alineado con Entrenamientos */
+#tab-metrics .stride-period-pills {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: var(--stitch-surface-high);
+  padding: 4px;
+  border-radius: var(--stitch-radius-pill);
+}
+
+#tab-metrics .stride-period-pill {
+  border: none;
+  background: transparent;
+  color: var(--stitch-text-secondary);
+  font-family: var(--stitch-font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--stitch-radius-pill);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#tab-metrics .stride-period-pill.active {
+  background: var(--stitch-text-primary);
+  color: #FFFFFF;
+  font-weight: 600;
+  box-shadow: var(--stitch-shadow-pill);
+}
+
+/* Filtros Training Log */
+#training-log-filters .strava-chip-btn {
+  border-radius: var(--stitch-radius-pill);
+  border: 1px solid var(--stitch-border);
+  background: var(--stitch-bg);
+  color: var(--stitch-text-secondary);
+  font-weight: 500;
+}
+
+#training-log-filters .strava-chip-btn.active {
+  background: var(--stitch-text-primary);
+  border-color: var(--stitch-text-primary);
+  color: #FFFFFF;
+  font-weight: 600;
+  box-shadow: var(--stitch-shadow-pill);
+}
+
+/* 2. Diferenciación visual clara: Mejores Tiempos (GPS) vs Récords Oficiales (RP) */
+#summit-prs-card .p-stat-box {
+  background: var(--stitch-bg) !important;
+  border: 1px solid var(--stitch-border) !important;
+  border-left: 3px solid var(--stitch-info) !important;
+  border-radius: var(--stitch-radius-row) !important;
+  padding: 12px 14px;
+  transition: border-color 0.15s ease;
+}
+
+#summit-prs-card .p-stat-box:hover {
+  border-color: var(--stitch-border-strong) !important;
+  border-left-color: var(--stitch-info) !important;
+}
+
+#summit-official-prs-card .p-stat-box {
+  background: #FFF9F6 !important;
+  border: 1px solid rgba(238, 90, 43, 0.24) !important;
+  border-left: 3px solid var(--stitch-accent) !important;
+  border-radius: var(--stitch-radius-row) !important;
+  padding: 12px 14px;
+}
+
+#summit-prs-card .p-stat-val,
+#summit-official-prs-card .p-stat-val,
+#garmin-wellness-card .p-stat-val {
+  font-family: var(--stitch-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 3. Responsive (< 1024px cero scroll horizontal / >= 1024px grid amplio) */
+@media (max-width: 1023px) {
+  #tab-metrics,
+  #tab-metrics .summit-desktop-grid,
+  #tab-metrics .stride-summit-explorations-row,
+  #tab-metrics .stride-analytics-panel {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  #tab-metrics .summit-bubble-grid {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+
+@media (min-width: 1024px) {
+  #tab-metrics .stride-summit-explorations-row {
+    gap: 20px;
+  }
+  #tab-metrics .stride-comp-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+  #tab-metrics .summit-desktop-grid {
+    gap: 24px;
+  }
+}
+
+/* ==========================================================================
+   FASE 2C — MODAL DE DETALLE DE ACTIVIDAD (#activity-detail-modal)
+   ========================================================================== */
+
+#activity-detail-modal.detail-modal-overlay {
+  background: var(--stitch-bg);
+}
+
+#activity-detail-modal .strava-detail-shell {
+  padding-bottom: 48px;
+  gap: 16px;
+}
+
+/* 1. Topbar & Sidebar */
+#activity-detail-modal .strava-detail-topbar {
+  background: var(--stitch-surface);
+  border: 1px solid var(--stitch-border);
+  border-radius: var(--stitch-radius-row);
+  box-shadow: var(--stitch-shadow-card);
+  padding: 12px 16px;
+}
+
+#activity-detail-modal .strava-detail-sidebar {
+  background: var(--stitch-surface);
+  border: 1px solid var(--stitch-border);
+  border-radius: var(--stitch-radius-card);
+  box-shadow: var(--stitch-shadow-card);
+  padding: 8px;
+  gap: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+#activity-detail-modal .strava-detail-sidebar::-webkit-scrollbar {
+  display: none;
+}
+
+#activity-detail-modal .detail-nav-item {
+  border-radius: var(--stitch-radius-pill);
+  border: none;
+  padding: 8px 14px;
+  font-family: var(--stitch-font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--stitch-text-secondary);
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#activity-detail-modal .detail-nav-item:hover:not(.active) {
+  background: var(--stitch-bg);
+  color: var(--stitch-text-primary);
+}
+
+#activity-detail-modal .detail-nav-item.active {
+  background: var(--stitch-text-primary);
+  color: #FFFFFF;
+  font-weight: 600;
+  box-shadow: var(--stitch-shadow-pill);
+}
+
+/* Botones sobrios .GPX y + Segmento */
+#activity-detail-modal #btn-download-gpx,
+#activity-detail-modal #btn-create-segment-from-act {
+  background: var(--stitch-bg);
+  border: 1px solid var(--stitch-border);
+  border-radius: var(--stitch-radius-pill);
+  color: var(--stitch-text-primary);
+  font-family: var(--stitch-font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+}
+
+#activity-detail-modal #btn-download-gpx:hover,
+#activity-detail-modal #btn-create-segment-from-act:hover {
+  background: var(--stitch-surface-high);
+  border-color: var(--stitch-border-strong);
+}
+
+/* 2. Tarjetas del Modal, KPIs principales y Mapa Leaflet */
+#activity-detail-modal .glass-card {
+  background: var(--stitch-surface);
+  border: 1px solid var(--stitch-border);
+  border-radius: var(--stitch-radius-card);
+  box-shadow: var(--stitch-shadow-card);
+  padding: 20px;
+}
+
+#activity-detail-modal .detail-big-stats,
+#activity-detail-modal .detail-sub-stats {
+  border-bottom: 1px solid var(--stitch-border);
+}
+
+#activity-detail-modal .detail-big-stat strong,
+#activity-detail-modal .detail-sub-stats strong,
+#activity-detail-modal .p-stat-val {
+  font-family: var(--stitch-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--stitch-text-primary);
+}
+
+#activity-detail-modal .p-stat-box {
+  background: var(--stitch-bg);
+  border: 1px solid var(--stitch-border);
+  border-radius: var(--stitch-radius-row);
+  padding: 12px 14px;
+}
+
+#activity-detail-modal .detail-map-box,
+#activity-detail-modal #detail-map-container {
+  border-radius: var(--stitch-radius-card);
+  overflow: hidden;
+  border: 1px solid var(--stitch-border);
+}
+
+#activity-detail-modal #detail-map-container .leaflet-top,
+#activity-detail-modal #detail-map-container .leaflet-bottom {
+  z-index: 400;
+}
+
+#activity-detail-modal #detail-map-container .leaflet-control-zoom {
+  margin: 12px;
+  border: 1px solid var(--stitch-border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--stitch-shadow-pill);
+}
+
+/* 3. Parciales, Zonas (Z1-Z6 / Z1-Z5) y Toggles de Streams */
+#activity-detail-modal .splits-table-head,
+#activity-detail-modal .pace-analysis-head {
+  border-bottom: 1px solid var(--stitch-border);
+  color: var(--stitch-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+#activity-detail-modal .detail-split-row,
+#activity-detail-modal .pace-analysis-row {
+  border-radius: 12px;
+  padding: 8px 10px;
+  font-family: var(--stitch-font-mono);
+  font-variant-numeric: tabular-nums;
+  border: 1px solid transparent;
+}
+
+#activity-detail-modal .detail-split-row:hover {
+  background: var(--stitch-bg);
+}
+
+#activity-detail-modal .detail-split-row.active {
+  background: var(--stitch-accent-soft);
+  border-color: rgba(238, 90, 43, 0.35);
+}
+
+#activity-detail-modal .detail-split-inspector {
+  background: var(--stitch-hero-gradient);
+  border-radius: var(--stitch-radius-row);
+  padding: 14px 16px;
+}
+
+#activity-detail-modal .pace-dist-row {
+  background: var(--stitch-bg);
+  border: 1px solid var(--stitch-border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Toggles de Streams como píldoras táctiles */
+#activity-detail-modal .detail-toggles-table {
+  gap: 10px;
+}
+
+#activity-detail-modal .detail-toggle-row {
+  background: var(--stitch-bg);
+  border: 1px solid var(--stitch-border);
+  border-radius: var(--stitch-radius-row);
+  padding: 10px 14px;
+  box-shadow: none;
+}
+
+#activity-detail-modal .detail-toggle-btn {
+  border-radius: var(--stitch-radius-pill);
+  border: 1px solid var(--stitch-border-strong);
+  background: var(--stitch-surface);
+  color: var(--stitch-text-secondary);
+  font-family: var(--stitch-font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+}
+
+#activity-detail-modal .detail-toggle-btn.on {
+  background: var(--stitch-text-primary);
+  border-color: var(--stitch-text-primary);
+  color: #FFFFFF;
+  box-shadow: var(--stitch-shadow-pill);
+}
+
+/* 4. Responsive (< 1024px pestañas horizontales / >= 1024px sidebar + contenido) */
+@media (max-width: 1023px) {
+  #activity-detail-modal,
+  #activity-detail-modal .strava-detail-shell,
+  #activity-detail-modal .strava-detail-main {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  #activity-detail-modal .strava-detail-sidebar {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+  #activity-detail-modal .detail-toggles-table {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 1024px) {
+  #activity-detail-modal .strava-detail-grid {
+    grid-template-columns: 220px 1fr;
+    gap: 24px;
+  }
+  #activity-detail-modal .strava-detail-sidebar {
+    flex-direction: column;
+    padding: 10px;
+  }
+  #activity-detail-modal .detail-nav-item {
+    border-left: none;
+    border-radius: 12px;
+    padding: 9px 12px;
+    width: 100%;
+  }
+  #activity-detail-modal .detail-nav-item.sub {
+    padding-left: 22px;
+  }
+  #activity-detail-modal .detail-nav-item.active {
+    border-left: none;
+    background: var(--stitch-text-primary);
+    color: #FFFFFF;
+  }
+}
+
+/* ==========================================================================
+   FASE 3 — CROSSHAIR, TOOLTIPS FLUIDOS Y ACCESIBILIDAD REDUCED-MOTION
+   ========================================================================== */
+
+.detail-chart-tooltip {
+  transition: transform 135ms cubic-bezier(0.22, 1, 0.36, 1), opacity 135ms ease;
+  will-change: transform;
+  max-width: calc(100vw - 32px);
+}
+
+.muscle-poly {
+  transition: fill 400ms cubic-bezier(0.65, 0, 0.35, 1), opacity 400ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+#summit-fitness-svg-wrap svg,
+#detail-chart-svg svg {
+  touch-action: pan-y;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detail-chart-tooltip,
+  .split-bar-fill,
+  .split-bar-track > div,
+  .progress-fill,
+  svg path,
+  svg polyline {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ==========================================================================
+   FASE 4 — QA RESPONSIVE, ZONAS TÁCTILES Y PULIDO PWA (SAFE AREA)
+   ========================================================================== */
+
+/* Zonas táctiles cómodas (>= 40px) en botones y píldoras principales */
+.btn,
+.training-plan-pill,
+.stride-period-pill,
+.detail-nav-item,
+.detail-toggle-btn,
+#training-log-filters .strava-chip-btn {
+  min-height: 40px;
+}
+
+/* Prevención estricta de desbordamiento horizontal en < 1024px */
+@media (max-width: 1023px) {
+  html,
+  body,
+  .app-container,
+  .tab-content-area,
+  .tab-view,
+  #tab-dashboard,
+  #tab-metrics,
+  #tab-training,
+  #tab-profile {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .tab-view > *,
+  .dashboard-grid > *,
+  .summit-desktop-grid > *,
+  .profile-desktop-grid > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Soporte env(safe-area-inset-bottom) para iPhone / PWA instalada */
+  .bottom-dock-nav.stride-bottom-dock {
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: 6px;
+  }
+
+  .tab-content-area {
+    padding-bottom: calc(98px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Balance de grids en >= 1024px sin huecos huérfanos */
+@media (min-width: 1024px) {
+  .profile-desktop-grid,
+  .dashboard-grid {
+    gap: 24px;
+  }
+
+  #tab-profile .glass-card {
+    background: var(--stitch-surface);
+    border: 1px solid var(--stitch-border);
+    border-radius: var(--stitch-radius-card);
+    box-shadow: var(--stitch-shadow-card);
+    padding: 20px;
+  }
+}
+
+/* ==========================================================================
+   PULIDO VISUAL STITCH GLOBAL (TOPBAR, DOCK, INICIO, HISTORIAL, GRÁFICAS)
+   ========================================================================== */
+
+.app-topbar {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--stitch-border);
+}
+
+.bottom-dock-nav.stride-bottom-dock {
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid var(--stitch-border);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
+}
+
+#tab-dashboard .stride-hero-card {
+  background: var(--stitch-hero-gradient);
+  border-radius: 30px;
+  box-shadow: var(--stitch-shadow-hero);
+}
+
+#tab-dashboard .stride-white-card,
+#tab-dashboard .glass-card,
+#tab-history .glass-card,
+#tab-profile .glass-card {
+  background: var(--stitch-surface);
+  border: 1px solid var(--stitch-border);
+  border-radius: var(--stitch-radius-card);
+  box-shadow: var(--stitch-shadow-card);
+}
+
+#summit-fitness-svg-wrap svg,
+#detail-streams-svg-el,
+#detail-matched-svg svg,
+#detail-hr-curve-svg svg {
+  border-radius: var(--stitch-radius-row) !important;
+  border: 1px solid var(--stitch-border) !important;
+}
+
+@media (min-width: 1024px) {
+  #summit-fitness-svg-wrap {
+    height: 225px !important;
+  }
+}
+
+/* ==========================================================================
+   VOLUMEN Y OBJETIVOS (L-D) — CHART LIMPIO SIN DISTORSIÓN
+   ========================================================================== */
+
+#training-volume-chart-wrap {
+  background: var(--stitch-bg);
+  border: 1px solid var(--stitch-border);
+  border-radius: var(--stitch-radius-row);
+  padding: 12px 14px 10px;
+}
+
+.stride-volume-header-pills {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.stride-volume-now-pill-inline {
+  display: inline-flex;
+  align-items: center;
+  background: var(--stitch-accent);
+  color: #FFFFFF;
+  font-family: var(--stitch-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: var(--stitch-radius-pill);
+  font-variant-numeric: tabular-nums;
+}
+
+.stride-volume-target-lbl {
+  font-family: var(--stitch-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--stitch-text-secondary);
+}
+
+#training-volume-chart-wrap .stride-volume-chart-box {
+  position: relative;
+  width: 100%;
+  height: 96px;
+  overflow: hidden;
+  border-radius: 10px;
+  margin-top: 0;
+}
+
+.stride-volume-now-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: var(--stitch-accent);
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 2px 6px rgba(238, 90, 43, 0.4);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.stride-volume-days-axis {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 2px 0;
+  font-family: var(--stitch-font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--stitch-text-muted);
+}
+
+#detail-matched-svg {
+  height: 155px !important;
+}
+
+.matched-dot-group circle {
+  transition: r 150ms ease, opacity 150ms ease;
+}
+
+.matched-dot-group:hover circle:last-of-type {
+  r: 7;
+}
+
+@keyframes stitchRoutePulse {
+  0%, 100% { transform: scale(1); opacity: 0.25; }
+  50% { transform: scale(1.45); opacity: 0.5; }
+}
+
+#stride-hero-card .stride-hero-route-svg circle:last-of-type {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: stitchRoutePulse 2.4s ease-in-out infinite;
+}
+
+.stride-volume-days-axis span.is-today {
+  color: var(--stitch-accent-hover);
+  font-weight: 700;
+}
+
+
+
+
+
+
+

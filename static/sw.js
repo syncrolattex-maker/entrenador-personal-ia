@@ -1,8 +1,10 @@
-const CACHE_NAME = "aaronfit-cache-v110";
+const CACHE_NAME = "aaronfit-cache-v124";
 const ASSETS = [
   "/",
   "/index.html",
   "/style.css",
+  "/theme-stitch.css",
+  "/chart-animations.js",
   "/app.js",
   "/manifest.json"
 ];

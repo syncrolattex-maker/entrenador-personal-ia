@@ -981,6 +981,10 @@ function updateStravaHeatmap(exerciseName) {
   if (txt) {
     txt.textContent = active.map(m => m.charAt(0).toUpperCase() + m.slice(1)).join(", ");
   }
+  const hm = document.querySelector(".strava-body-heatmap");
+  if (hm && window.AaronCharts && typeof window.AaronCharts.animateMuscles === "function") {
+    window.AaronCharts.animateMuscles(hm);
+  }
 }
 
 function adjustWeight(delta) {
@@ -2172,6 +2176,10 @@ function renderTrainingTab(plan) {
   setBar("goal-run-progress-label", "goal-run-bar", `${pRun.toFixed(1)} / ${gRun} km`, gRun > 0 ? (pRun / gRun) * 100 : 0);
   setBar("goal-bike-progress-label", "goal-bike-bar", `${pBike.toFixed(1)} / ${gBike} km`, gBike > 0 ? (pBike / gBike) * 100 : 0);
   setBar("goal-strength-progress-label", "goal-strength-bar", `${pStr} / ${gStr} ses`, gStr > 0 ? (pStr / gStr) * 100 : 0);
+  if (window.AaronCharts) {
+    const goalsCardEl = document.getElementById("training-goals-card");
+    if (goalsCardEl) window.AaronCharts.animate(goalsCardEl);
+  }
 
   // Populate Stride 10 · Progress, history & profile cards in Objetivos Semanales
   const elTotKm = document.getElementById("goals-total-km");
@@ -2209,6 +2217,7 @@ function renderTrainingTab(plan) {
         return `<rect x="${x}" y="${y}" width="32" height="${h}" rx="4" fill="${fill}"><title>${d.dia}: ${d.distancia_km || 0} km</title></rect>`;
       }).join("");
       elWeeklySpark.innerHTML = `<svg viewBox="0 0 320 44" preserveAspectRatio="none" style="width:100%; height:44px;">${bars}</svg>`;
+      if (window.AaronCharts) window.AaronCharts.animate(elWeeklySpark);
     }
   }
 
@@ -2258,42 +2267,67 @@ function renderTrainingTab(plan) {
 
   const volWrap = document.getElementById("training-volume-chart-wrap");
   if (volWrap) {
-    const peakKm = Math.round(Math.max(gRun * 1.15, pRun, 25));
-    volWrap.style.display = "block";
-    volWrap.innerHTML = `
-      <div class="stride-volume-chart-box">
-        <svg viewBox="0 0 350 128" preserveAspectRatio="none" style="width:100%; height:100%; overflow:visible;">
-          <defs>
-            <pattern id="stride-diag-stripe" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-              <line x1="0" y1="0" x2="0" y2="8" stroke="#EAE9E4" stroke-width="3"></line>
-            </pattern>
-          </defs>
-          <path d="M 0,128 L 0,88 L 35,84 L 70,78 L 105,82 L 140,72 L 165,62 L 165,128 Z" fill="#171716"></path>
-          <path d="M 165,128 L 165,62 L 190,56 L 220,52 L 250,48 L 285,62 L 320,74 L 350,86 L 350,128 Z" fill="url(#stride-diag-stripe)"></path>
-          <path d="M 165,62 L 190,56 L 220,52 L 250,48 L 285,62 L 320,74 L 350,86" fill="none" stroke="#D6D3CC" stroke-dasharray="3 3" stroke-width="1.5"></path>
-          <circle cx="35" cy="84" r="3" fill="#FFFFFF"></circle>
-          <circle cx="70" cy="78" r="3" fill="#FFFFFF"></circle>
-          <circle cx="105" cy="82" r="3" fill="#FFFFFF"></circle>
-          <circle cx="140" cy="72" r="3" fill="#FFFFFF"></circle>
-          <circle cx="250" cy="48" r="4" fill="#FFFFFF" stroke="#171716" stroke-width="2"></circle>
-          <circle cx="165" cy="62" r="5" fill="#EE5A2B" stroke="#FFFFFF" stroke-width="2"></circle>
-        </svg>
-        <div class="stride-volume-now-pill">Hoy · ${pRun.toFixed(1)} km</div>
-        <span style="position:absolute; right:26%; top:6px; font-size:11px; font-weight:600; color:#5B5955;">Pico ${peakKm} km</span>
-      </div>
-      <div class="stride-phase-segments">
-        <div class="stride-phase-seg is-done" style="grid-column:span 4;"></div>
-        <div class="stride-phase-seg is-current" style="grid-column:span 4;"></div>
-        <div class="stride-phase-seg" style="grid-column:span 2;"></div>
-        <div class="stride-phase-seg" style="grid-column:span 2;"></div>
-      </div>
-      <div class="stride-phase-labels">
-        <span>Base</span>
-        <span style="color:#171716; font-weight:600;">Construcción</span>
-        <span>Específico</span>
-        <span>Taper</span>
-      </div>
-    `;
+    const diasList = Array.isArray(plan.dias) && plan.dias.length > 0 ? plan.dias : [];
+    if (diasList.length === 0) {
+      volWrap.style.display = "none";
+    } else {
+      const W = 350, H = 96, padT = 14, padB = 10;
+      const plotH = H - padT - padB;
+      let cumPlan = 0;
+      const pts = diasList.map((d, i) => {
+        cumPlan += Number(d.distancia_km || (d.duracion_min ? d.duracion_min * 0.12 : 0));
+        return { d, i, cum: cumPlan };
+      });
+      const maxVal = Math.max(gRun, cumPlan, pRun, 10);
+      const todayIdx = Math.max(0, pts.findIndex(p => p.d.es_hoy));
+      const splitIdx = todayIdx >= 0 ? todayIdx : Math.floor(pts.length / 2);
+
+      const coords = pts.map((p, i) => {
+        const x = (i / Math.max(1, pts.length - 1)) * W;
+        const y = padT + plotH - (p.cum / maxVal) * plotH;
+        return { x, y, ...p };
+      });
+
+      const doneCoords = coords.slice(0, splitIdx + 1);
+      const futCoords = coords.slice(splitIdx);
+      const doneLine = doneCoords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ");
+      const doneArea = doneCoords.length > 0
+        ? `${doneLine} L${doneCoords[doneCoords.length - 1].x.toFixed(1)},${H} L0,${H} Z`
+        : "";
+      const futLine = futCoords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ");
+      const futArea = futCoords.length > 1
+        ? `${futLine} L${W},${H} L${futCoords[0].x.toFixed(1)},${H} Z`
+        : "";
+
+      const nowPt = coords[splitIdx] || coords[0];
+      const nowLeftPct = Math.min(82, Math.max(18, (nowPt.x / W) * 100));
+
+      volWrap.style.display = "block";
+      volWrap.innerHTML = `
+        <div class="stride-volume-header-pills">
+          <span class="stride-volume-now-pill-inline">Hoy · ${pRun.toFixed(1)} km</span>
+          <span class="stride-volume-target-lbl tabular-num">Obj. ${gRun.toFixed(0)} km</span>
+        </div>
+        <div class="stride-volume-chart-box">
+          <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%; height:100%; display:block;">
+            <defs>
+              <pattern id="stride-diag-stripe" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <line x1="0" y1="0" x2="0" y2="8" stroke="#E7E5E4" stroke-width="3"></line>
+              </pattern>
+            </defs>
+            ${doneArea ? `<path d="${doneArea}" fill="#171716"></path>` : ""}
+            ${futArea ? `<path d="${futArea}" fill="url(#stride-diag-stripe)"></path>` : ""}
+            ${doneLine ? `<path d="${doneLine}" fill="none" stroke="#171716" stroke-width="2" vector-effect="non-scaling-stroke"></path>` : ""}
+            ${futLine ? `<path d="${futLine}" fill="none" stroke="#A8A29E" stroke-dasharray="3 3" stroke-width="1.5" vector-effect="non-scaling-stroke"></path>` : ""}
+          </svg>
+          <span class="stride-volume-now-dot" style="left:${nowLeftPct.toFixed(1)}%; top:${((nowPt.y / H) * 100).toFixed(1)}%;"></span>
+        </div>
+        <div class="stride-volume-days-axis">
+          ${diasList.map((d, i) => `<span class="${i === splitIdx ? "is-today" : ""}">${(d.dia || "").slice(0, 1).toUpperCase()}</span>`).join("")}
+        </div>
+      `;
+      if (window.AaronCharts) window.AaronCharts.animate(volWrap);
+    }
   }
 
   const calEl = document.getElementById("training-weekly-calendar");
@@ -2331,7 +2365,6 @@ function renderTrainingTab(plan) {
       : "✓ Garmin";
     const dayAbbr = (d.dia || "").slice(0, 3).toUpperCase();
     const dayNum = (d.fecha || "").slice(8, 10) || "—";
-    const dotCls = d.completado ? "is-done" : (d.es_hoy && !isCancelled ? "is-today" : "");
 
     let breakdownPreview = "";
     if (Array.isArray(d.phases) && d.phases.length > 0) {
@@ -2347,46 +2380,61 @@ function renderTrainingTab(plan) {
     const isNotDone = estadoDia === "no_realizado";
     const isSubstituted = estadoDia === "sustituido";
     const isExtra = estadoDia === "extra";
+    const stateCardCls = estadoDia === "completado"
+      ? "state-done"
+      : (isSubstituted || isExtra)
+        ? "state-other"
+        : (isNotDone || isCancelled)
+          ? "state-missed"
+          : "state-pending";
+    const dotCls = estadoDia === "completado"
+      ? "is-done"
+      : (isSubstituted || isExtra)
+        ? "is-other"
+        : (isNotDone || isCancelled)
+          ? "is-missed"
+          : (d.es_hoy && !isCancelled ? "is-today" : "");
     const reales = Array.isArray(d.actividades_reales) ? d.actividades_reales : [];
     const realChipHtml = (isSubstituted || isExtra) && reales.length > 0
-      ? `<div style="margin-top:6px; padding:6px 10px; border-radius:10px; background:${isExtra ? "rgba(238,90,43,0.10)" : "rgba(0,119,204,0.10)"}; color:${isExtra ? "#C23B00" : "#0066B3"}; font-size:0.78rem; font-weight:600;">
+      ? `<div style="margin-top:6px; padding:6px 10px; border-radius:10px; background:${isExtra ? "var(--stitch-accent-soft)" : "var(--stitch-info-soft)"}; color:${isExtra ? "var(--stitch-accent-hover)" : "var(--stitch-info)"}; font-size:0.78rem; font-weight:600;">
            Actividad real: ${reales.map(r => `${r.nombre} (${r.tipo}${r.distancia_km > 0 ? ` · ${r.distancia_km} km` : ""}${r.duracion_min > 0 ? ` · ${r.duracion_min} min` : ""})`).join(" + ")}
          </div>`
       : "";
 
     let statusBadgeHtml = `<span class="body-xs tabular-num">${distInfo}${d.zona_objetivo ? ` • ${d.zona_objetivo}` : ""}</span>`;
     if (estadoDia === "completado") {
-      statusBadgeHtml = `<span class="pill-tag" style="background:rgba(21,128,61,0.12); color:#15803D;">✓ Completado</span>`;
+      statusBadgeHtml = `<span class="stitch-status-badge is-done">✓ Completado</span>`;
     } else if (isSubstituted) {
-      statusBadgeHtml = `<span class="pill-tag" style="background:rgba(0,119,204,0.12); color:#0066B3;">Realizado (otro deporte)</span>`;
+      statusBadgeHtml = `<span class="stitch-status-badge is-other">Realizado · Otro deporte</span>`;
     } else if (isExtra) {
-      statusBadgeHtml = `<span class="pill-tag" style="background:rgba(238,90,43,0.14); color:#C23B00;">Extra / Fuera de plan</span>`;
+      statusBadgeHtml = `<span class="stitch-status-badge is-extra">Extra · Fuera de plan</span>`;
     } else if (isNotDone) {
-      statusBadgeHtml = `<span class="pill-tag" style="background:#FEE2E2; color:#B91C1C;">No realizado (0 carga)</span>`;
+      statusBadgeHtml = `<span class="stitch-status-badge is-missed">No realizado · 0 carga</span>`;
+    } else if (isCancelled) {
+      statusBadgeHtml = `<span class="stitch-status-badge is-missed">Cancelado</span>`;
     } else if (d.garmin_scheduled) {
-      statusBadgeHtml = `<span class="pill-tag" style="background:rgba(21,128,61,0.10); color:#15803D;">Pendiente · 📅 Garmin</span>`;
-    } else if (!isRest && !isCancelled) {
-      statusBadgeHtml = `<span class="pill-tag">Pendiente</span>`;
+      statusBadgeHtml = `<span class="stitch-status-badge is-pending">Pendiente · 📅 Garmin</span>`;
+    } else if (!isRest) {
+      statusBadgeHtml = `<span class="stitch-status-badge is-pending">Pendiente</span>`;
     }
 
     return `
-      <div class="training-day-card ${d.es_hoy && !isCancelled ? "is-today" : ""}" style="${isCancelled || isNotDone ? "opacity:0.72; background:#F5F5F4;" : ""}">
+      <div class="training-day-card ${stateCardCls} ${d.es_hoy && !isCancelled ? "is-today" : ""}">
         <div class="stride-day-row-main">
           <div class="stride-day-datecol">
-            <span class="stride-day-abbr" style="${d.es_hoy && !isCancelled ? "color:var(--primary-text);" : ""}">${dayAbbr}</span>
+            <span class="stride-day-abbr">${dayAbbr}</span>
             <span class="stride-day-num-col">${dayNum}</span>
           </div>
           <div class="stride-day-nodecol">
-            <span class="stride-timeline-dot ${dotCls}">${d.completado ? "✓" : isSubstituted ? "~" : isNotDone ? "×" : ""}</span>
+            <span class="stride-timeline-dot ${dotCls}">${estadoDia === "completado" ? "✓" : (isSubstituted || isExtra) ? "~" : isNotDone ? "–" : ""}</span>
           </div>
           <div class="training-day-info" style="${!isRest && !isCancelled ? "cursor:pointer;" : ""}" ${!isRest && !isCancelled ? `onclick="startPlannedWorkout(${idx})"` : ""}>
             <div class="training-day-head">
               <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                <span style="font-weight:600; font-size:15px; color:var(--on-surface); ${isCancelled || isNotDone || isSubstituted ? "text-decoration:line-through; color:var(--text-secondary);" : ""}">${d.titulo}</span>
+                <span class="training-day-title" style="font-weight:600; font-size:15px; color:var(--on-surface);">${d.titulo}</span>
                 ${d.es_hoy && !isCancelled ? `<span class="pill-tag orange">HOY</span>` : ""}
                 <span class="pill-tag ${badgeCls}">${d.tipo}</span>
                 ${d.opcional ? `<span class="pill-tag">OPCIONAL</span>` : ""}
-                ${isCancelled ? `<span class="pill-tag" style="background:#FEE2E2; color:#B91C1C;">CANCELADO</span>` : ""}
               </div>
               ${statusBadgeHtml}
             </div>
@@ -3650,6 +3698,27 @@ function renderWeeklyPlan(plan) {
       if (hPlay && todayIdx >= 0 && todayDay.tipo !== "Descanso") {
         hPlay.onclick = () => startPlannedWorkout(todayIdx);
       }
+      const heroCard = document.getElementById("stride-hero-card");
+      if (heroCard) {
+        const waveSvg = heroCard.querySelector(".stride-hero-wave-svg");
+        if (waveSvg && Array.isArray(todayDay.phases) && todayDay.phases.length > 0) {
+          const totalSec = todayDay.phases.reduce((s, p) => s + Math.max(30, Number(p.duration_seconds || 60)), 0) || 1;
+          let curX = 0;
+          const pts = ["M0 30"];
+          todayDay.phases.forEach((p) => {
+            const w = (Math.max(30, Number(p.duration_seconds || 60)) / totalSec) * 340;
+            const isWork = p.type === "WORK" || /interval|tempo|serie|fartlek|velocidad|ritmo/i.test(p.name || "");
+            const isWarmCool = p.type === "WARMUP" || p.type === "COOLDOWN";
+            const y = isWork ? 8 : isWarmCool ? 28 : 22;
+            const xEnd = Math.min(340, curX + w);
+            pts.push(`L${(curX + 3).toFixed(1)} ${y} L${Math.max(curX + 3, xEnd - 3).toFixed(1)} ${y}`);
+            curX = xEnd;
+          });
+          pts.push("L340 30");
+          waveSvg.innerHTML = `<path d="${pts.join(" ")}" fill="none" stroke="#EE5A2B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity="0.88"/>`;
+        }
+        if (window.AaronCharts) window.AaronCharts.animate(heroCard);
+      }
     }
 
     // 3. Render Stride "Up next" (Próximos entrenos)
@@ -3866,6 +3935,10 @@ function renderSummitExplorations(summit) {
     if (elRingSub) elRingSub.textContent = `${pRunKm.toFixed(1)} / ${gRun} km carrera`;
     if (elRingSt) elRingSt.textContent = plan.plan_type ? plan.plan_type.toUpperCase() : "ACTIVO";
   }
+  if (window.AaronCharts) {
+    const expRow = document.getElementById("summit-explorations-row");
+    if (expRow) window.AaronCharts.animate(expRow);
+  }
 }
 
 function renderOfficialRecords(records) {
@@ -4029,6 +4102,7 @@ function renderTrainingLogBubbles(sportFilter) {
   }
   html += `</div>`;
   grid.innerHTML = html;
+  if (window.AaronCharts) window.AaronCharts.animate(grid, { hash: sportFilter });
 }
 
 function renderFitnessFreshnessChart(curve) {
@@ -4044,7 +4118,10 @@ function renderFitnessFreshnessChart(curve) {
     return;
   }
 
-  const W = 480, H = 175, padL = 42, padR = 14, padT = 16, padB = 26;
+  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
+  const W = isDesktop ? 960 : 480;
+  const H = isDesktop ? 210 : 175;
+  const padL = 46, padR = 16, padT = 18, padB = 26;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
   const allVals = curve.flatMap(p => [p.ctl, p.atl, p.tsb]);
@@ -4064,7 +4141,7 @@ function renderFitnessFreshnessChart(curve) {
   const fmtD = (iso) => (iso || "").slice(5).split("-").reverse().join("/");
 
   wrap.innerHTML = `
-    <svg id="fitness-svg-el" viewBox="0 0 ${W} ${H}" style="width:100%; height:100%; cursor:crosshair; display:block;">
+    <svg id="fitness-svg-el" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%; height:100%; cursor:crosshair; display:block;">
       <line x1="${padL}" y1="${padT}" x2="${W - padR}" y2="${padT}" stroke="#E5E5EA" stroke-dasharray="3 3"/>
       <line x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${W - padR}" y2="${zeroY.toFixed(1)}" stroke="#CBD5E1" stroke-dasharray="4 3"/>
       <line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" stroke="#E5E5EA"/>
@@ -4081,6 +4158,7 @@ function renderFitnessFreshnessChart(curve) {
       <circle id="fitness-dot-ctl" cx="0" cy="0" r="3.5" fill="#0077CC" stroke="#FFFFFF" stroke-width="1.5" style="display:none;"/>
     </svg>
   `;
+  if (window.AaronCharts) window.AaronCharts.animate(wrap, { pointCount: curve.length });
 
   const svgEl = document.getElementById("fitness-svg-el");
   const crosshair = document.getElementById("fitness-crosshair");
@@ -4557,6 +4635,7 @@ async function saveActivityGear(gearIdVal) {
 
 function toggleChartLayer(layerKey) {
   _detailStreamState[layerKey] = !_detailStreamState[layerKey];
+  window._detailChartToggleTriggered = true;
   if (_currentDetailActivity) renderStravaDetailChart(_currentDetailActivity.chart_series || {});
 }
 
@@ -4747,6 +4826,13 @@ function renderStravaDetailChart(series) {
       <circle id="detail-chart-dot" cx="0" cy="0" r="4.5" fill="#FF5500" stroke="#FFFFFF" stroke-width="2" style="display:none;"/>
     </svg>
   `;
+  if (window.AaronCharts) {
+    window.AaronCharts.animate(chartSvg, {
+      isToggleUpdate: !!window._detailChartToggleTriggered,
+      pointCount: dists.length
+    });
+  }
+  window._detailChartToggleTriggered = false;
 
   const svgEl = document.getElementById("detail-streams-svg-el");
   const crosshair = document.getElementById("detail-chart-crosshair");
@@ -4968,6 +5054,7 @@ async function openActivityDetail(externalId, updateUrl = true) {
           </button>
         `;
       }).join("");
+      if (window.AaronCharts) window.AaronCharts.animate(splitsList);
     } else {
       splitsList.innerHTML = `<p class="body-xs">Sin parciales disponibles para esta actividad.</p>`;
     }
@@ -5178,35 +5265,68 @@ function renderMatchedRuns(matchedRuns) {
     return;
   }
 
-  const W = 560, H = 120, padX = 28, padY = 18;
+  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
+  const W = isDesktop ? 720 : 520;
+  const H = 150;
+  const padL = 48, padR = 22, padT = 22, padB = 26;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
   const paces = valid.map(r => r.pace_sec);
   const minP = Math.min(...paces), maxP = Math.max(...paces), rng = (maxP - minP) || 10;
 
   const coords = valid.map((r, i) => {
-    const x = padX + (i / (valid.length - 1)) * (W - padX * 2);
+    const x = padL + (i / (valid.length - 1)) * plotW;
     // Faster pace (lower sec) higher up on chart
-    const y = padY + ((r.pace_sec - minP) / rng) * (H - padY * 2);
+    const y = padT + ((r.pace_sec - minP) / rng) * plotH;
     return { x, y, r };
   });
 
   const linePath = coords.map((pt, i) => `${i === 0 ? "M" : "L"}${pt.x.toFixed(1)},${pt.y.toFixed(1)}`).join(" ");
+  const areaPath = `${linePath} L${coords[coords.length - 1].x.toFixed(1)},${(padT + plotH).toFixed(1)} L${coords[0].x.toFixed(1)},${(padT + plotH).toFixed(1)} Z`;
+  const midP = Math.round((minP + maxP) / 2);
+  const fmtPace = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+  const fmtDateShort = (d) => (d || "").slice(5).split("-").reverse().join("/");
+
+  const gridLines = [
+    { y: padT, label: fmtPace(minP) },
+    { y: padT + plotH / 2, label: fmtPace(midP) },
+    { y: padT + plotH, label: fmtPace(maxP) }
+  ].map(t => `
+    <line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W - padR}" y2="${t.y.toFixed(1)}" stroke="#ECECEA" stroke-dasharray="3 4" stroke-width="1"/>
+    <text x="${padL - 8}" y="${(t.y + 3).toFixed(1)}" text-anchor="end" font-size="10" fill="#78716C" font-family="JetBrains Mono, monospace">${t.label}</text>
+  `).join("");
+
   const dotsHtml = coords.map(pt => {
-    const col = pt.r.is_current ? "#FC5200" : "#0066B3";
-    const rad = pt.r.is_current ? 6 : 4.5;
+    const isCur = !!pt.r.is_current;
+    const col = isCur ? "#EE5A2B" : "#111111";
+    const rad = isCur ? 6 : 4.5;
     return `
-      <g style="cursor:pointer;" onclick="openActivityDetail('${pt.r.external_id}')">
+      <g class="matched-dot-group" style="cursor:pointer;" onclick="openActivityDetail('${pt.r.external_id}')">
         <title>${pt.r.start_date} · ${pt.r.avg_pace_str}</title>
-        <circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="${rad}" fill="${col}" stroke="#FFFFFF" stroke-width="1.5"/>
+        ${isCur ? `<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="11" fill="rgba(238,90,43,0.16)"/>` : ""}
+        <circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="${rad}" fill="${col}" stroke="#FFFFFF" stroke-width="2"/>
+        ${isCur ? `<text x="${pt.x.toFixed(1)}" y="${Math.max(12, pt.y - 10).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="#C2421A" font-family="JetBrains Mono, monospace">${pt.r.avg_pace_str || ""}</text>` : ""}
       </g>
     `;
   }).join("");
 
   svgEl.innerHTML = `
-    <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:100%; background:#FAFAFC; border:1px solid #E5E5EA; border-radius:8px;">
-      <path d="${linePath}" fill="none" stroke="#93C5FD" stroke-width="2"/>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%; height:100%; background:#FFFFFF; border:1px solid #ECECEA; border-radius:18px; display:block;">
+      <defs>
+        <linearGradient id="matchedAreaGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#EE5A2B" stop-opacity="0.18"/>
+          <stop offset="100%" stop-color="#EE5A2B" stop-opacity="0.01"/>
+        </linearGradient>
+      </defs>
+      ${gridLines}
+      <text x="${padL}" y="${H - 6}" text-anchor="start" font-size="9.5" fill="#78716C" font-family="JetBrains Mono, monospace">${fmtDateShort(valid[0].start_date)}</text>
+      <text x="${W - padR}" y="${H - 6}" text-anchor="end" font-size="9.5" fill="#78716C" font-family="JetBrains Mono, monospace">${fmtDateShort(valid[valid.length - 1].start_date)}</text>
+      <path d="${areaPath}" fill="url(#matchedAreaGrad)"/>
+      <path d="${linePath}" fill="none" stroke="#111111" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
       ${dotsHtml}
     </svg>
   `;
+  if (window.AaronCharts) window.AaronCharts.animate(svgEl);
 }
 
 function renderPaceAnalysisSubview(act) {
@@ -5256,6 +5376,7 @@ function renderPaceAnalysisSubview(act) {
       </div>
     `;
   }).join("");
+  if (window.AaronCharts) window.AaronCharts.animate(listEl);
 }
 
 function _normalizeZonePercentages(zones) {
@@ -5301,6 +5422,7 @@ function renderPaceDistributionSubview(paceDist) {
       <span style="text-align:right; color:var(--text-secondary);">${z.pct}%</span>
     </div>
   `).join("");
+  if (window.AaronCharts) window.AaronCharts.animate(listEl);
 }
 
 function renderHrAnalysisSubview(act) {
@@ -5381,6 +5503,10 @@ function renderHrAnalysisSubview(act) {
       <div class="split-bar-track"><div style="height:100%; width:${z.pct}%; background:${z.color}; border-radius:999px;"></div></div>
     </div>
   `).join("");
+  if (window.AaronCharts) {
+    if (hrSvg) window.AaronCharts.animate(hrSvg);
+    window.AaronCharts.animate(zonesList);
+  }
 }
 
 

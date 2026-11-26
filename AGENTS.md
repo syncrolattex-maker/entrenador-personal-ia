@@ -36,3 +36,14 @@ Este archivo define las reglas de comportamiento, la visión del producto y las 
 
 4. **Envío Automático a Garmin Connect**:
    * Las sesiones generadas se envían directamente a **Garmin Connect** (sin descargas manuales `.fit`).
+
+---
+
+## 🎨 4. Design System Stitch (*Kinetic Precision*)
+
+Los tokens visuales oficiales viven aislados en `static/theme-stitch.css` (cargado tras `static/style.css`):
+
+* **Superficies**: fondo `--stitch-bg` (`#F5F5F4`), tarjetas `--stitch-surface` (`#FFFFFF`) con hairline `--stitch-border` (`#ECECEA`) y héroes oscuros `--stitch-hero-gradient` (`radial-gradient(circle at 85% 15%, #662E19 0%, #201715 50%, #151415 100%)`).
+* **Acento y Semántica**: acento principal `--stitch-accent` (`#EE5A2B`), hover `#C2421A`, éxito `#15803D`, aviso `#B45309`, error `#BA1A1A`, info `#0066B3`.
+* **Tipografía**: `Geist` (`--stitch-font-sans`) + `JetBrains Mono` (`--stitch-font-mono`), con `font-variant-numeric: tabular-nums` obligatorio en todas las métricas deportivas.
+* **Radios y Sombras**: tarjetas `26px` (`--stitch-radius-card`), filas `18px`, héroes `28px`–`32px`, píldoras `9999px`; elevación sutil `--stitch-shadow-card` sin bordes artificiales.
