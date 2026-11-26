@@ -2234,6 +2234,7 @@ function renderTrainingTab(plan) {
   });
 
   const race = plan.carrera_objetivo;
+  const raceBanner = document.getElementById("training-race-countdown-banner");
   if (race && race.activo) {
     const rName = document.getElementById("training-race-name");
     const rDate = document.getElementById("training-race-date");
@@ -2241,6 +2242,58 @@ function renderTrainingTab(plan) {
     if (rName) rName.value = race.nombre || "";
     if (rDate) rDate.value = (race.fecha || "").slice(0, 10);
     if (rDist) rDist.value = race.distancia_km || 10;
+    if (raceBanner && race.fecha) {
+      const daysLeft = Math.max(0, Math.ceil((new Date(race.fecha) - new Date()) / 86400000));
+      const weeksLeft = Math.max(1, Math.ceil(daysLeft / 7));
+      raceBanner.style.display = "flex";
+      raceBanner.innerHTML = `
+        <span class="stride-stitch-race-kicker">${(race.nombre || "CARRERA OBJETIVO").toUpperCase()} · ${race.distancia_km || 10} KM</span>
+        <h2 class="stride-stitch-race-title">Carrera objetivo en ${weeksLeft} ${weeksLeft === 1 ? "semana" : "semanas"}</h2>
+        <span class="stride-stitch-race-sub">${(race.fecha || "").slice(0, 10)} · Faltan ${daysLeft} días · Progresión adaptada</span>
+      `;
+    }
+  } else if (raceBanner) {
+    raceBanner.style.display = "none";
+  }
+
+  const volWrap = document.getElementById("training-volume-chart-wrap");
+  if (volWrap) {
+    const peakKm = Math.round(Math.max(gRun * 1.15, pRun, 25));
+    volWrap.style.display = "block";
+    volWrap.innerHTML = `
+      <div class="stride-volume-chart-box">
+        <svg viewBox="0 0 350 128" preserveAspectRatio="none" style="width:100%; height:100%; overflow:visible;">
+          <defs>
+            <pattern id="stride-diag-stripe" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <line x1="0" y1="0" x2="0" y2="8" stroke="#EAE9E4" stroke-width="3"></line>
+            </pattern>
+          </defs>
+          <path d="M 0,128 L 0,88 L 35,84 L 70,78 L 105,82 L 140,72 L 165,62 L 165,128 Z" fill="#171716"></path>
+          <path d="M 165,128 L 165,62 L 190,56 L 220,52 L 250,48 L 285,62 L 320,74 L 350,86 L 350,128 Z" fill="url(#stride-diag-stripe)"></path>
+          <path d="M 165,62 L 190,56 L 220,52 L 250,48 L 285,62 L 320,74 L 350,86" fill="none" stroke="#D6D3CC" stroke-dasharray="3 3" stroke-width="1.5"></path>
+          <circle cx="35" cy="84" r="3" fill="#FFFFFF"></circle>
+          <circle cx="70" cy="78" r="3" fill="#FFFFFF"></circle>
+          <circle cx="105" cy="82" r="3" fill="#FFFFFF"></circle>
+          <circle cx="140" cy="72" r="3" fill="#FFFFFF"></circle>
+          <circle cx="250" cy="48" r="4" fill="#FFFFFF" stroke="#171716" stroke-width="2"></circle>
+          <circle cx="165" cy="62" r="5" fill="#EE5A2B" stroke="#FFFFFF" stroke-width="2"></circle>
+        </svg>
+        <div class="stride-volume-now-pill">Hoy · ${pRun.toFixed(1)} km</div>
+        <span style="position:absolute; right:26%; top:6px; font-size:11px; font-weight:600; color:#5B5955;">Pico ${peakKm} km</span>
+      </div>
+      <div class="stride-phase-segments">
+        <div class="stride-phase-seg is-done" style="grid-column:span 4;"></div>
+        <div class="stride-phase-seg is-current" style="grid-column:span 4;"></div>
+        <div class="stride-phase-seg" style="grid-column:span 2;"></div>
+        <div class="stride-phase-seg" style="grid-column:span 2;"></div>
+      </div>
+      <div class="stride-phase-labels">
+        <span>Base</span>
+        <span style="color:#171716; font-weight:600;">Construcción</span>
+        <span>Específico</span>
+        <span>Taper</span>
+      </div>
+    `;
   }
 
   const calEl = document.getElementById("training-weekly-calendar");

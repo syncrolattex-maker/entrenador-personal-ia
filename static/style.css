@@ -327,14 +327,14 @@ body {
 }
 
 /* ==========================================================================
-   STRIDE LIGHT CARD SYSTEM (CLEAN WHITE, 20PX RADIUS, SUBTLE HAIRLINE)
+   STRIDE LIGHT CARD SYSTEM (STITCH KINETIC PRECISION: #FFFFFF, 26PX, HAIRLINE)
    ========================================================================== */
 .glass-card {
   background: var(--surface);
   border: 1px solid var(--outline);
-  border-radius: var(--rounded-lg);
-  box-shadow: var(--card-shadow);
-  padding: 16px 18px;
+  border-radius: 26px;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04), 0 1px 4px -1px rgba(0, 0, 0, 0.02);
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -3354,25 +3354,107 @@ body {
 }
 
 .stride-exp-dark-card {
-  background: linear-gradient(145deg, #111111 0%, #2B1509 100%);
-  border: 1px solid rgba(238, 90, 43, 0.25);
-  border-radius: 20px;
-  padding: 18px;
+  background: radial-gradient(circle at 85% 15%, #662E19 0%, #201715 50%, #151415 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 28px;
+  padding: 20px;
   color: #FFFFFF;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 10px;
-  box-shadow: 0 10px 26px rgba(17, 17, 17, 0.14);
+  box-shadow: 0 12px 28px rgba(17, 17, 17, 0.14);
 }
 
 .stride-exp-light-card {
-  border-radius: 20px;
-  padding: 16px 18px;
+  border-radius: 26px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 10px;
+}
+
+/* Stitch Weekly Volume & Phase Curve (Full Plan & Volume) */
+.stride-stitch-race-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.stride-stitch-race-kicker {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #63615C;
+}
+
+.stride-stitch-race-title {
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  color: #171716;
+  margin: 0;
+}
+
+.stride-stitch-race-sub {
+  font-size: 14px;
+  color: #5B5955;
+}
+
+.stride-volume-chart-box {
+  position: relative;
+  width: 100%;
+  height: 132px;
+  margin-top: 4px;
+}
+
+.stride-volume-now-pill {
+  position: absolute;
+  top: 22px;
+  left: 47%;
+  transform: translateX(-50%);
+  background: #EE5A2B;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 4px 10px rgba(238, 90, 43, 0.28);
+}
+
+.stride-phase-segments {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.stride-phase-seg {
+  height: 6px;
+  border-radius: 999px;
+  background: #E8E6E0;
+}
+
+.stride-phase-seg.is-done {
+  background: #171716;
+}
+
+.stride-phase-seg.is-current {
+  background: #EE5A2B;
+}
+
+.stride-phase-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #78716C;
+  margin-top: 4px;
 }
 
 .stride-eff-bar {

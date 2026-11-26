@@ -17,7 +17,7 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=110">
+  <link rel="stylesheet" href="/style.css?v=111">
 
   <!-- Icons & Fonts (Geist & JetBrains Mono - Stride UI Kit) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -620,6 +620,8 @@
           <p class="body-sm-muted">Calendario Lunes–Domingo con tus próximos entrenamientos sincronizados con Garmin Connect</p>
         </div>
 
+        <div id="training-race-countdown-banner" class="stride-stitch-race-banner" style="display:none;"></div>
+
         <!-- Bloque 1 (Principal en /plan): Calendario Semanal de Entrenamientos (7 días) -->
         <div class="glass-card" id="training-calendar-card">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
@@ -639,9 +641,11 @@
           <!-- Bloque 2: Objetivos Semanales (Stride 10 · Progress, history & profile) -->
           <div class="glass-card" id="training-goals-card">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
-              <h2 class="headline-sm" style="margin:0;">Objetivos Semanales (L–D)</h2>
+              <h2 class="headline-sm" style="margin:0;">Volumen y Objetivos (L–D)</h2>
               <span id="training-week-range" class="body-xs tabular-num">—</span>
             </div>
+
+            <div id="training-volume-chart-wrap" style="display:none;"></div>
 
             <!-- Stride 10 · Progress / Weekly distance & Profile / Activity totals -->
             <div class="stride-progress-hero">
@@ -1504,6 +1508,6 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/app.js?v=110"></script>
+  <script src="/app.js?v=111"></script>
 </body>
 </html>
