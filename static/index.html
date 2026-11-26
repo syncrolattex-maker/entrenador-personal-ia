@@ -17,8 +17,8 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=125">
-  <link rel="stylesheet" href="/theme-stitch.css?v=125">
+  <link rel="stylesheet" href="/style.css?v=126">
+  <link rel="stylesheet" href="/theme-stitch.css?v=126">
 
   <!-- Icons & Local Geist Font -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -1199,6 +1199,7 @@
         <!-- Columna Izquierda: Sidebar (Desktop vertical / Mobile horizontal scrollable) -->
         <aside class="strava-detail-sidebar" aria-label="Secciones de actividad">
           <button type="button" class="detail-nav-item active" onclick="scrollDetailSection('detail-sec-overview', this)">Descripción general</button>
+          <button type="button" class="detail-nav-item" onclick="scrollDetailSection('detail-sec-deep-analysis', this)">Intervalos / Potencia</button>
           <button type="button" class="detail-nav-item" onclick="scrollDetailSection('detail-sec-analysis', this)">Análisis</button>
           <button type="button" class="detail-nav-item sub" onclick="scrollDetailSection('detail-sec-pace-analysis', this)">Análisis del ritmo</button>
           <button type="button" class="detail-nav-item sub" onclick="scrollDetailSection('detail-sec-pace-dist', this)">Distribución del ritmo</button>
@@ -1279,6 +1280,9 @@
             <p class="body-xs">Rutas coincidentes (±7% distancia y mismo inicio/fin). Pulsa cualquier punto para comparar.</p>
             <div id="detail-matched-svg" style="width:100%; height:130px;"></div>
           </section>
+
+          <!-- Análisis Profundo por Tipo de Sesión (Series / Tempo / Ciclismo Potencia) -->
+          <section id="detail-sec-deep-analysis" class="glass-card" style="display:none;"></section>
 
           <!-- Bloque Central (Grid 260px 1fr): Parciales a la izquierda + Mapa Leaflet & GPX a la derecha -->
           <section id="detail-sec-splits" class="detail-center-block">
@@ -1508,7 +1512,7 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/chart-animations.js?v=125"></script>
-  <script src="/app.js?v=125"></script>
+  <script src="/chart-animations.js?v=126"></script>
+  <script src="/app.js?v=126"></script>
 </body>
 </html>

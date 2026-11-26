@@ -941,28 +941,111 @@ def calculate_gap_sec(pace_sec: float, grade_pct: float) -> int:
     return max(120, int(round(pace_sec / cost)))
 
 
-def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
+def _normalize_garmin_laps(raw_data: Any) -> List[Dict[str, Any]]:
+    lap_dtos: List[Dict[str, Any]] = []
+    if isinstance(raw_data, dict):
+        lap_dtos = raw_data.get("lapDTOs") or raw_data.get("laps") or []
+    elif isinstance(raw_data, list):
+        lap_dtos = raw_data
+    out: List[Dict[str, Any]] = []
+    for i, lap in enumerate(lap_dtos):
+        if not isinstance(lap, dict):
+            continue
+        dur = float(lap.get("duration") or lap.get("movingDuration") or lap.get("elapsedDuration") or 0)
+        dist = float(lap.get("distance") or 0)
+        spd = float(lap["averageSpeed"]) if lap.get("averageSpeed") is not None else (dist / dur if dur > 0 and dist > 0 else None)
+        pace_s = round(1000.0 / spd) if (spd and spd > 0.4) else None
+        cad = lap.get("averageRunCadence") or lap.get("averageBikeCadence") or lap.get("averageCadence")
+        if cad is not None:
+            cad_f = float(cad)
+            if "averageRunCadence" in lap and 0 < cad_f < 115:
+                cad_f *= 2
+            cad_val = round(cad_f)
+        else:
+            cad_val = None
+        pwr = lap.get("averagePower")
+        out.append({
+            "index": int(lap.get("lapIndex") or (i + 1)),
+            "intent": lap.get("intensityType") or lap.get("wktStepType") or None,
+            "duration_sec": round(dur, 1),
+            "distance_m": round(dist, 1),
+            "avg_speed_mps": round(spd, 3) if spd else None,
+            "pace_sec": pace_s,
+            "avg_hr": round(float(lap["averageHR"])) if lap.get("averageHR") else None,
+            "max_hr": round(float(lap["maxHR"])) if lap.get("maxHR") else None,
+            "cadence": cad_val,
+            "avg_power_w": round(float(pwr), 1) if pwr is not None else None,
+            "elevation_gain_m": round(float(lap.get("elevationGain") or 0), 1),
+            "elevation_loss_m": round(float(lap.get("elevationLoss") or 0), 1),
+            "source": "laps_garmin",
+        })
+    return out
+
+
+def get_garmin_activity_laps(activity_id: str) -> List[Dict[str, Any]]:
     """
-    Fetches GPS polyline and time-series metrics from Garmin Personal API for an activity,
-    and derives 1km splits, HR Zones (Z1-Z5), and chart series (Elevation, Pace, HR).
+    Hypothesis-tested Garmin laps fetch: tries Personal API /splits first, then garth OAuth /splits.
+    Returns [] cleanly if unavailable so caller falls back to Strava laps or stream detection.
+    """
+    bearer = _get_personal_api_token()
+    if bearer:
+        try:
+            r = requests.get(
+                f"{PERSONAL_API_BASE}/activity-service/activity/{activity_id}/splits",
+                headers={"Authorization": f"Bearer {bearer}"},
+                timeout=10,
+            )
+            if r.status_code == 200:
+                laps = _normalize_garmin_laps(r.json())
+                if laps:
+                    print(f"[Garmin Laps] Loaded {len(laps)} laps via Personal API /splits for {activity_id}")
+                    return laps
+        except Exception as e:
+            print(f"[Garmin Laps] Personal API /splits not available for {activity_id}: {e}")
+
+    client = _get_garth_client()
+    if client is not None:
+        try:
+            raw = client.connectapi(f"/activity-service/activity/{activity_id}/splits")
+            laps = _normalize_garmin_laps(raw)
+            if laps:
+                print(f"[Garmin Laps] Loaded {len(laps)} laps via garth OAuth /splits for {activity_id}")
+                return laps
+        except Exception as e:
+            print(f"[Garmin Laps] Garth /splits not available for {activity_id}: {e}")
+
+    return []
+
+
+def get_garmin_activity_details(activity_id: str, max_chart_size: int = 1500) -> Dict[str, Any]:
+    """
+    Fetches GPS polyline, time-series metrics (testing maxChartSize=1500 with fallback to 180),
+    and laps from Garmin API. Includes directPower, speed_mps, cadence, and downsamples if >2000 pts.
     """
     bearer = _get_personal_api_token()
     if not bearer:
-        return {"polyline": [], "splits": [], "hr_zones": [], "chart_series": {}}
+        return {"polyline": [], "splits": [], "hr_zones": [], "chart_series": {}, "laps": []}
 
-    try:
-        r = requests.get(
-            f"{PERSONAL_API_BASE}/activity-service/activity/{activity_id}/details",
-            params={"maxChartSize": 180, "maxPolylineSize": 400},
-            headers={"Authorization": f"Bearer {bearer}"},
-            timeout=12,
-        )
-        if r.status_code != 200:
-            return {"polyline": [], "splits": [], "hr_zones": [], "chart_series": {}}
-        data = r.json()
-    except Exception as e:
-        print(f"[Garmin Details] Error fetching {activity_id}: {e}")
-        return {"polyline": [], "splits": [], "hr_zones": [], "chart_series": {}}
+    data = None
+    for chart_sz in (max_chart_size, 180) if max_chart_size != 180 else (180,):
+        try:
+            r = requests.get(
+                f"{PERSONAL_API_BASE}/activity-service/activity/{activity_id}/details",
+                params={"maxChartSize": chart_sz, "maxPolylineSize": 400},
+                headers={"Authorization": f"Bearer {bearer}"},
+                timeout=14,
+            )
+            if r.status_code == 200:
+                candidate = r.json()
+                if candidate and (candidate.get("activityDetailMetrics") or candidate.get("geoPolylineDTO")):
+                    data = candidate
+                    print(f"[Garmin Details] Loaded details for {activity_id} with maxChartSize={chart_sz}")
+                    break
+        except Exception as e:
+            print(f"[Garmin Details] Error fetching {activity_id} (maxChartSize={chart_sz}): {e}")
+
+    if not data:
+        return {"polyline": [], "splits": [], "hr_zones": [], "chart_series": {}, "laps": []}
 
     # 1. Polyline [lat, lon]
     raw_poly = (data.get("geoPolylineDTO") or {}).get("polyline") or []
@@ -989,9 +1072,11 @@ def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
     idx_cad = _first_idx("directDoubleCadence", "directRunCadence", "directBikeCadence", "directCadence")
     is_run_cad_single = ("directDoubleCadence" not in desc) and ("directRunCadence" in desc)
     idx_temp = _first_idx("directAirTemperature", "directTemperature", "directBodyTemperature")
+    idx_pwr = _first_idx("directPower", "avgPower")
 
     rows = data.get("activityDetailMetrics") or []
     chart_dist, chart_elev, chart_hr, chart_pace, chart_time, chart_cad, chart_temp = [], [], [], [], [], [], []
+    chart_power, chart_speed = [], []
     hr_counts = [0, 0, 0, 0, 0]  # Z1..Z5
 
     # Splits accumulator per 1000m
@@ -1015,6 +1100,7 @@ def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
         spd = m[idx_spd] if idx_spd is not None and idx_spd < len(m) else None
         cad = m[idx_cad] if idx_cad is not None and idx_cad < len(m) else None
         temp = m[idx_temp] if idx_temp is not None and idx_temp < len(m) else None
+        pwr = m[idx_pwr] if idx_pwr is not None and idx_pwr < len(m) else None
 
         if d_m is not None:
             last_d_m = float(d_m)
@@ -1039,16 +1125,18 @@ def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
             split_hrs.append(hr)
 
         if d_m is not None:
-            chart_dist.append(round(d_m / 1000.0, 2))
+            chart_dist.append(round(d_m / 1000.0, 3))
             chart_elev.append(round(el, 1) if el is not None else None)
             chart_hr.append(round(hr) if hr is not None else None)
             pace_s = round(1000.0 / spd) if (spd and spd > 0.4) else None
             chart_pace.append(pace_s)
+            chart_speed.append(round(float(spd), 2) if spd is not None else None)
             chart_time.append(round(t_s, 1) if t_s is not None else None)
             if cad is not None and is_run_cad_single and 0 < cad < 115:
                 cad = cad * 2
             chart_cad.append(round(cad) if cad is not None else None)
             chart_temp.append(round(temp, 1) if temp is not None else None)
+            chart_power.append(round(float(pwr), 1) if pwr is not None else None)
 
             if t_s is not None and d_m >= current_km * 1000.0:
                 seg_t = max(1.0, t_s - split_start_t)
@@ -1112,18 +1200,39 @@ def get_garmin_activity_details(activity_id: str) -> Dict[str, Any]:
         for i in range(5)
     ]
 
+    # Downsample chart series if > 2000 points to protect DB size
+    n_pts = len(chart_dist)
+    if n_pts > 2000:
+        idxs = [round(i * (n_pts - 1) / 1999) for i in range(2000)]
+        def _sub(arr):
+            return [arr[k] for k in idxs] if len(arr) == n_pts else arr
+        chart_dist = _sub(chart_dist)
+        chart_elev = _sub(chart_elev)
+        chart_hr = _sub(chart_hr)
+        chart_pace = _sub(chart_pace)
+        chart_speed = _sub(chart_speed)
+        chart_time = _sub(chart_time)
+        chart_cad = _sub(chart_cad)
+        chart_temp = _sub(chart_temp)
+        chart_power = _sub(chart_power)
+
+    laps = get_garmin_activity_laps(activity_id)
+
     return {
         "polyline": polyline,
         "splits": splits,
         "hr_zones": hr_zones,
+        "laps": laps,
         "elevation_gain": round(total_elev_gain),
         "chart_series": {
             "dist_km": chart_dist,
             "elevation_m": chart_elev,
             "hr": chart_hr,
             "pace_sec": chart_pace,
+            "speed_mps": chart_speed,
             "time_sec": chart_time,
             "cadence": chart_cad,
             "temp_c": chart_temp,
+            "power_w": chart_power,
         },
     }

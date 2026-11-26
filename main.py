@@ -3065,6 +3065,7 @@ async def api_activity_detail(external_id: str):
                 det.get("hr_zones", []),
                 det.get("chart_series", {}),
                 det.get("elevation_gain", 0),
+                laps=det.get("laps") or None,
             )
             if saved_detail:
                 detail = saved_detail
@@ -3110,6 +3111,74 @@ async def api_activity_detail(external_id: str):
     # 4. Matched Runs (same route ±7% dist, <200m start/end)
     detail["matched_runs"] = _find_matched_runs(detail)
     return detail
+
+
+@app.get("/api/activity/{external_id}/analysis")
+async def api_activity_deep_analysis(external_id: str, refresh: bool = False):
+    """
+    Paso 4: Deep interval & cycling analysis endpoint.
+    Tries Garmin laps -> Strava laps -> stream segment detection, classifies session,
+    computes type-specific metrics, and adds grounded Gemini AI interpretation.
+    """
+    detail = database.get_activity_detail(external_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Actividad no encontrada")
+
+    if not refresh and detail.get("analysis") and isinstance(detail["analysis"], dict) and detail["analysis"].get("tipo"):
+        return detail["analysis"]
+
+    cs = detail.get("chart_series") or {}
+    laps = detail.get("laps") or []
+
+    # 1. Try Garmin details/laps if missing high-res stream or laps
+    if (not laps or "power_w" not in cs) and garmin_client.is_garmin_connected():
+        det = garmin_client.get_garmin_activity_details(external_id, max_chart_size=1500)
+        if det.get("polyline") or det.get("splits") or det.get("laps"):
+            laps = det.get("laps") or laps
+            cs = det.get("chart_series") or cs
+            saved = database.save_activity_stream(
+                external_id,
+                det.get("polyline"),
+                det.get("splits", []),
+                det.get("hr_zones", []),
+                cs,
+                det.get("elevation_gain", 0),
+                laps=laps if laps else None,
+            )
+            if saved:
+                detail = saved
+
+    # 2. Fallback to Strava laps if Garmin laps were unavailable
+    if not laps and strava_client.is_strava_configured():
+        strava_laps = strava_client.find_matching_strava_laps(
+            detail.get("start_date", ""),
+            detail.get("sport_type", "Carrera"),
+            float(detail.get("distance_km") or 0),
+        )
+        if strava_laps:
+            laps = strava_laps
+
+    # 3. Check athlete FTP strictly from profile setting (None if unconfigured)
+    ftp_raw = database.get_setting("ftp")
+    athlete_ftp: Optional[float] = None
+    if ftp_raw:
+        try:
+            val = float(ftp_raw)
+            if val > 50:
+                athlete_ftp = val
+        except Exception:
+            athlete_ftp = None
+
+    analysis = analytics_engine.analyze_activity_deep(
+        detail,
+        laps=laps,
+        stream=cs,
+        planned_day=None,
+        athlete_ftp=athlete_ftp,
+    )
+    analysis["ai_interpretation"] = ai_coach.generate_session_deep_interpretation(analysis)
+    database.save_activity_analysis(external_id, analysis, laps=laps if laps else None)
+    return analysis
 
 
 class ThresholdPacePayload(BaseModel):

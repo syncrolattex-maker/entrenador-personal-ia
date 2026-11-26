@@ -133,9 +133,28 @@ def init_db() -> None:
             activity_id TEXT PRIMARY KEY,
             splits_json TEXT,
             hr_zones_json TEXT,
-            chart_series_json TEXT
+            chart_series_json TEXT,
+            laps_json TEXT,
+            analysis_json TEXT
         )
     """)
+
+    stream_new_cols = [
+        ("laps_json", "TEXT"),
+        ("analysis_json", "TEXT"),
+    ]
+    try:
+        if is_pg:
+            for col_name, col_type in stream_new_cols:
+                cur.execute(f"ALTER TABLE activity_streams ADD COLUMN IF NOT EXISTS {col_name} {col_type}")
+        else:
+            cur.execute("PRAGMA table_info(activity_streams)")
+            existing_st_cols = [r[1] for r in cur.fetchall()]
+            for col_name, col_type in stream_new_cols:
+                if col_name not in existing_st_cols:
+                    cur.execute(f"ALTER TABLE activity_streams ADD COLUMN {col_name} {col_type}")
+    except Exception as e:
+        print(f"[DB] Activity streams migration note: {e}")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS personal_records (
@@ -764,6 +783,8 @@ def save_activity_stream(
     hr_zones: List[Dict[str, Any]],
     chart_series: Dict[str, Any],
     elevation_gain: float = 0.0,
+    laps: Optional[List[Dict[str, Any]]] = None,
+    analysis: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
     init_db()
     conn = _get_conn()
@@ -776,16 +797,27 @@ def save_activity_stream(
             (json.dumps(polyline), float(elevation_gain or 0), str(external_id)),
         )
 
+    laps_str = json.dumps(laps) if laps is not None else None
+    analysis_str = json.dumps(analysis) if analysis is not None else None
+
     cur.execute(f"SELECT activity_id FROM activity_streams WHERE activity_id = {p}", (str(external_id),))
     if cur.fetchone():
         cur.execute(
-            f"UPDATE activity_streams SET splits_json = {p}, hr_zones_json = {p}, chart_series_json = {p} WHERE activity_id = {p}",
-            (json.dumps(splits), json.dumps(hr_zones), json.dumps(chart_series), str(external_id)),
+            f"""
+            UPDATE activity_streams
+            SET splits_json = {p},
+                hr_zones_json = {p},
+                chart_series_json = {p},
+                laps_json = COALESCE({p}, laps_json),
+                analysis_json = COALESCE({p}, analysis_json)
+            WHERE activity_id = {p}
+            """,
+            (json.dumps(splits), json.dumps(hr_zones), json.dumps(chart_series), laps_str, analysis_str, str(external_id)),
         )
     else:
         cur.execute(
-            f"INSERT INTO activity_streams (activity_id, splits_json, hr_zones_json, chart_series_json) VALUES ({p}, {p}, {p}, {p})",
-            (str(external_id), json.dumps(splits), json.dumps(hr_zones), json.dumps(chart_series)),
+            f"INSERT INTO activity_streams (activity_id, splits_json, hr_zones_json, chart_series_json, laps_json, analysis_json) VALUES ({p}, {p}, {p}, {p}, {p}, {p})",
+            (str(external_id), json.dumps(splits), json.dumps(hr_zones), json.dumps(chart_series), laps_str, analysis_str),
         )
 
     # Recompute physiological metrics with real streams + detect segments
@@ -1064,10 +1096,14 @@ def get_activity_detail(external_id: str) -> Optional[Dict[str, Any]]:
         act["splits"] = json.loads(st["splits_json"]) if st.get("splits_json") else []
         act["hr_zones"] = json.loads(st["hr_zones_json"]) if st.get("hr_zones_json") else []
         act["chart_series"] = json.loads(st["chart_series_json"]) if st.get("chart_series_json") else {}
+        act["laps"] = json.loads(st["laps_json"]) if st.get("laps_json") else []
+        act["analysis"] = json.loads(st["analysis_json"]) if st.get("analysis_json") else None
     else:
         act["splits"] = []
         act["hr_zones"] = []
         act["chart_series"] = {}
+        act["laps"] = []
+        act["analysis"] = None
 
     # Lazy-fill physiological metrics for pre-existing activities
     if act.get("relative_effort") is None:
@@ -1253,6 +1289,38 @@ def update_activity_metadata(
         conn.commit()
     conn.close()
     return get_activity_detail(external_id)
+
+
+def save_activity_analysis(
+    external_id: str,
+    analysis: Dict[str, Any],
+    laps: Optional[List[Dict[str, Any]]] = None,
+) -> None:
+    """Caches deep activity analysis and optional resolved laps in activity_streams."""
+    init_db()
+    conn = _get_conn()
+    cur = conn.cursor()
+    p = _ph(conn)
+    laps_str = json.dumps(laps) if laps is not None else None
+    analysis_str = json.dumps(analysis)
+    cur.execute(f"SELECT activity_id FROM activity_streams WHERE activity_id = {p}", (str(external_id),))
+    if cur.fetchone():
+        cur.execute(
+            f"""
+            UPDATE activity_streams
+            SET analysis_json = {p},
+                laps_json = COALESCE({p}, laps_json)
+            WHERE activity_id = {p}
+            """,
+            (analysis_str, laps_str, str(external_id)),
+        )
+    else:
+        cur.execute(
+            f"INSERT INTO activity_streams (activity_id, splits_json, hr_zones_json, chart_series_json, laps_json, analysis_json) VALUES ({p}, {p}, {p}, {p}, {p}, {p})",
+            (str(external_id), "[]", "[]", "{}", laps_str or "[]", analysis_str),
+        )
+    conn.commit()
+    conn.close()
 
 
 def update_activity_rpe(external_id: str, rpe: int) -> Optional[Dict[str, Any]]:

@@ -210,3 +210,146 @@ def generate_analytics_interpretation(
         print(f"[AI Coach] Gemini fallback triggered: {e}")
         res = _deterministic_fallback_interpretation(sanitized, mode="deterministic_fallback_on_error")
         return res
+
+
+class SessionDeepInterpretationResponse(BaseModel):
+    conclusiones: List[str] = Field(..., description="Exactamente 3 conclusiones respaldadas únicamente por cifras del resumen.")
+    punto_a_mejorar: str = Field(..., description="1 aspecto concreto a mejorar o vigilar según los datos.")
+    recomendacion_siguiente_sesion: str = Field(..., description="1 recomendación específica para la próxima sesión del mismo tipo.")
+    datos_faltantes: List[str] = Field(default_factory=list, description="Avisos de métricas ausentes sin suponer valores.")
+
+
+def _deterministic_session_interpretation(summary: Dict[str, Any], mode: str = "deterministic_fallback") -> Dict[str, Any]:
+    tipo = summary.get("tipo") or "otro"
+    m = summary.get("metricas") or {}
+    avisos = list(summary.get("avisos") or [])
+    fuente = summary.get("fuente") or "stream"
+
+    conclusiones: List[str] = []
+    mejorar = "Mantener el control de intensidad y registrar pulso/vueltas completas en reloj."
+    recomendacion = "Repetir estructura similar en la próxima sesión manteniendo progresión gradual."
+
+    if tipo in ("series", "fartlek"):
+        reps = m.get("repeticiones_trabajo") or 0
+        pace_str = m.get("ritmo_medio_trabajo_str") or "N/D"
+        fc_med = m.get("fc_media_trabajo")
+        cv = m.get("consistencia_cv_pct")
+        fat = m.get("fatiga_primera_vs_ultima_sec")
+        drop = m.get("recuperacion_caida_60s_media_bpm")
+        conclusiones.append(f"Sesión clasificada como {tipo} ({fuente}) con {reps} repeticiones de trabajo a ritmo medio {pace_str}" + (f" y FC media {fc_med} ppm." if fc_med else "."))
+        conclusiones.append(f"Consistencia entre repeticiones: variación CV={cv if cv is not None else 'N/D'}% y diferencia primera vs última serie de {fat if fat is not None else 'N/D'} s/km.")
+        conclusiones.append(f"Recuperación cardíaca en los primeros 60 s de descanso: caída media de {drop if drop is not None else 'N/D'} ppm (calentamiento y enfriamiento excluidos de la media de trabajo).")
+        if fat is not None and fat > 8:
+            mejorar = f"La última repetición fue {fat} s/km más lenta que la primera: conviene empezar la primera serie de forma más conservadora."
+            recomendacion = "En la próxima sesión de series, inicia las 2 primeras repeticiones en el extremo suave del ritmo objetivo para cerrar en progresión."
+        elif cv is not None and cv > 4.0:
+            mejorar = f"Variabilidad de ritmo entre series (CV {cv}%): busca mayor regularidad entre repeticiones."
+            recomendacion = "Mantén el mismo ritmo objetivo en todas las repeticiones antes de aumentar el número de series."
+        else:
+            mejorar = "Control de ritmo sólido entre repeticiones; vigilar la recuperación entre bloques."
+            recomendacion = "En la próxima sesión de intervalos puedes mantener el ritmo o añadir 1 repetición si el TSB es favorable."
+    elif tipo == "bici_potencia":
+        np_w = m.get("potencia_normalizada_np_w")
+        avg_w = m.get("potencia_media_w")
+        if_val = m.get("factor_intensidad_if")
+        tss = m.get("tss")
+        dec = m.get("desacoplamiento_potencia_fc_pct")
+        est_ftp = m.get("ftp_estimado_20m_w")
+        conclusiones.append(f"Salida de ciclismo con potenciómetro ({fuente}): potencia media {avg_w if avg_w is not None else 'N/D'} W y Potencia Normalizada (NP) {np_w if np_w is not None else 'N/D'} W.")
+        conclusiones.append(f"Carga relativa al FTP: IF={if_val if if_val is not None else 'N/D (sin FTP en perfil)'} y TSS={tss if tss is not None else 'N/D (sin FTP en perfil)'}.")
+        conclusiones.append(f"Desacoplamiento potencia/FC entre mitades: {dec if dec is not None else 'N/D'}% y FTP estimado (20 min): {est_ftp if est_ftp is not None else 'N/D'} W.")
+        if if_val is None:
+            mejorar = "Configura tu FTP en el perfil para poder calcular el Factor de Intensidad (IF) y el TSS."
+        elif dec is not None and dec > 5.0:
+            mejorar = f"Desacoplamiento aeróbico de {dec}% (>5%): indica deriva cardíaca en la segunda mitad."
+        recomendacion = "En la próxima salida en bici, mantén cadencia fluida y potencia estable en los tramos de subida."
+    elif tipo == "bici_sin_potencia":
+        spd = m.get("velocidad_media_kmh")
+        vam = m.get("vam_mh")
+        fc = m.get("fc_media")
+        conclusiones.append(f"Salida de ciclismo sin potenciómetro ({fuente}): análisis limitado a telemetría GPS y pulso.")
+        conclusiones.append(f"Velocidad media {spd if spd is not None else 'N/D'} km/h y VAM {vam if vam is not None else 'N/D'} m/h.")
+        conclusiones.append(f"Frecuencia cardíaca media registrada: {fc if fc is not None else 'N/D'} ppm.")
+        mejorar = "Sin potenciómetro no se calculan NP, IF ni TSS; usa las zonas de FC para regular el esfuerzo en subidas."
+        recomendacion = "En la próxima salida en bici, controla que la FC en subidas sostenidas no supere Z4."
+    else:
+        p_str = m.get("ritmo_medio_str") or "N/D"
+        fc = m.get("fc_media")
+        cv = m.get("estabilidad_ritmo_cv_pct")
+        conclusiones.append(f"Sesión clasificada como {tipo} ({fuente}) con ritmo medio {p_str}.")
+        conclusiones.append(f"Frecuencia cardíaca media: {fc if fc is not None else 'N/D'} ppm.")
+        conclusiones.append(f"Estabilidad del ritmo: CV={cv if cv is not None else 'N/D'}% y deriva entre mitades={m.get('deriva_fc_mitades_bpm') if m.get('deriva_fc_mitades_bpm') is not None else 'N/D'} ppm.")
+
+    while len(conclusiones) < 3:
+        conclusiones.append("Datos verificados directamente desde el resumen estructurado de la sesión.")
+
+    return {
+        "conclusiones": conclusiones[:3],
+        "punto_a_mejorar": mejorar,
+        "recomendacion_siguiente_sesion": recomendacion,
+        "datos_faltantes": avisos,
+        "source_mode": mode,
+    }
+
+
+def generate_session_deep_interpretation(analysis_summary: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Paso 5: Interprets ONLY the structured session summary from Paso 3 (never raw streams or GPS).
+    Returns 3 conclusions, 1 point to improve, and 1 recommendation for the next session of the same type.
+    """
+    compact_summary = sanitize_snapshot_for_gemini({
+        "tipo": analysis_summary.get("tipo"),
+        "fuente": analysis_summary.get("fuente"),
+        "metricas": analysis_summary.get("metricas"),
+        "calentamiento": analysis_summary.get("calentamiento"),
+        "enfriamiento": analysis_summary.get("enfriamiento"),
+        "avisos": analysis_summary.get("avisos"),
+        "resumen_laps": [
+            {
+                "index": l.get("index"),
+                "role": l.get("role"),
+                "rep_num": l.get("rep_num"),
+                "duration_sec": l.get("duration_sec"),
+                "distance_m": l.get("distance_m"),
+                "pace_str": l.get("pace_str"),
+                "avg_hr": l.get("avg_hr"),
+                "avg_power_w": l.get("avg_power_w"),
+                "recovery_drop_60s_bpm": l.get("recovery_drop_60s_bpm"),
+            }
+            for l in (analysis_summary.get("series_o_laps") or [])[:25]
+        ],
+    })
+
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not HAS_GENAI or not api_key:
+        return _deterministic_session_interpretation(compact_summary, mode="deterministic_no_key")
+
+    system_instruction = (
+        "Eres el analista fisiológico de AaronFit. Recibes ÚNICAMENTE el resumen estructurado de una sesión (nunca el stream crudo).\n"
+        "REGLAS ESTRICTAS:\n"
+        "1. Devuelve exactamente 3 conclusiones en 'conclusiones', 1 'punto_a_mejorar' y 1 'recomendacion_siguiente_sesion' del mismo tipo.\n"
+        "2. PROHIBIDO citar cifras que no estén presentes en el JSON recibido.\n"
+        "3. Si una métrica es null/None o está en 'avisos' (ej. sin potencia, sin FTP, sin FC), indícalo explícitamente en vez de suponerla."
+    )
+
+    try:
+        client = genai.Client(api_key=api_key, http_options={"timeout": 15000})
+        resp = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=f"Analiza este resumen estructurado de sesión:\n{json.dumps(compact_summary, ensure_ascii=False)}",
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                response_mime_type="application/json",
+                response_schema=SessionDeepInterpretationResponse,
+                temperature=0.15,
+            ),
+        )
+        parsed = json.loads(resp.text)
+        validated = SessionDeepInterpretationResponse(**parsed).model_dump()
+        validated["conclusiones"] = (validated.get("conclusiones") or [])[:3]
+        validated["source_mode"] = "gemini_live"
+        return validated
+    except Exception as e:
+        print(f"[AI Coach Session] Gemini fallback triggered: {e}")
+        return _deterministic_session_interpretation(compact_summary, mode="deterministic_fallback_on_error")
+

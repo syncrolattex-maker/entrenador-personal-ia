@@ -5081,6 +5081,7 @@ async function openActivityDetail(externalId, updateUrl = true) {
     renderMatchedRuns(act.matched_runs || []);
     renderPaceAnalysisSubview(act);
     renderPaceDistributionSubview(act.pace_distribution || null);
+    loadActivityDeepAnalysis(act.external_id || externalId, act.chart_series || {});
 
     // Render Detected Segments in this Activity
     const segListEl = document.getElementById("detail-segments-list");
@@ -5339,6 +5340,292 @@ function renderMatchedRuns(matchedRuns) {
     </svg>
   `;
   if (window.AaronCharts) window.AaronCharts.animate(svgEl);
+}
+
+async function loadActivityDeepAnalysis(externalId, chartSeries) {
+  const sec = document.getElementById("detail-sec-deep-analysis");
+  if (!sec || !externalId) return;
+  sec.style.display = "flex";
+  sec.innerHTML = `<div class="skeleton-shimmer" style="height:160px; border-radius:var(--radius-row);"></div>`;
+  try {
+    const res = await fetch(`/api/activity/${encodeURIComponent(externalId)}/analysis`);
+    if (!res.ok) {
+      sec.style.display = "none";
+      return;
+    }
+    const analysis = await res.json();
+    renderActivityDeepAnalysis(analysis, chartSeries || {});
+  } catch (e) {
+    console.warn("Deep analysis fetch error:", e);
+    sec.style.display = "none";
+  }
+}
+
+function renderActivityDeepAnalysis(analysis, chartSeries) {
+  const sec = document.getElementById("detail-sec-deep-analysis");
+  if (!sec || !analysis) return;
+
+  const tipoLabels = {
+    series: "SERIES / INTERVALOS",
+    fartlek: "FARTLEK",
+    tempo: "TEMPO / UMBRAL",
+    rodaje: "RODAJE AERÓBICO",
+    bici_potencia: "CICLISMO · CON POTENCIA",
+    bici_sin_potencia: "CICLISMO · SIN POTENCIA",
+    fuerza: "FUERZA",
+    otro: "SESIÓN"
+  };
+  const fuenteLabels = {
+    laps_garmin: "Fuente: Vueltas Garmin",
+    laps_strava: "Fuente: Vueltas Strava",
+    stream: "Fuente: Tramos detectados del stream"
+  };
+
+  const tipo = analysis.tipo || "otro";
+  const fuente = analysis.fuente || "stream";
+  const m = analysis.metricas || {};
+  const laps = Array.isArray(analysis.series_o_laps) ? analysis.series_o_laps : [];
+  const avisos = Array.isArray(analysis.avisos) ? analysis.avisos : [];
+  const ai = analysis.ai_interpretation || null;
+
+  const avisosHtml = avisos.length > 0
+    ? `<div style="display:flex; flex-direction:column; gap:6px;">
+         ${avisos.map(av => `<div style="padding:8px 12px; border-radius:var(--radius-control); background:var(--surface-elevated); border:1px solid var(--border-strong); font-size:12px; color:var(--text-dark-secondary);">⚠️ ${_escHtml(av)}</div>`).join("")}
+       </div>`
+    : "";
+
+  let bodyHtml = "";
+
+  if (tipo === "series" || tipo === "fartlek") {
+    const workReps = laps.filter(l => l.role === "work");
+    const avgPaceSec = Number(m.ritmo_medio_trabajo_sec || 0);
+    const planComp = m.cumplimiento_plan;
+
+    // SVG bar chart per repetition (pace height + HR & recovery drop)
+    let chartHtml = "";
+    if (workReps.length >= 2) {
+      const W = 560, H = 160, padL = 44, padR = 16, padT = 20, padB = 28;
+      const plotW = W - padL - padR, plotH = H - padT - padB;
+      const paces = workReps.map(r => Number(r.pace_sec || avgPaceSec || 300));
+      const minP = Math.min(...paces) * 0.92;
+      const maxP = Math.max(...paces) * 1.05;
+      const rng = Math.max(10, maxP - minP);
+      // Faster pace (lower sec) -> taller bar
+      const toH = (p) => Math.max(14, Math.min(plotH, ((maxP - p) / rng) * plotH));
+      const avgY = avgPaceSec > 0 ? (padT + plotH - toH(avgPaceSec)) : null;
+      const slotW = plotW / workReps.length;
+      const barW = Math.min(38, Math.max(14, slotW * 0.56));
+
+      const barsSvg = workReps.map((r, i) => {
+        const p = Number(r.pace_sec || avgPaceSec || 300);
+        const bh = toH(p);
+        const bx = padL + i * slotW + (slotW - barW) / 2;
+        const by = padT + plotH - bh;
+        const dropTxt = r.recovery_drop_60s_bpm !== null && r.recovery_drop_60s_bpm !== undefined
+          ? `-${r.recovery_drop_60s_bpm}`
+          : "";
+        return `
+          <rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="6" fill="var(--accent-orange)">
+            <title>Serie #${r.rep_num || (i + 1)}: ${r.pace_str || "—"}${r.avg_hr ? ` · ${r.avg_hr} ppm` : ""}${dropTxt ? ` · Rec 60s: ${dropTxt} ppm` : ""}</title>
+          </rect>
+          <text x="${(bx + barW / 2).toFixed(1)}" y="${Math.max(12, by - 5).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--text-primary)">${(r.pace_str || "").replace(" /km", "")}</text>
+          <text x="${(bx + barW / 2).toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="10" fill="var(--text-muted)">#${r.rep_num || (i + 1)}${dropTxt ? ` (${dropTxt})` : ""}</text>
+        `;
+      }).join("");
+
+      chartHtml = `
+        <div id="deep-intervals-chart-wrap" style="width:100%; height:165px;">
+          <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%; height:100%; background:var(--surface); border:1px solid var(--border-default); border-radius:var(--radius-row); display:block;">
+            <line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" stroke="var(--curve-grid-stroke)" stroke-width="1.5"/>
+            ${avgY !== null ? `<line x1="${padL}" y1="${avgY.toFixed(1)}" x2="${W - padR}" y2="${avgY.toFixed(1)}" stroke="var(--curve-stroke-dark)" stroke-width="1.5" stroke-dasharray="4 3"/>` : ""}
+            ${avgY !== null ? `<text x="${padL - 5}" y="${(avgY + 3).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--text-secondary)">Media</text>` : ""}
+            ${barsSvg}
+          </svg>
+        </div>
+      `;
+    }
+
+    const warmCoolHtml = (analysis.calentamiento || analysis.enfriamiento)
+      ? `<div style="display:flex; gap:8px; flex-wrap:wrap; font-size:12px; color:var(--text-secondary);">
+           ${analysis.calentamiento ? `<span class="pill-tag">Calentamiento: ${Math.round((analysis.calentamiento.duration_sec || 0) / 60)}' @ ${analysis.calentamiento.pace_str || "—"}</span>` : ""}
+           ${analysis.enfriamiento ? `<span class="pill-tag">Enfriamiento: ${Math.round((analysis.enfriamiento.duration_sec || 0) / 60)}' @ ${analysis.enfriamiento.pace_str || "—"}</span>` : ""}
+         </div>`
+      : "";
+
+    bodyHtml = `
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(125px, 1fr)); gap:8px;">
+        <div class="p-stat-box">
+          <span class="label-caps">REPETICIONES</span>
+          <span class="p-stat-val tabular-num">${m.repeticiones_trabajo ?? "—"}</span>
+        </div>
+        <div class="p-stat-box">
+          <span class="label-caps">RITMO TRABAJO</span>
+          <span class="p-stat-val tabular-num">${m.ritmo_medio_trabajo_str || "—"}</span>
+        </div>
+        <div class="p-stat-box">
+          <span class="label-caps">FC MEDIA / MÁX</span>
+          <span class="p-stat-val tabular-num">${m.fc_media_trabajo ?? "—"} / ${m.fc_max_trabajo ?? "—"}</span>
+        </div>
+        <div class="p-stat-box">
+          <span class="label-caps">CONSISTENCIA (CV)</span>
+          <span class="p-stat-val tabular-num">${m.consistencia_cv_pct !== null && m.consistencia_cv_pct !== undefined ? `${m.consistencia_cv_pct}%` : "—"}</span>
+        </div>
+        <div class="p-stat-box">
+          <span class="label-caps">FATIGA 1ª VS ÚLT.</span>
+          <span class="p-stat-val tabular-num">${m.fatiga_primera_vs_ultima_sec !== null && m.fatiga_primera_vs_ultima_sec !== undefined ? `${m.fatiga_primera_vs_ultima_sec > 0 ? "+" : ""}${m.fatiga_primera_vs_ultima_sec}s` : "—"}</span>
+        </div>
+        <div class="p-stat-box">
+          <span class="label-caps">CAÍDA FC 60S</span>
+          <span class="p-stat-val tabular-num">${m.recuperacion_caida_60s_media_bpm !== null && m.recuperacion_caida_60s_media_bpm !== undefined ? `-${m.recuperacion_caida_60s_media_bpm} ppm` : "—"}</span>
+        </div>
+      </div>
+      ${planComp ? `<div class="body-xs tabular-num" style="padding:8px 12px; border-radius:var(--radius-control); background:var(--surface-muted);"><strong>Cumplimiento del plan:</strong> ${planComp.in_target_reps}/${planComp.total_reps} series en objetivo (${planComp.target_pace_str}) · ${planComp.compliance_pct}%</div>` : ""}
+      ${warmCoolHtml}
+      ${chartHtml}
+    `;
+  } else if (tipo === "bici_potencia") {
+    const be = m.mejores_esfuerzos_w || {};
+    const pwrs = (chartSeries.power_w || []).filter(p => p !== null && p !== undefined);
+    let pwrChartHtml = "";
+    if (pwrs.length >= 4) {
+      const W = 560, H = 140, padL = 44, padR = 16, padT = 16, padB = 22;
+      const plotW = W - padL - padR, plotH = H - padT - padB;
+      const maxP = Math.max(...pwrs, Number(m.potencia_normalizada_np_w || 200), 100);
+      const pts = pwrs.map((v, i) => {
+        const x = padL + (i / (pwrs.length - 1)) * plotW;
+        const y = padT + plotH - (Math.max(0, Number(v)) / maxP) * plotH;
+        return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(" ");
+      const npVal = Number(m.potencia_normalizada_np_w || 0);
+      const npY = npVal > 0 ? (padT + plotH - (npVal / maxP) * plotH) : null;
+      pwrChartHtml = `
+        <div style="width:100%; height:145px;">
+          <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%; height:100%; background:var(--surface); border:1px solid var(--border-default); border-radius:var(--radius-row); display:block;">
+            <path d="${pts}" fill="none" stroke="var(--curve-stroke-dark)" stroke-width="1.8" stroke-linecap="round"/>
+            ${npY !== null ? `<line x1="${padL}" y1="${npY.toFixed(1)}" x2="${W - padR}" y2="${npY.toFixed(1)}" stroke="var(--curve-stroke-accent)" stroke-width="2" stroke-dasharray="4 3"/>` : ""}
+            ${npY !== null ? `<text x="${padL - 5}" y="${(npY + 3).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--accent-orange-hover)">NP ${Math.round(npVal)}W</text>` : ""}
+          </svg>
+        </div>
+      `;
+    }
+
+    const effortsList = [
+      { lbl: "5 seg", val: be["5s"] },
+      { lbl: "1 min", val: be["1m"] },
+      { lbl: "5 min", val: be["5m"] },
+      { lbl: "20 min", val: be["20m"] }
+    ];
+    const maxEff = Math.max(1, ...effortsList.map(e => Number(e.val || 0)));
+    const effortsBarsHtml = effortsList.map(e => {
+      const pct = e.val ? Math.round((Number(e.val) / maxEff) * 100) : 0;
+      return `
+        <div class="pace-dist-row" style="grid-template-columns:64px 1fr 64px;">
+          <strong>${e.lbl}</strong>
+          <div class="split-bar-track"><div class="split-bar-fill" style="width:${pct}%;"></div></div>
+          <span class="tabular-num" style="text-align:right; font-weight:600;">${e.val !== null && e.val !== undefined ? `${e.val} W` : "—"}</span>
+        </div>
+      `;
+    }).join("");
+
+    bodyHtml = `
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(125px, 1fr)); gap:8px;">
+        <div class="p-stat-box">
+          <span class="label-caps">POTENCIA MEDIA</span>
+          <span class="p-stat-val tabular-num">${m.potencia_media_w !== null && m.potencia_media_w !== undefined ? `${m.potencia_media_w} W` : "—"}</span>
+        </div>
+        <div class="p-stat-box">
+          <span class="label-caps">POTENCIA NORM. (NP)</span>
+          <span class="p-stat-val tabular-num">${m.potencia_normalizada_np_w !== null && m.potencia_normalizada_np_w !== undefined ? `${m.potencia_normalizada_np_w} W` : "—"}</span>
+        </div>
+        <div class="p-stat-box">
+          <span class="label-caps">IF / TSS</span>
+          <span class="p-stat-val tabular-num">${m.factor_intensidad_if ?? "—"} / ${m.tss ?? "—"}</span>
+        </div>
+        <div class="p-stat-box">
+          <span class="label-caps">EFICIENCIA (W/FC)</span>
+          <span class="p-stat-val tabular-num">${m.eficiencia_w_fc ?? "—"}</span>
+        </div>
+        <div class="p-stat-box">
+          <span class="label-caps">DESACOPLAMIENTO</span>
+          <span class="p-stat-val tabular-num">${m.desacoplamiento_potencia_fc_pct !== null && m.desacoplamiento_potencia_fc_pct !== undefined ? `${m.desacoplamiento_potencia_fc_pct}%` : "—"}</span>
+        </div>
+        <div class="p-stat-box">
+          <span class="label-caps">FTP EST. (20M)</span>
+          <span class="p-stat-val tabular-num">${m.ftp_estimado_20m_w !== null && m.ftp_estimado_20m_w !== undefined ? `~${m.ftp_estimado_20m_w} W` : "—"}</span>
+        </div>
+      </div>
+      ${pwrChartHtml}
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <span class="label-caps">CURVA DE MEJORES ESFUERZOS (POTENCIA)</span>
+        ${effortsBarsHtml}
+      </div>
+    `;
+  } else if (tipo === "bici_sin_potencia") {
+    const fcp = m.fc_por_pendiente || {};
+    bodyHtml = `
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(125px, 1fr)); gap:8px;">
+        <div class="p-stat-box">
+          <span class="label-caps">VELOCIDAD MEDIA</span>
+          <span class="p-stat-val tabular-num">${m.velocidad_media_kmh ? `${m.velocidad_media_kmh} km/h` : "—"}</span>
+        </div>
+        <div class="p-stat-box">
+          <span class="label-caps">VAM</span>
+          <span class="p-stat-val tabular-num">${m.vam_mh ? `${m.vam_mh} m/h` : "—"}</span>
+        </div>
+        <div class="p-stat-box">
+          <span class="label-caps">FC LLANO (&lt;2%)</span>
+          <span class="p-stat-val tabular-num">${fcp.llano ? `${fcp.llano} ppm` : "—"}</span>
+        </div>
+        <div class="p-stat-box">
+          <span class="label-caps">FC SUBIDA (2–6% / &gt;6%)</span>
+          <span class="p-stat-val tabular-num">${fcp.subida_moderada ?? "—"} / ${fcp.subida_fuerte ?? "—"} ppm</span>
+        </div>
+      </div>
+    `;
+  } else {
+    bodyHtml = `
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(125px, 1fr)); gap:8px;">
+        <div class="p-stat-box">
+          <span class="label-caps">RITMO MEDIO</span>
+          <span class="p-stat-val tabular-num">${m.ritmo_medio_str || "—"}</span>
+        </div>
+        <div class="p-stat-box">
+          <span class="label-caps">ESTABILIDAD (CV)</span>
+          <span class="p-stat-val tabular-num">${m.estabilidad_ritmo_cv_pct !== null && m.estabilidad_ritmo_cv_pct !== undefined ? `${m.estabilidad_ritmo_cv_pct}%` : "—"}</span>
+        </div>
+        <div class="p-stat-box">
+          <span class="label-caps">DERIVA FC MITADES</span>
+          <span class="p-stat-val tabular-num">${m.deriva_fc_mitades_bpm !== null && m.deriva_fc_mitades_bpm !== undefined ? `${m.deriva_fc_mitades_bpm > 0 ? "+" : ""}${m.deriva_fc_mitades_bpm} ppm` : "—"}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  const aiHtml = ai
+    ? `<div style="margin-top:6px; padding:14px 16px; border-radius:var(--radius-row); background:var(--surface-muted); border:1px solid var(--border-default); display:flex; flex-direction:column; gap:8px;">
+         <span class="label-caps" style="color:var(--accent-orange-hover);">LECTURA ESTRUCTURADA DE LA SESIÓN</span>
+         <ul style="margin:0; padding-left:18px; font-size:13px; color:var(--text-primary); display:flex; flex-direction:column; gap:4px;">
+           ${(ai.conclusiones || []).map(c => `<li>${_escHtml(c)}</li>`).join("")}
+         </ul>
+         <div class="body-xs" style="color:var(--text-dark-secondary);"><strong>Punto a mejorar:</strong> ${_escHtml(ai.punto_a_mejorar || "—")}</div>
+         <div class="body-xs" style="color:var(--text-dark-secondary);"><strong>Siguiente sesión:</strong> ${_escHtml(ai.recomendacion_siguiente_sesion || "—")}</div>
+       </div>`
+    : "";
+
+  sec.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+      <h3 class="headline-sm" style="margin:0;">Análisis Específico · ${tipoLabels[tipo] || tipo.toUpperCase()}</h3>
+      <span class="pill-tag">${fuenteLabels[fuente] || fuente}</span>
+    </div>
+    ${avisosHtml}
+    ${bodyHtml}
+    ${aiHtml}
+  `;
+
+  if (window.AaronCharts) {
+    const pwrPts = ((chartSeries && chartSeries.power_w) || []).length;
+    window.AaronCharts.animate(sec, { hash: `${analysis.activity_id}_${tipo}_${fuente}`, pointCount: pwrPts });
+  }
 }
 
 function renderPaceAnalysisSubview(act) {

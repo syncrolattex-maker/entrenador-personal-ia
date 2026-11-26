@@ -140,3 +140,69 @@ def get_strava_activities(per_page: int = 30, page: int = 1) -> List[Dict[str, A
     except Exception as e:
         print(f"[Strava] Fetch activities error: {e}")
         return []
+
+
+def get_strava_activity_laps(strava_id: str) -> List[Dict[str, Any]]:
+    """Fetches laps for a specific Strava activity ID via /api/v3/activities/{id}/laps."""
+    token = _get_strava_access_token()
+    if not token or not strava_id:
+        return []
+    sid = str(strava_id).replace("strava_", "")
+    try:
+        resp = requests.get(
+            f"https://www.strava.com/api/v3/activities/{sid}/laps",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            return []
+        raw_laps = resp.json() or []
+        out: List[Dict[str, Any]] = []
+        for i, lap in enumerate(raw_laps):
+            dur = float(lap.get("moving_time") or lap.get("elapsed_time") or 0)
+            dist = float(lap.get("distance") or 0)
+            spd = float(lap["average_speed"]) if lap.get("average_speed") else (dist / dur if dur > 0 and dist > 0 else None)
+            pace_s = round(1000.0 / spd) if (spd and spd > 0.4) else None
+            cad = lap.get("average_cadence")
+            out.append({
+                "index": int(lap.get("lap_index") or (i + 1)),
+                "intent": None,
+                "duration_sec": round(dur, 1),
+                "distance_m": round(dist, 1),
+                "avg_speed_mps": round(spd, 3) if spd else None,
+                "pace_sec": pace_s,
+                "avg_hr": round(float(lap["average_heartrate"])) if lap.get("average_heartrate") else None,
+                "max_hr": round(float(lap["max_heartrate"])) if lap.get("max_heartrate") else None,
+                "cadence": round(float(cad) * 2) if (cad and float(cad) < 115) else (round(float(cad)) if cad else None),
+                "avg_power_w": round(float(lap["average_watts"]), 1) if lap.get("average_watts") else None,
+                "elevation_gain_m": round(float(lap.get("total_elevation_gain") or 0), 1),
+                "elevation_loss_m": 0.0,
+                "source": "laps_strava",
+            })
+        if out:
+            print(f"[Strava Laps] Loaded {len(out)} laps from Strava activity {sid}")
+        return out
+    except Exception as e:
+        print(f"[Strava Laps] Error fetching laps for {sid}: {e}")
+        return []
+
+
+def find_matching_strava_laps(start_date: str, sport_type: str, distance_km: float) -> List[Dict[str, Any]]:
+    """Finds an equivalent Strava activity on the same date/sport (±10% distance) and returns its laps."""
+    acts = get_strava_activities(per_page=30, page=1)
+    if not acts:
+        return []
+    target_date = (start_date or "")[:10]
+    for a in acts:
+        if (a.get("fecha") or "")[:10] != target_date:
+            continue
+        if a.get("tipo") != sport_type:
+            continue
+        a_dist = float(a.get("distancia_km") or 0)
+        if distance_km > 0 and a_dist > 0:
+            if abs(a_dist - distance_km) / max(0.1, distance_km) > 0.12:
+                continue
+        laps = get_strava_activity_laps(a.get("strava_id") or "")
+        if laps:
+            return laps
+    return []
