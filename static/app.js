@@ -3740,10 +3740,14 @@ function renderWeeklyPlan(plan) {
           if (d.distancia_km > 0) metaParts.push(`${d.distancia_km} km`);
           else if (d.duracion_min > 0) metaParts.push(`${d.duracion_min} min`);
           if (d.zona_objetivo) metaParts.push(d.zona_objetivo);
-          const strokeCol = d.tipo === "Fuerza" ? "#111113" : "#FF5500";
-          const miniIcon = d.tipo === "Fuerza"
+          const isFuerzaNext = d.tipo === "Fuerza";
+          const isBiciNext = d.tipo === "Ciclismo";
+          const strokeCol = isFuerzaNext ? "#111113" : isBiciNext ? "#0066B3" : "#EE5A2B";
+          const miniIcon = isFuerzaNext
             ? `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${strokeCol}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/></svg>`
-            : `<svg width="34" height="34" viewBox="0 0 40 40" fill="none"><path d="M8 14 L18 10 L30 15 L32 25 L22 30 L10 26 Z" stroke="${strokeCol}" stroke-width="2.2" stroke-linejoin="round" fill="none"/></svg>`;
+            : isBiciNext
+            ? `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${strokeCol}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>`
+            : `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${strokeCol}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="15" cy="4" r="2"/><path d="M10.5 9.5 7 11.5l1 3.5"/><path d="m14 9.5 3.5 2.5 2.5-.5"/><path d="m13.5 9.5-2.5 5 3.5 2.5 1.5 4.5"/><path d="m11 14.5-4 2.5-2 3.5"/></svg>`;
           return `
             <button type="button" class="stride-up-next-item" onclick="startPlannedWorkout(${idx})">
               <div class="stride-mini-route">${miniIcon}</div>
@@ -4383,8 +4387,8 @@ async function loadActivitiesFeed(limit = _feedPageSize, offset = 0, append = fa
       const sportSvg = isFuerza
         ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FC5200" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/></svg>`
         : isBici
-        ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0077CC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>`
-        : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 4v6l3.5 3.5"/><circle cx="12" cy="12" r="9"/></svg>`;
+        ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0077CC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>`
+        : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="15" cy="4" r="2"/><path d="M10.5 9.5 7 11.5l1 3.5"/><path d="m14 9.5 3.5 2.5 2.5-.5"/><path d="m13.5 9.5-2.5 5 3.5 2.5 1.5 4.5"/><path d="m11 14.5-4 2.5-2 3.5"/></svg>`;
       const badgeBg = isFuerza ? "rgba(252,82,0,0.10)" : isBici ? "rgba(0,119,204,0.10)" : "rgba(22,163,74,0.10)";
       const badgeColor = isFuerza ? "#FC5200" : isBici ? "#0077CC" : "#16A34A";
       const paceOrSpeed = isBici && a.duration_min > 0
