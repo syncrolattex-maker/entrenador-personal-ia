@@ -3925,7 +3925,7 @@ function renderSummitExplorations(summit) {
   const elRingSt = document.getElementById("summit-exp-ring-status");
   if (plan && plan.weekly_compliance) {
     const pct = Math.min(100, Math.max(0, Number(plan.weekly_compliance.overall_pct || 0)));
-    const circ = 201;
+    const circ = 326.7;
     if (elRingArc) elRingArc.style.strokeDashoffset = (circ - (pct / 100) * circ).toFixed(1);
     if (elRingPct) elRingPct.textContent = `${pct}%`;
     const gRun = Number((plan.goals && plan.goals.goal_run_km) || plan.objetivo_km_carrera || 20);
@@ -4140,22 +4140,34 @@ function renderFitnessFreshnessChart(curve) {
   const midPt = curve[Math.floor((curve.length - 1) / 2)];
   const fmtD = (iso) => (iso || "").slice(5).split("-").reverse().join("/");
 
+  const ctlPath = toPath('ctl');
+  const ctlArea = ctlPath
+    ? `${ctlPath} L${(padL + plotW).toFixed(1)},${(padT + plotH).toFixed(1)} L${padL.toFixed(1)},${(padT + plotH).toFixed(1)} Z`
+    : "";
+
   wrap.innerHTML = `
-    <svg id="fitness-svg-el" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%; height:100%; cursor:crosshair; display:block;">
-      <line x1="${padL}" y1="${padT}" x2="${W - padR}" y2="${padT}" stroke="#E5E5EA" stroke-dasharray="3 3"/>
-      <line x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${W - padR}" y2="${zeroY.toFixed(1)}" stroke="#CBD5E1" stroke-dasharray="4 3"/>
-      <line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" stroke="#E5E5EA"/>
-      <text x="${padL - 5}" y="${padT + 4}" text-anchor="end" font-size="9.5" fill="#5B5B66">${Math.round(maxV)} pts</text>
-      <text x="${padL - 5}" y="${zeroY + 3}" text-anchor="end" font-size="9.5" fill="#5B5B66">0</text>
-      <text x="${padL - 5}" y="${padT + plotH}" text-anchor="end" font-size="9.5" fill="#5B5B66">${Math.round(minV)}</text>
-      <text x="${padL}" y="${H - 6}" text-anchor="start" font-size="9.5" fill="#5B5B66">${fmtD(curve[0].date) || "-90d"}</text>
-      <text x="${padL + plotW / 2}" y="${H - 6}" text-anchor="middle" font-size="9.5" fill="#5B5B66">${fmtD(midPt.date) || "-45d"}</text>
-      <text x="${W - padR}" y="${H - 6}" text-anchor="end" font-size="9.5" fill="#5B5B66">${fmtD(last.date) || "Hoy"}</text>
-      <path d="${toPath('atl')}" fill="none" stroke="#EE5A2B" stroke-width="1.9" opacity="0.9"/>
-      <path d="${toPath('ctl')}" fill="none" stroke="#0077CC" stroke-width="2.4"/>
-      <path d="${toPath('tsb')}" fill="none" stroke="#15803D" stroke-width="1.8" stroke-dasharray="3 2"/>
-      <line id="fitness-crosshair" x1="0" y1="${padT}" x2="0" y2="${padT + plotH}" stroke="#111111" stroke-width="1.2" stroke-dasharray="3 2" style="display:none;"/>
-      <circle id="fitness-dot-ctl" cx="0" cy="0" r="3.5" fill="#0077CC" stroke="#FFFFFF" stroke-width="1.5" style="display:none;"/>
+    <svg id="fitness-svg-el" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%; height:100%; cursor:crosshair; display:block; background:var(--surface);">
+      <defs>
+        <linearGradient id="strideCtlAreaGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--curve-stroke-accent)" stop-opacity="0.28"/>
+          <stop offset="100%" stop-color="var(--curve-stroke-accent)" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <line x1="${padL}" y1="${padT}" x2="${W - padR}" y2="${padT}" stroke="var(--curve-grid-stroke)" stroke-width="1"/>
+      <line x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${W - padR}" y2="${zeroY.toFixed(1)}" stroke="var(--border-strong)" stroke-width="1" stroke-dasharray="4 3"/>
+      <line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" stroke="var(--curve-grid-stroke)" stroke-width="1.5"/>
+      <text x="${padL - 6}" y="${padT + 4}" text-anchor="end" font-size="11" fill="var(--text-muted)">${Math.round(maxV)} pts</text>
+      <text x="${padL - 6}" y="${zeroY + 3}" text-anchor="end" font-size="11" fill="var(--text-muted)">0</text>
+      <text x="${padL - 6}" y="${padT + plotH}" text-anchor="end" font-size="11" fill="var(--text-muted)">${Math.round(minV)}</text>
+      <text x="${padL}" y="${H - 6}" text-anchor="start" font-size="11" fill="var(--text-muted)">${fmtD(curve[0].date) || "-90d"}</text>
+      <text x="${padL + plotW / 2}" y="${H - 6}" text-anchor="middle" font-size="11" fill="var(--text-muted)">${fmtD(midPt.date) || "-45d"}</text>
+      <text x="${W - padR}" y="${H - 6}" text-anchor="end" font-size="11" fill="var(--text-muted)">${fmtD(last.date) || "Hoy"}</text>
+      ${ctlArea ? `<path d="${ctlArea}" fill="url(#strideCtlAreaGrad)"/>` : ""}
+      <path d="${toPath('atl')}" fill="none" stroke="var(--curve-stroke-dark)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+      <path d="${ctlPath}" fill="none" stroke="var(--curve-stroke-accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="${toPath('tsb')}" fill="none" stroke="var(--text-secondary)" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3 2"/>
+      <line id="fitness-crosshair" x1="0" y1="${padT}" x2="0" y2="${padT + plotH}" stroke="var(--surface-dark)" stroke-width="1.2" stroke-dasharray="3 2" style="display:none;"/>
+      <circle id="fitness-dot-ctl" cx="0" cy="0" r="4" fill="var(--accent-orange)" stroke="var(--surface)" stroke-width="2" style="display:none;"/>
     </svg>
   `;
   if (window.AaronCharts) window.AaronCharts.animate(wrap, { pointCount: curve.length });
@@ -5292,37 +5304,37 @@ function renderMatchedRuns(matchedRuns) {
     { y: padT + plotH / 2, label: fmtPace(midP) },
     { y: padT + plotH, label: fmtPace(maxP) }
   ].map(t => `
-    <line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W - padR}" y2="${t.y.toFixed(1)}" stroke="#ECECEA" stroke-dasharray="3 4" stroke-width="1"/>
-    <text x="${padL - 8}" y="${(t.y + 3).toFixed(1)}" text-anchor="end" font-size="10" fill="#78716C" font-family="JetBrains Mono, monospace">${t.label}</text>
+    <line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W - padR}" y2="${t.y.toFixed(1)}" stroke="var(--curve-grid-stroke)" stroke-width="1"/>
+    <text x="${padL - 8}" y="${(t.y + 3).toFixed(1)}" text-anchor="end" font-size="11" fill="var(--text-muted)">${t.label}</text>
   `).join("");
 
   const dotsHtml = coords.map(pt => {
     const isCur = !!pt.r.is_current;
-    const col = isCur ? "#EE5A2B" : "#111111";
+    const col = isCur ? "var(--accent-orange)" : "var(--curve-stroke-dark)";
     const rad = isCur ? 6 : 4.5;
     return `
       <g class="matched-dot-group" style="cursor:pointer;" onclick="openActivityDetail('${pt.r.external_id}')">
         <title>${pt.r.start_date} · ${pt.r.avg_pace_str}</title>
         ${isCur ? `<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="11" fill="rgba(238,90,43,0.16)"/>` : ""}
-        <circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="${rad}" fill="${col}" stroke="#FFFFFF" stroke-width="2"/>
-        ${isCur ? `<text x="${pt.x.toFixed(1)}" y="${Math.max(12, pt.y - 10).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="#C2421A" font-family="JetBrains Mono, monospace">${pt.r.avg_pace_str || ""}</text>` : ""}
+        <circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="${rad}" fill="${col}" stroke="var(--surface)" stroke-width="2"/>
+        ${isCur ? `<text x="${pt.x.toFixed(1)}" y="${Math.max(12, pt.y - 10).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="600" fill="var(--accent-orange-hover)">${pt.r.avg_pace_str || ""}</text>` : ""}
       </g>
     `;
   }).join("");
 
   svgEl.innerHTML = `
-    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%; height:100%; background:#FFFFFF; border:1px solid #ECECEA; border-radius:18px; display:block;">
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%; height:100%; background:var(--surface); border:1px solid var(--border-default); border-radius:18px; display:block;">
       <defs>
         <linearGradient id="matchedAreaGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#EE5A2B" stop-opacity="0.18"/>
-          <stop offset="100%" stop-color="#EE5A2B" stop-opacity="0.01"/>
+          <stop offset="0%" stop-color="var(--curve-stroke-accent)" stop-opacity="0.28"/>
+          <stop offset="100%" stop-color="var(--curve-stroke-accent)" stop-opacity="0"/>
         </linearGradient>
       </defs>
       ${gridLines}
-      <text x="${padL}" y="${H - 6}" text-anchor="start" font-size="9.5" fill="#78716C" font-family="JetBrains Mono, monospace">${fmtDateShort(valid[0].start_date)}</text>
-      <text x="${W - padR}" y="${H - 6}" text-anchor="end" font-size="9.5" fill="#78716C" font-family="JetBrains Mono, monospace">${fmtDateShort(valid[valid.length - 1].start_date)}</text>
+      <text x="${padL}" y="${H - 6}" text-anchor="start" font-size="11" fill="var(--text-muted)">${fmtDateShort(valid[0].start_date)}</text>
+      <text x="${W - padR}" y="${H - 6}" text-anchor="end" font-size="11" fill="var(--text-muted)">${fmtDateShort(valid[valid.length - 1].start_date)}</text>
       <path d="${areaPath}" fill="url(#matchedAreaGrad)"/>
-      <path d="${linePath}" fill="none" stroke="#111111" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="${linePath}" fill="none" stroke="var(--curve-stroke-accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
       ${dotsHtml}
     </svg>
   `;

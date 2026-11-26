@@ -129,14 +129,14 @@
         }
       });
 
-      // Área bajo la línea: fade-in después de la línea (sin animar width/height)
+      // Área bajo la línea: fade-in (300 ms) después de la línea
       if (!isUpdate && !(opts && opts.isToggleUpdate)) {
-        const areas = container.querySelectorAll('svg path[fill^="url("], svg path[fill="#171716"]');
+        const areas = container.querySelectorAll('svg path[fill^="url("], svg path[fill="#171716"], svg path[fill="var(--surface-dark)"]');
         areas.forEach((area) => {
           if (typeof area.animate === "function") {
             area.animate([{ opacity: 0 }, { opacity: 1 }], {
-              duration: CHART_MOTION.update,
-              delay: Math.round(CHART_MOTION.enter * 0.45),
+              duration: 300,
+              delay: CHART_MOTION.enter,
               easing: CHART_MOTION.easeOutCubic,
               fill: "both"
             });
@@ -149,7 +149,7 @@
     const ring = container.querySelector("#summit-exp-ring-arc");
     const pctEl = container.querySelector("#summit-exp-ring-pct");
     if (ring) {
-      const circ = parseFloat(ring.getAttribute("stroke-dasharray")) || 201;
+      const circ = parseFloat(ring.getAttribute("stroke-dasharray")) || 326.7;
       const targetOffset = parseFloat(ring.style.strokeDashoffset);
       const targetPct = pctEl ? parseFloat((pctEl.textContent || "0").replace(/[^\d.]/g, "")) || 0 : 0;
       const prev = stateStore.get(ring) || { offset: circ, pct: 0 };

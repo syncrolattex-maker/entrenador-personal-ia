@@ -1,83 +1,169 @@
 /* ==========================================================================
-   AARONFIT — GOOGLE STITCH DESIGN SYSTEM ("Kinetic Precision" / Stride)
-   Project: projects/9210415846705469464
-   Aislamiento de estilos: cargado inmediatamente después de style.css
+   AARONFIT — STRIDE DESIGN SYSTEM (ÚNICO :root + GEIST AUTOALOJADA)
    ========================================================================== */
 
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/geist-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/geist-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/geist-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  /* 1. Paleta de Superficies y Fondos (Warm Paper Light + Dark Ember Hero) */
-  --stitch-bg: #F5F5F4;
-  --stitch-bg-alt: #FBF9F8;
-  --stitch-surface: #FFFFFF;
-  --stitch-surface-low: #F5F3F3;
-  --stitch-surface-container: #EFEDED;
-  --stitch-surface-high: #E9E8E7;
-  --stitch-surface-dim: #DBDAD9;
-  --stitch-surface-dark: #141416;
-  --stitch-hero-gradient: radial-gradient(circle at 85% 15%, #662E19 0%, #201715 50%, #151415 100%);
+  /* Superficies */
+  --surface: #FFFFFF;
+  --surface-muted: #F5F5F4;
+  --surface-subtle: #F2F2F0;
+  --surface-elevated: #F0F0EE;
+  --surface-dark: #111111;
 
-  /* 2. Bordes / Hairlines */
-  --stitch-border: #ECECEA;
-  --stitch-border-strong: #DCDCD8;
-  --stitch-outline-variant: #E2BFB5;
+  /* Bordes */
+  --border-default: #ECECEA;
+  --border-subtle: #E2E2DF;
+  --border-strong: #D6D6D3;
+  --dot-inactive: #C9C9C6;
 
-  /* 3. Textos */
-  --stitch-text-primary: #111111;
-  --stitch-text-ink: #1B1C1C;
-  --stitch-text-secondary: #6B6B6B;
-  --stitch-text-muted: #78716C;
-  --stitch-text-on-dark-muted: #A3A3A3;
+  /* Texto */
+  --text-primary: #111111;
+  --text-ink-alt: #1A1A1A;
+  --text-dark-secondary: #333333;
+  --text-secondary: #6B6B6B;
+  --text-muted: #8C8C8C;
+  --text-caption: #9A9A9A;
+  --text-on-dark-muted: #A3A3A3;
+  --text-faint: #A8A8A5;
 
-  /* 4. Acento Principal y Estados Semánticos */
-  --stitch-accent: #EE5A2B;
-  --stitch-accent-hover: #C2421A;
-  --stitch-accent-deep: #AB2F00;
-  --stitch-accent-soft: rgba(238, 90, 43, 0.10);
-  --stitch-accent-glow: rgba(238, 90, 43, 0.28);
+  /* Acento */
+  --accent-orange: #EE5A2B;
+  --accent-orange-hover: #C2421A;
+  --accent-orange-soft: #F8D6C9;
 
+  /* Tipografía */
+  --font-family: 'Geist', system-ui, sans-serif;
+
+  /* Radios */
+  --radius-control: 14px;
+  --radius-row: 18px;
+  --radius-sm-card: 22px;
+  --radius-md-card: 24px;
+  --radius-card: 26px;
+  --radius-surface: 28px;
+  --radius-frame: 40px;
+  --radius-pill: 999px;
+
+  /* Sombras */
+  --shadow-hero: 0 12px 28px rgba(17, 17, 17, .14);
+  --shadow-floating: 0 16px 32px rgba(17, 17, 17, .16);
+  --shadow-focus-ring: 0 0 0 5px #F3C7B6, 0 0 0 4px #F5F5F4;
+
+  /* Curvas */
+  --stroke-hairline: 1px;
+  --stroke-axis: 1.5px;
+  --stroke-icon: 1.75px;
+  --stroke-curve-main: 2.5px;
+  --curve-stroke-accent: #EE5A2B;
+  --curve-stroke-dark: #111111;
+  --curve-grid-stroke: #F2F2F0;
+  --curve-area-fill: linear-gradient(180deg, rgba(238, 90, 43, .28) 0%, rgba(238, 90, 43, 0) 100%);
+  --badge-accent-gradient: linear-gradient(135deg, #FFA463 0%, #EE5A2B 50%, #C93218 100%);
+  --hero-bg-dark:
+    radial-gradient(circle at 100% 50%, rgba(238, 90, 43, .45) 0%, rgba(238, 90, 43, .15) 36%, rgba(238, 90, 43, 0) 66%),
+    radial-gradient(circle at 0% 50%, rgba(122, 34, 12, .42) 0%, rgba(122, 34, 12, 0) 70%),
+    linear-gradient(160deg, #1D1815 0%, #121212 52%, #0A0A0A 100%);
+
+  /* Alias unificados (evita doble sistema de tokens) */
+  --background: var(--surface-muted);
+  --surface-dim: var(--surface-muted);
+  --surface-container-low: var(--surface);
+  --surface-container: var(--surface);
+  --surface-container-high: var(--surface-elevated);
+  --surface-container-highest: var(--border-default);
+  --on-surface: var(--text-primary);
+  --on-surface-variant: var(--text-secondary);
+  --primary: var(--accent-orange);
+  --primary-btn: var(--accent-orange-hover);
+  --primary-text: var(--accent-orange-hover);
+  --outline: var(--border-default);
+  --border-glass: var(--border-default);
+  --font-hanken: var(--font-family);
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --stitch-bg: var(--surface-muted);
+  --stitch-bg-alt: var(--surface-muted);
+  --stitch-surface: var(--surface);
+  --stitch-surface-low: var(--surface-subtle);
+  --stitch-surface-container: var(--surface-elevated);
+  --stitch-surface-high: var(--surface-elevated);
+  --stitch-surface-dim: var(--border-strong);
+  --stitch-surface-dark: var(--surface-dark);
+  --stitch-hero-gradient: var(--hero-bg-dark);
+  --stitch-border: var(--border-default);
+  --stitch-border-strong: var(--border-strong);
+  --stitch-text-primary: var(--text-primary);
+  --stitch-text-ink: var(--text-ink-alt);
+  --stitch-text-secondary: var(--text-secondary);
+  --stitch-text-muted: var(--text-secondary);
+  --stitch-text-on-dark-muted: var(--text-on-dark-muted);
+  --stitch-accent: var(--accent-orange);
+  --stitch-accent-hover: var(--accent-orange-hover);
+  --stitch-accent-soft: var(--accent-orange-soft);
   --stitch-success: #15803D;
   --stitch-success-soft: rgba(21, 128, 61, 0.12);
   --stitch-warning: #B45309;
-  --stitch-warning-soft: rgba(180, 83, 9, 0.12);
   --stitch-danger: #BA1A1A;
-  --stitch-danger-soft: #FFDAD6;
   --stitch-info: #0066B3;
   --stitch-info-soft: rgba(0, 102, 179, 0.10);
+  --stitch-font-sans: var(--font-family);
+  --stitch-font-mono: var(--font-mono);
+  --stitch-radius-sm: var(--radius-control);
+  --stitch-radius-md: var(--radius-row);
+  --stitch-radius-row: var(--radius-row);
+  --stitch-radius-card: var(--radius-card);
+  --stitch-radius-hero: var(--radius-surface);
+  --stitch-radius-xl: var(--radius-surface);
+  --stitch-radius-pill: var(--radius-pill);
+  --stitch-shadow-card: 0 2px 12px rgba(17, 17, 17, 0.04);
+  --stitch-shadow-hero: var(--shadow-hero);
+  --stitch-shadow-pill: 0 2px 8px rgba(17, 17, 17, 0.08);
+}
 
-  /* 5. Tipografía */
-  --stitch-font-sans: 'Geist', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --stitch-font-mono: 'JetBrains Mono', monospace;
+body {
+  font-family: var(--font-family);
+  background-color: var(--surface-muted);
+  color: var(--text-primary);
+}
 
-  /* Escala de tamaños */
-  --stitch-text-xs: 0.75rem;     /* 12px */
-  --stitch-text-sm: 0.8125rem;   /* 13px */
-  --stitch-text-base: 0.9375rem; /* 15px */
-  --stitch-text-lg: 1.125rem;    /* 18px */
-  --stitch-text-xl: 1.5rem;      /* 24px */
-  --stitch-text-2xl: 2rem;       /* 32px */
-  --stitch-text-hero: 2.5rem;    /* 40px */
+h1, h2, h3, h4, .headline-md, .headline-sm, .greeting-title, .stride-greeting-title {
+  font-family: var(--font-family);
+  font-weight: 600;
+}
 
-  /* 6. Border Radius */
-  --stitch-radius-sm: 12px;
-  --stitch-radius-md: 16px;
-  --stitch-radius-row: 18px;
-  --stitch-radius-card: 26px;
-  --stitch-radius-hero: 28px;
-  --stitch-radius-xl: 32px;
-  --stitch-radius-pill: 9999px;
+:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus-ring);
+}
 
-  /* 7. Sombras y Elevación */
-  --stitch-shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.04), 0 1px 4px -1px rgba(0, 0, 0, 0.02);
-  --stitch-shadow-card-hover: 0 8px 24px -4px rgba(17, 17, 17, 0.08);
-  --stitch-shadow-hero: 0 12px 28px rgba(17, 17, 17, 0.14);
-  --stitch-shadow-pill: 0 2px 8px -2px rgba(0, 0, 0, 0.08), 0 1px 3px -1px rgba(0, 0, 0, 0.04);
-
-  /* 8. Espaciados */
-  --stitch-space-xs: 8px;
-  --stitch-space-sm: 12px;
-  --stitch-space-md: 16px;
-  --stitch-space-lg: 20px;
-  --stitch-space-xl: 24px;
+.glass-card,
+.training-day-card,
+.p-stat-box {
+  transition: transform 150ms ease, opacity 150ms ease, box-shadow 150ms ease;
 }
 
 /* Alineación tabular estricta en todas las métricas deportivas */
@@ -915,13 +1001,52 @@
    ========================================================================== */
 
 .detail-chart-tooltip {
+  background: var(--surface-dark) !important;
+  color: var(--surface) !important;
+  border: none !important;
+  border-radius: var(--radius-control) !important;
+  box-shadow: var(--shadow-floating) !important;
   transition: transform 135ms cubic-bezier(0.22, 1, 0.36, 1), opacity 135ms ease;
   will-change: transform;
   max-width: calc(100vw - 32px);
 }
 
+/* Paso 2 Stride Charts: Barras, Anillo Semanal y Diagrama Muscular */
+.split-bar-track {
+  background: var(--surface-elevated);
+  border-radius: 8px;
+}
+
+.split-bar-fill,
+.split-bar-track > div,
+.progress-fill {
+  border-radius: 8px;
+}
+
+.split-bar-fill {
+  background: var(--accent-orange);
+}
+
+#summit-exp-ring-pct {
+  font-family: var(--font-family);
+  font-size: 44px !important;
+  font-weight: 600 !important;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+}
+
 .muscle-poly {
+  fill: var(--surface-elevated);
   transition: fill 400ms cubic-bezier(0.65, 0, 0.35, 1), opacity 400ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.muscle-poly.secondary-target {
+  fill: var(--accent-orange-soft);
+}
+
+.muscle-poly.active-target {
+  fill: var(--accent-orange);
 }
 
 #summit-fitness-svg-wrap svg,

@@ -1,4 +1,4 @@
-const CACHE_NAME = "aaronfit-cache-v124";
+const CACHE_NAME = "aaronfit-cache-v125";
 const ASSETS = [
   "/",
   "/index.html",
@@ -6,7 +6,10 @@ const ASSETS = [
   "/theme-stitch.css",
   "/chart-animations.js",
   "/app.js",
-  "/manifest.json"
+  "/manifest.json",
+  "/fonts/geist-400.woff2",
+  "/fonts/geist-500.woff2",
+  "/fonts/geist-600.woff2"
 ];
 
 // Install Event

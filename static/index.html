@@ -17,14 +17,13 @@
   <!-- Stylesheet & Leaflet Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="/style.css?v=124">
-  <link rel="stylesheet" href="/theme-stitch.css?v=124">
+  <link rel="stylesheet" href="/style.css?v=125">
+  <link rel="stylesheet" href="/theme-stitch.css?v=125">
 
-  <!-- Icons & Fonts (Geist & JetBrains Mono - Stride UI Kit) -->
+  <!-- Icons & Local Geist Font -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="preload" href="/fonts/geist-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/geist-600.woff2" as="font" type="font/woff2" crossorigin>
 </head>
 <body>
   <!-- Top Bar (Mobile Compact Header / Desktop Fixed Strava Web Navbar) -->
@@ -388,12 +387,12 @@
               <span id="summit-exp-ring-status" class="body-xs tabular-num">—</span>
             </div>
             <div style="display:flex; align-items:center; gap:14px; margin-top:4px;">
-              <div style="position:relative; width:72px; height:72px; flex-shrink:0; display:flex; align-items:center; justify-content:center;">
-                <svg viewBox="0 0 80 80" style="width:72px; height:72px; transform:rotate(-90deg);">
-                  <circle cx="40" cy="40" r="32" fill="none" stroke="#ECECEA" stroke-width="7"/>
-                  <circle id="summit-exp-ring-arc" cx="40" cy="40" r="32" fill="none" stroke="#EE5A2B" stroke-width="7" stroke-linecap="round" stroke-dasharray="201" stroke-dashoffset="201"/>
+              <div style="position:relative; width:124px; height:124px; flex-shrink:0; display:flex; align-items:center; justify-content:center;">
+                <svg viewBox="0 0 124 124" style="width:124px; height:124px; transform:rotate(-90deg);">
+                  <circle cx="62" cy="62" r="52" fill="none" stroke="var(--surface-elevated)" stroke-width="8"/>
+                  <circle id="summit-exp-ring-arc" cx="62" cy="62" r="52" fill="none" stroke="var(--accent-orange)" stroke-width="8" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
                 </svg>
-                <span id="summit-exp-ring-pct" class="tabular-num" style="position:absolute; font-size:0.95rem; font-weight:800; color:var(--on-surface);">0%</span>
+                <span id="summit-exp-ring-pct" class="tabular-num" style="position:absolute; font-size:44px; font-weight:600; color:var(--text-primary);">0%</span>
               </div>
               <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
                 <strong id="summit-exp-ring-rem" class="tabular-num" style="font-size:1.05rem; color:var(--on-surface);">—</strong>
@@ -1509,7 +1508,7 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/chart-animations.js?v=124"></script>
-  <script src="/app.js?v=124"></script>
+  <script src="/chart-animations.js?v=125"></script>
+  <script src="/app.js?v=125"></script>
 </body>
 </html>
