@@ -4304,9 +4304,15 @@ let _feedActivitiesCache = [];
 const _feedPageSize = 20;
 let _feedOffset = 0;
 let _feedHasMore = false;
+let _dashboardVisibleCount = 5;
 
 function loadMoreActivities() {
-  loadActivitiesFeed(_feedPageSize, _feedOffset, true);
+  _dashboardVisibleCount += 10;
+  if (_dashboardVisibleCount <= _feedActivitiesCache.length && !_feedHasMore) {
+    loadActivitiesFeed(_feedPageSize, 0, false);
+  } else {
+    loadActivitiesFeed(_feedPageSize, _feedOffset, true);
+  }
 }
 
 async function loadActivitiesFeed(limit = _feedPageSize, offset = 0, append = false) {
@@ -4388,7 +4394,7 @@ async function loadActivitiesFeed(limit = _feedPageSize, offset = 0, append = fa
       const elevVal = `+${Math.round(a.elevation_gain || 0)} m`;
       const hasPoly = Array.isArray(a.polyline) && a.polyline.length > 2;
 
-      if (idx < 5) {
+      if (idx < _dashboardVisibleCount) {
         feedHtml += `
         <article class="glass-card strava-feed-card" onclick="openActivityDetail('${a.external_id}')">
           <div class="strava-feed-header">
@@ -4420,7 +4426,7 @@ async function loadActivitiesFeed(limit = _feedPageSize, offset = 0, append = fa
       `;
       }
 
-      if (idx < 5) {
+      if (idx < _dashboardVisibleCount) {
         listHtml += `
           <div class="history-card-item" onclick="openActivityDetail('${a.external_id}')" style="cursor:pointer; border-left: 3px solid ${badgeColor};">
             <div class="history-card-header">
@@ -4440,7 +4446,8 @@ async function loadActivitiesFeed(limit = _feedPageSize, offset = 0, append = fa
       }
     });
 
-    const loadMoreBtn = _feedHasMore
+    const canShowMore = (acts.length > _dashboardVisibleCount) || _feedHasMore;
+    const loadMoreBtn = canShowMore
       ? `<button type="button" class="btn btn-ghost" style="width:100%; border-radius:9999px; margin-top:4px;" onclick="loadMoreActivities()">Cargar más actividades</button>`
       : "";
 
