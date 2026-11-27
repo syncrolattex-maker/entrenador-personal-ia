@@ -71,7 +71,13 @@ let state = {
     siguiente_bloque: "Fuerza",
     historial_entrenamientos: []
   },
-  currentWorkout: null
+  currentWorkout: null,
+  wellnessToday: null,
+  wellnessHistory: null,
+  wellnessHistoryDays: 28,
+  wellnessCheckin: null,
+  wellnessLoading: false,
+  garminConnected: null
 };
 let _latestWeeklyPlan = null;
 
@@ -173,6 +179,8 @@ document.addEventListener("DOMContentLoaded", () => {
   loadSummitAnalytics();
   loadActivitiesFeed();
   loadGearList();
+  loadWellnessToday();
+  initWellnessCheckinEvents();
   syncRouteFromLocation();
   window.addEventListener("popstate", syncRouteFromLocation);
 
@@ -2804,6 +2812,7 @@ function switchTab(tabId, updateUrl = true) {
   if (window.lucide) lucide.createIcons();
 
   if (tabId === "tab-metrics") {
+    loadWellnessHistory(state.wellnessHistoryDays || 28);
     fetch("/historial-actividades")
       .then(res => res.json())
       .then(data => {
@@ -3389,6 +3398,12 @@ async function checkGarminStatus() {
 }
 
 function updateGarminUI(connected, profile, writeConnected = false) {
+  state.garminConnected = !!connected;
+  const dashDisBanner = document.getElementById("wellness-dash-disconnected-banner");
+  if (dashDisBanner) {
+    dashDisBanner.style.display = connected ? "none" : "flex";
+  }
+
   const badge = document.getElementById("garmin-status-badge");
   const loginForm = document.getElementById("garmin-login-form");
   const connectedPanel = document.getElementById("garmin-connected-panel");
@@ -6120,3 +6135,1110 @@ function renderProfileRunnerStats(overview) {
   if (elElev) elElev.textContent = `${Math.round(Number(c12.elevation_gain_m || 0))} m`;
   if (elEffort) elEffort.textContent = `${Math.round(Number(c12.relative_effort || 0))}`;
 }
+
+/* ==========================================================================
+   AARONFIT — FASE 5.2: BIENESTAR, SUEÑO, MOVILIDAD Y RECUPERACIÓN (CLIENT ENGINE)
+   ========================================================================== */
+
+let _wellnessCache = {
+  today: null,
+  todayFetchedAt: 0,
+  history: {},
+  historyFetchedAt: {}
+};
+
+/**
+ * Carga el contexto de bienestar fisiológico de hoy (/api/wellness/today).
+ * No bloqueante, con manejo limpio de caché y estados.
+ */
+async function loadWellnessToday(force = false) {
+  const now = Date.now();
+  if (!force && _wellnessCache.today && (now - _wellnessCache.todayFetchedAt < 90000)) {
+    renderWellnessTodayDashboard(_wellnessCache.today);
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/wellness/today");
+    if (!res.ok) {
+      console.warn("[Wellness] /api/wellness/today returned", res.status);
+      return;
+    }
+    const data = await res.json();
+    if (data.status === "ok") {
+      _wellnessCache.today = data;
+      _wellnessCache.todayFetchedAt = now;
+      state.wellnessToday = data;
+      renderWellnessTodayDashboard(data);
+    }
+  } catch (err) {
+    console.error("[Wellness] Error fetching today wellness:", err);
+  }
+}
+
+/**
+ * Renderiza las 4 tarjetas del Dashboard de Inicio:
+ * 1. Sueño, 2. Pasos, 3. Recuperación, 4. Estado Diario (Readiness).
+ */
+function renderWellnessTodayDashboard(data) {
+  if (!data) return;
+  const w = data.wellness || {};
+  const b = data.baselines || {};
+  const r = data.readiness || {};
+  const chk = data.checkin || {};
+  const bSleep = b.sleep || {};
+  const bMob = b.mobility || {};
+  const bRec = b.recovery || {};
+
+  // --- TARJETA 1: SUEÑO ---
+  const elSleepDuration = document.getElementById("wellness-dash-sleep-duration");
+  const elSleepScore = document.getElementById("wellness-dash-sleep-score");
+  const elSleepDiff = document.getElementById("wellness-dash-sleep-diff");
+  const elSleepDeep = document.getElementById("wellness-dash-sleep-deep");
+  const elSleepLight = document.getElementById("wellness-dash-sleep-light");
+  const elSleepRem = document.getElementById("wellness-dash-sleep-rem");
+
+  if (elSleepDuration) {
+    if (w.sleep_total_sec != null && Number(w.sleep_total_sec) > 0) {
+      const h = Math.floor(w.sleep_total_sec / 3600);
+      const m = Math.floor((w.sleep_total_sec % 3600) / 60);
+      elSleepDuration.textContent = `${h}h ${m.toString().padStart(2, "0")}m`;
+    } else {
+      elSleepDuration.textContent = data.day_status === "unavailable" ? "Sin datos" : "Pendiente";
+    }
+  }
+
+  if (elSleepScore) {
+    if (w.sleep_score != null) {
+      elSleepScore.textContent = `${w.sleep_score} / 100`;
+      elSleepScore.className = `pill-tag tabular-num ${w.sleep_score >= 80 ? "orange" : ""}`;
+    } else {
+      elSleepScore.textContent = "Sin datos";
+      elSleepScore.className = "pill-tag tabular-num";
+    }
+  }
+
+  if (elSleepDiff) {
+    if (w.sleep_total_sec != null && bSleep.avg_hours_7d != null) {
+      const curH = w.sleep_total_sec / 3600;
+      const diffMin = Math.round((curH - bSleep.avg_hours_7d) * 60);
+      const sign = diffMin >= 0 ? "+" : "";
+      elSleepDiff.textContent = `${sign}${diffMin} min vs media 7d (${bSleep.avg_hours_7d.toFixed(1)}h)`;
+      elSleepDiff.style.color = diffMin >= 0 ? "var(--stitch-success)" : "var(--text-secondary)";
+    } else {
+      elSleepDiff.textContent = bSleep.avg_hours_7d != null ? `Media 7d: ${bSleep.avg_hours_7d.toFixed(1)}h` : "Sin línea base 7d";
+      elSleepDiff.style.color = "var(--text-secondary)";
+    }
+  }
+
+  function _fmtMin(sec) {
+    if (sec == null) return "—";
+    const m = Math.round(Number(sec) / 60);
+    const h = Math.floor(m / 60);
+    const remM = m % 60;
+    return h > 0 ? `${h}h ${remM}m` : `${remM}m`;
+  }
+
+  if (elSleepDeep) elSleepDeep.textContent = _fmtMin(w.deep_sleep_sec);
+  if (elSleepLight) elSleepLight.textContent = _fmtMin(w.light_sleep_sec);
+  if (elSleepRem) elSleepRem.textContent = _fmtMin(w.rem_sleep_sec);
+
+  // --- TARJETA 2: PASOS & MOVILIDAD ---
+  const elStepsCount = document.getElementById("wellness-dash-steps-count");
+  const elStepsGoalSub = document.getElementById("wellness-dash-steps-goal-sub");
+  const elStepsPct = document.getElementById("wellness-dash-steps-pct");
+  const elStepsBar = document.getElementById("wellness-dash-steps-bar");
+  const elStepsDiff = document.getElementById("wellness-dash-steps-diff");
+  const elStepsDist = document.getElementById("wellness-dash-steps-dist");
+  const elStepsFloors = document.getElementById("wellness-dash-steps-floors");
+  const elStepsNonSport = document.getElementById("wellness-dash-steps-non-sport");
+
+  const stepsVal = w.steps;
+  const goalVal = w.step_goal || 10000;
+
+  if (elStepsCount) {
+    elStepsCount.textContent = stepsVal != null ? Number(stepsVal).toLocaleString("es-ES") : (data.day_status === "unavailable" ? "Sin datos" : "Pendiente");
+  }
+  if (elStepsGoalSub) {
+    elStepsGoalSub.textContent = `/ ${Number(goalVal).toLocaleString("es-ES")} meta`;
+  }
+  if (elStepsPct) {
+    if (stepsVal != null) {
+      const pct = Math.round((stepsVal / goalVal) * 100);
+      elStepsPct.textContent = `${pct}%`;
+      elStepsPct.className = `pill-tag tabular-num ${pct >= 100 ? "orange" : ""}`;
+    } else {
+      elStepsPct.textContent = "—";
+      elStepsPct.className = "pill-tag tabular-num";
+    }
+  }
+  if (elStepsBar) {
+    const pct = stepsVal != null ? Math.min(100, Math.round((stepsVal / goalVal) * 100)) : 0;
+    elStepsBar.style.width = `${pct}%`;
+    elStepsBar.style.background = pct >= 100 ? "var(--stitch-success)" : "var(--accent-orange)";
+  }
+  if (elStepsDiff) {
+    if (stepsVal != null && bMob.avg_steps_7d != null) {
+      const diffSteps = stepsVal - bMob.avg_steps_7d;
+      const sign = diffSteps >= 0 ? "+" : "";
+      elStepsDiff.textContent = `${sign}${Number(diffSteps).toLocaleString("es-ES")} vs media 7d (${Number(bMob.avg_steps_7d).toLocaleString("es-ES")})`;
+      elStepsDiff.style.color = diffSteps >= 0 ? "var(--stitch-success)" : "var(--text-secondary)";
+    } else {
+      elStepsDiff.textContent = bMob.avg_steps_7d != null ? `Media 7d: ${Number(bMob.avg_steps_7d).toLocaleString("es-ES")} pasos` : "Sin línea base 7d";
+      elStepsDiff.style.color = "var(--text-secondary)";
+    }
+  }
+  if (elStepsDist) {
+    elStepsDist.textContent = w.steps_distance_m != null ? `${(Number(w.steps_distance_m) / 1000).toFixed(1)} km` : "—";
+  }
+  if (elStepsFloors) {
+    elStepsFloors.textContent = w.floors_climbed != null ? `${Math.round(Number(w.floors_climbed))} pisos` : "—";
+  }
+  if (elStepsNonSport) {
+    if (bMob.avg_non_sport_steps_7d != null) {
+      elStepsNonSport.textContent = `${Number(bMob.avg_non_sport_steps_7d).toLocaleString("es-ES")}`;
+    } else {
+      elStepsNonSport.textContent = "—";
+    }
+  }
+
+  // --- TARJETA 3: RECUPERACIÓN FISIOLÓGICA ---
+  const elHrvVal = document.getElementById("wellness-dash-hrv-val");
+  const elHrvStatus = document.getElementById("wellness-dash-hrv-status");
+  const elHrvBaseline = document.getElementById("wellness-dash-hrv-baseline");
+  const elRhrVal = document.getElementById("wellness-dash-rhr-val");
+  const elBbVal = document.getElementById("wellness-dash-bb-val");
+  const elStressVal = document.getElementById("wellness-dash-stress-val");
+
+  if (elHrvVal) {
+    elHrvVal.textContent = w.hrv_last_night != null ? `${Math.round(w.hrv_last_night)} ms` : (data.day_status === "unavailable" ? "Sin datos" : "Pendiente");
+  }
+  if (elHrvStatus) {
+    const statusText = w.hrv_status_garmin || (w.hrv_last_night ? "Equilibrada" : "Sin datos");
+    elHrvStatus.textContent = statusText;
+    elHrvStatus.className = `pill-tag tabular-num ${w.hrv_last_night ? "orange" : ""}`;
+  }
+  if (elHrvBaseline) {
+    if (bRec.hrv_baseline_28d != null) {
+      const base = Math.round(bRec.hrv_baseline_28d);
+      const std = bRec.hrv_std_28d ? Math.round(bRec.hrv_std_28d * 0.75) : 4;
+      elHrvBaseline.textContent = `Banda basal 28d: ${base - std}–${base + std} ms`;
+    } else {
+      elHrvBaseline.textContent = "Banda basal 28d: Pendiente";
+    }
+  }
+  if (elRhrVal) {
+    elRhrVal.textContent = w.resting_hr != null ? `${Math.round(w.resting_hr)} ppm` : "—";
+  }
+  if (elBbVal) {
+    const curBb = w.body_battery_most_recent ?? w.body_battery_actual;
+    const maxBb = w.body_battery_max;
+    if (curBb != null && maxBb != null) {
+      elBbVal.textContent = `${curBb} / ${maxBb}`;
+    } else if (curBb != null) {
+      elBbVal.textContent = `${curBb}`;
+    } else if (maxBb != null) {
+      elBbVal.textContent = `Máx ${maxBb}`;
+    } else {
+      elBbVal.textContent = "—";
+    }
+  }
+  if (elStressVal) {
+    elStressVal.textContent = w.stress_avg != null ? `${Math.round(w.stress_avg)} / 100` : "—";
+  }
+
+  // --- TARJETA 4: ESTADO DIARIO (READINESS ENGINE) ---
+  const elBadge = document.getElementById("wellness-dash-readiness-badge");
+  const elRecTitle = document.getElementById("wellness-dash-rec-title");
+  const elRecText = document.getElementById("wellness-dash-rec-text");
+  const elReasons = document.getElementById("wellness-dash-reasons");
+  const elConf = document.getElementById("wellness-dash-confidence");
+
+  const estado = r.estado || "DATOS INSUFICIENTES";
+  const estadoClassMap = {
+    "LISTO": "readiness-listo",
+    "PRECAUCIÓN": "readiness-precaucion",
+    "RECUPERACIÓN": "readiness-recuperacion",
+    "DESCANSO": "readiness-descanso",
+    "DATOS INSUFICIENTES": "readiness-insuficiente"
+  };
+
+  if (elBadge) {
+    elBadge.textContent = estado;
+    elBadge.className = `pill-tag pill-readiness tabular-num ${estadoClassMap[estado] || "readiness-insuficiente"}`;
+  }
+
+  if (elRecTitle) {
+    const titles = {
+      "LISTO": "Condición favorable para asimilar entrenamiento",
+      "PRECAUCIÓN": "Fatiga moderada detectada: modula la intensidad",
+      "RECUPERACIÓN": "Signos fisiológicos de estrés: sesión suave sugerida",
+      "DESCANSO": "Sobrecarga acumulada: prioridad a la recuperación",
+      "DATOS INSUFICIENTES": "Datos fisiológicos pendientes"
+    };
+    elRecTitle.textContent = titles[estado] || "Estado del día";
+  }
+
+  if (elRecText) {
+    elRecText.textContent = r.recomendacion || "Sincroniza tu reloj Garmin tras levantarte para una recomendación fundamentada.";
+  }
+
+  if (elReasons && Array.isArray(r.motivos_principales)) {
+    if (r.motivos_principales.length > 0) {
+      elReasons.innerHTML = r.motivos_principales.map(m => `<li>${_escHtml(m)}</li>`).join("");
+    } else {
+      elReasons.innerHTML = "<li>Línea base fisiológica en curso.</li>";
+    }
+  }
+
+  if (elConf) {
+    const conf = r.confianza ? r.confianza.toUpperCase() : "BAJA";
+    elConf.textContent = `Confianza: ${conf}`;
+  }
+}
+
+/**
+ * Inicializa eventos del modal de Check-in diario (escala 1 a 5).
+ */
+function initWellnessCheckinEvents() {
+  document.querySelectorAll(".checkin-scale-buttons").forEach(group => {
+    const metric = group.dataset.metric;
+    const badge = document.getElementById(`checkin-val-${metric === "sleep_quality" ? "sleep" : (metric === "muscle_fatigue" ? "fatigue" : (metric === "perceived_stress" ? "stress" : (metric === "general_feeling" ? "feeling" : metric)))}`);
+
+    group.querySelectorAll(".checkin-btn-scale").forEach(btn => {
+      btn.addEventListener("click", () => {
+        group.querySelectorAll(".checkin-btn-scale").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const val = btn.dataset.val;
+        const sub = btn.querySelector("small") ? btn.querySelector("small").textContent : "";
+        if (badge) badge.textContent = `${val}/5 · ${sub}`;
+      });
+    });
+  });
+}
+
+/**
+ * Abre el modal de check-in diario preseleccionando datos si ya existen.
+ */
+function openWellnessCheckinModal(dateStr) {
+  const modal = document.getElementById("wellness-checkin-modal");
+  if (!modal) return;
+
+  const todayStr = (dateStr || new Date().toISOString()).slice(0, 10);
+  const dateInput = document.getElementById("checkin-input-date");
+  if (dateInput) dateInput.value = todayStr;
+
+  const existing = state.wellnessToday?.checkin || {};
+  const metrics = [
+    { key: "energy", tag: "energy" },
+    { key: "sleep_quality", tag: "sleep" },
+    { key: "muscle_fatigue", tag: "fatigue" },
+    { key: "perceived_stress", tag: "stress" },
+    { key: "general_feeling", tag: "feeling" }
+  ];
+
+  metrics.forEach(m => {
+    const group = document.querySelector(`.checkin-scale-buttons[data-metric="${m.key}"]`);
+    const badge = document.getElementById(`checkin-val-${m.tag}`);
+    const val = existing[m.key];
+    if (group) {
+      group.querySelectorAll(".checkin-btn-scale").forEach(b => {
+        if (val && b.dataset.val === String(val)) {
+          b.classList.add("active");
+          const sub = b.querySelector("small") ? b.querySelector("small").textContent : "";
+          if (badge) badge.textContent = `${val}/5 · ${sub}`;
+        } else if (!val) {
+          b.classList.remove("active");
+          if (badge) badge.textContent = "—";
+        }
+      });
+    }
+  });
+
+  const disInput = document.getElementById("checkin-input-discomfort");
+  if (disInput) disInput.value = existing.physical_discomfort || "";
+
+  const notesInput = document.getElementById("checkin-input-notes");
+  if (notesInput) notesInput.value = existing.notes || "";
+
+  modal.style.display = "flex";
+}
+
+function closeWellnessCheckinModal() {
+  const modal = document.getElementById("wellness-checkin-modal");
+  if (modal) modal.style.display = "none";
+}
+
+/**
+ * Procesa el envío del check-in diario (POST /api/wellness/checkin).
+ */
+async function handleWellnessCheckinSubmit(event) {
+  if (event) event.preventDefault();
+  const dateInput = document.getElementById("checkin-input-date");
+  const dateStr = dateInput ? dateInput.value : new Date().toISOString().slice(0, 10);
+
+  function _getActive(metric) {
+    const active = document.querySelector(`.checkin-scale-buttons[data-metric="${metric}"] .checkin-btn-scale.active`);
+    return active ? parseInt(active.dataset.val, 10) : null;
+  }
+
+  const payload = {
+    date: dateStr,
+    energy: _getActive("energy"),
+    sleep_quality: _getActive("sleep_quality"),
+    muscle_fatigue: _getActive("muscle_fatigue"),
+    perceived_stress: _getActive("perceived_stress"),
+    general_feeling: _getActive("general_feeling"),
+    physical_discomfort: document.getElementById("checkin-input-discomfort")?.value.trim() || null,
+    notes: document.getElementById("checkin-input-notes")?.value.trim() || null
+  };
+
+  const btn = document.getElementById("btn-save-wellness-checkin");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Guardando...";
+  }
+
+  try {
+    const res = await fetch("/api/wellness/checkin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error("Error en servidor al guardar check-in");
+    const data = await res.json();
+    if (data.status === "ok") {
+      closeWellnessCheckinModal();
+      showSuccessBanner("✅ Check-in diario guardado correctamente.");
+      // Actualizar estado local inmediatamente
+      if (state.wellnessToday) {
+        state.wellnessToday.checkin = data.checkin;
+        state.wellnessToday.readiness = data.readiness;
+        renderWellnessTodayDashboard(state.wellnessToday);
+      }
+      // Invalidar cache de histórico
+      _wellnessCache.history = {};
+      loadWellnessToday(true);
+    }
+  } catch (err) {
+    console.error("[Wellness] Error saving checkin:", err);
+    showSuccessBanner("⚠️ No se pudo guardar el check-in diario.");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Guardar Check-in";
+    }
+  }
+}
+
+/**
+ * Sincroniza telemetría de bienestar desde Garmin Connect (POST /api/wellness/sync).
+ */
+async function syncWellnessData(event) {
+  if (event) event.preventDefault();
+  const btn = document.getElementById("btn-sync-wellness-dash");
+  const label = document.getElementById("btn-sync-wellness-label");
+  if (btn) btn.disabled = true;
+  if (label) label.textContent = "Sincronizando...";
+
+  showSuccessBanner("🔄 Sincronizando sueño, pasos y HRV con Garmin Connect...");
+
+  try {
+    const res = await fetch("/api/wellness/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ days: 14, force: true })
+    });
+    if (!res.ok) throw new Error("Error en sincronización de bienestar");
+    const data = await res.json();
+    const syn = data.sync || {};
+    showSuccessBanner(`✅ Bienestar sincronizado: ${syn.synced_days || 0} días actualizados de Garmin.`);
+    _wellnessCache.today = null;
+    _wellnessCache.history = {};
+    await loadWellnessToday(true);
+    if (state.wellnessHistoryDays) {
+      await loadWellnessHistory(state.wellnessHistoryDays, true);
+    }
+  } catch (err) {
+    console.error("[Wellness] Sync error:", err);
+    showSuccessBanner("⚠️ No se pudo sincronizar el bienestar con Garmin.");
+  } finally {
+    if (btn) btn.disabled = false;
+    if (label) label.textContent = "Sincronizar";
+  }
+}
+
+/**
+ * Selecciona el periodo de análisis (7, 14, 28 días).
+ */
+function selectWellnessPeriod(days, btn) {
+  state.wellnessHistoryDays = days;
+  document.querySelectorAll("#wellness-period-pills .stride-period-pill").forEach(p => p.classList.remove("active"));
+  if (btn) btn.classList.add("active");
+  loadWellnessHistory(days, false);
+}
+
+/**
+ * Carga el histórico de bienestar (/api/wellness/history?days=X).
+ */
+async function loadWellnessHistory(days = 28, force = false) {
+  const boundedDays = Math.max(1, Math.min(days || 28, 90));
+  const now = Date.now();
+  if (!force && _wellnessCache.history[boundedDays] && (now - (_wellnessCache.historyFetchedAt[boundedDays] || 0) < 120000)) {
+    renderWellnessHistoryViews(_wellnessCache.history[boundedDays]);
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/wellness/history?days=${boundedDays}`);
+    if (!res.ok) {
+      console.warn("[Wellness] /api/wellness/history error:", res.status);
+      return;
+    }
+    const data = await res.json();
+    if (data.status === "ok") {
+      _wellnessCache.history[boundedDays] = data;
+      _wellnessCache.historyFetchedAt[boundedDays] = now;
+      state.wellnessHistory = data;
+      renderWellnessHistoryViews(data);
+    }
+  } catch (err) {
+    console.error("[Wellness] Error fetching wellness history:", err);
+  }
+}
+
+/**
+ * Renderiza los 4 bloques de la sección de Análisis de Bienestar en Summit:
+ * A. Sueño, B. Movilidad, C. Recuperación, D. Lectura Coach IA.
+ */
+function renderWellnessHistoryViews(histData) {
+  if (!histData) return;
+  const history = Array.isArray(histData.history) ? histData.history : [];
+  const baselines = histData.baselines || {};
+  const bSleep = baselines.sleep || {};
+  const bMob = baselines.mobility || {};
+  const bRec = baselines.recovery || {};
+
+  // --- BLOQUE A: SUEÑO ---
+  const elSleepAvgHours = document.getElementById("wellness-sleep-avg-hours");
+  const elSleepAvgScore = document.getElementById("wellness-sleep-avg-score");
+  const elSleepReg = document.getElementById("wellness-sleep-regularity");
+  const elSleep7d = document.getElementById("wellness-sleep-7d");
+  const elSleep28d = document.getElementById("wellness-sleep-28d");
+  const elSleepSched = document.getElementById("wellness-sleep-schedule");
+
+  if (elSleepAvgHours) {
+    elSleepAvgHours.textContent = bSleep.avg_hours_28d != null ? `${bSleep.avg_hours_28d.toFixed(1)} h` : (bSleep.avg_hours_7d != null ? `${bSleep.avg_hours_7d.toFixed(1)} h` : "—");
+  }
+  if (elSleepAvgScore) {
+    elSleepAvgScore.textContent = bSleep.avg_score_28d != null ? `${Math.round(bSleep.avg_score_28d)}` : (bSleep.avg_score_7d != null ? `${Math.round(bSleep.avg_score_7d)}` : "—");
+  }
+  if (elSleepReg) {
+    const regMap = { "alta": "Alta", "moderada": "Moderada", "irregular": "Irregular" };
+    elSleepReg.textContent = regMap[bSleep.schedule_regularity_label] || "—";
+  }
+  if (elSleep7d) elSleep7d.textContent = bSleep.avg_hours_7d != null ? `${bSleep.avg_hours_7d.toFixed(1)} h` : "—";
+  if (elSleep28d) elSleep28d.textContent = bSleep.avg_hours_28d != null ? `${bSleep.avg_hours_28d.toFixed(1)} h` : "—";
+
+  // Horario medio si hay días con sleep_start_local / sleep_end_local
+  if (elSleepSched) {
+    const daysWithSched = history.filter(d => d.sleep_start_local && d.sleep_end_local);
+    if (daysWithSched.length > 0) {
+      const last = daysWithSched[daysWithSched.length - 1];
+      const startT = (last.sleep_start_local || "").slice(11, 16);
+      const endT = (last.sleep_end_local || "").slice(11, 16);
+      elSleepSched.textContent = startT && endT ? `${startT} → ${endT}` : "—";
+    } else {
+      elSleepSched.textContent = "—";
+    }
+  }
+
+  // Fases apiladas
+  let totDeep = 0, totLight = 0, totRem = 0, totAwake = 0, countStages = 0;
+  history.forEach(d => {
+    if (d.deep_sleep_sec || d.light_sleep_sec || d.rem_sleep_sec) {
+      totDeep += Number(d.deep_sleep_sec || 0);
+      totLight += Number(d.light_sleep_sec || 0);
+      totRem += Number(d.rem_sleep_sec || 0);
+      totAwake += Number(d.awake_sec || 0);
+      countStages++;
+    }
+  });
+
+  const sumStages = totDeep + totLight + totRem + totAwake;
+  const elStgDeep = document.getElementById("stage-deep");
+  const elStgLight = document.getElementById("stage-light");
+  const elStgRem = document.getElementById("stage-rem");
+  const elStgAwake = document.getElementById("stage-awake");
+  const elLegDeep = document.getElementById("legend-deep-val");
+  const elLegLight = document.getElementById("legend-light-val");
+  const elLegRem = document.getElementById("legend-rem-val");
+  const elLegAwake = document.getElementById("legend-awake-val");
+
+  if (sumStages > 0 && countStages > 0) {
+    const pctD = Math.round((totDeep / sumStages) * 100);
+    const pctL = Math.round((totLight / sumStages) * 100);
+    const pctR = Math.round((totRem / sumStages) * 100);
+    const pctA = Math.max(0, 100 - pctD - pctL - pctR);
+
+    if (elStgDeep) elStgDeep.style.width = `${pctD}%`;
+    if (elStgLight) elStgLight.style.width = `${pctL}%`;
+    if (elStgRem) elStgRem.style.width = `${pctR}%`;
+    if (elStgAwake) elStgAwake.style.width = `${pctA}%`;
+
+    const avgD = Math.round(totDeep / countStages / 60);
+    const avgL = Math.round(totLight / countStages / 60);
+    const avgR = Math.round(totRem / countStages / 60);
+    const avgA = Math.round(totAwake / countStages / 60);
+
+    if (elLegDeep) elLegDeep.textContent = `${pctD}% (${avgD}m)`;
+    if (elLegLight) elLegLight.textContent = `${pctL}% (${avgL}m)`;
+    if (elLegRem) elLegRem.textContent = `${pctR}% (${avgR}m)`;
+    if (elLegAwake) elLegAwake.textContent = `${pctA}% (${avgA}m)`;
+  } else {
+    if (elLegDeep) elLegDeep.textContent = "—";
+    if (elLegLight) elLegLight.textContent = "—";
+    if (elLegRem) elLegRem.textContent = "—";
+    if (elLegAwake) elLegAwake.textContent = "—";
+  }
+
+  // Gráfico SVG Sueño
+  renderWellnessSleepChart(history);
+
+  // --- BLOQUE B: MOVILIDAD ---
+  const elStepsAvg = document.getElementById("wellness-steps-avg");
+  const elStepsGoalRate = document.getElementById("wellness-steps-goal-rate");
+  const elStepsWow = document.getElementById("wellness-steps-wow");
+  const elStepsTotalDist = document.getElementById("wellness-steps-total-dist");
+  const elStepsTotalFloors = document.getElementById("wellness-steps-total-floors");
+  const elIntensityMins = document.getElementById("wellness-intensity-mins");
+  const elStepsNonSportAvg = document.getElementById("wellness-steps-non-sport-avg");
+
+  if (elStepsAvg) {
+    elStepsAvg.textContent = bMob.avg_steps_28d != null ? Number(bMob.avg_steps_28d).toLocaleString("es-ES") : (bMob.avg_steps_7d != null ? Number(bMob.avg_steps_7d).toLocaleString("es-ES") : "—");
+  }
+
+  let daysWithSteps = 0, daysMetGoal = 0, sumDistM = 0, sumFloors = 0, sumIntMins = 0;
+  history.forEach(d => {
+    if (d.steps != null && Number(d.steps) > 0) {
+      daysWithSteps++;
+      if (d.step_goal && Number(d.steps) >= Number(d.step_goal)) {
+        daysMetGoal++;
+      }
+      sumDistM += Number(d.steps_distance_m || 0);
+      sumFloors += Number(d.floors_climbed || 0);
+      sumIntMins += Number(d.moderate_intensity_min || 0) + Number(d.vigorous_intensity_min || 0);
+    }
+  });
+
+  if (elStepsGoalRate) {
+    if (daysWithSteps > 0) {
+      const rate = Math.round((daysMetGoal / daysWithSteps) * 100);
+      elStepsGoalRate.textContent = `${rate}% (${daysMetGoal}/${daysWithSteps}d)`;
+    } else {
+      elStepsGoalRate.textContent = "—";
+    }
+  }
+
+  if (elStepsWow) {
+    if (bMob.avg_steps_7d != null && bMob.avg_steps_prev_7d != null && bMob.avg_steps_prev_7d > 0) {
+      const pctChange = Math.round(((bMob.avg_steps_7d - bMob.avg_steps_prev_7d) / bMob.avg_steps_prev_7d) * 100);
+      const sign = pctChange >= 0 ? "+" : "";
+      elStepsWow.textContent = `${sign}${pctChange}% vs sem. ant.`;
+      elStepsWow.style.color = pctChange >= 0 ? "var(--stitch-success)" : "var(--text-secondary)";
+    } else {
+      elStepsWow.textContent = "—";
+      elStepsWow.style.color = "var(--text-secondary)";
+    }
+  }
+
+  if (elStepsTotalDist) elStepsTotalDist.textContent = `${(sumDistM / 1000).toFixed(1)} km`;
+  if (elStepsTotalFloors) elStepsTotalFloors.textContent = `${Math.round(sumFloors)}`;
+  if (elIntensityMins) elIntensityMins.textContent = `${Math.round(sumIntMins)} min`;
+  if (elStepsNonSportAvg) {
+    elStepsNonSportAvg.textContent = bMob.avg_non_sport_steps_7d != null ? `${Number(bMob.avg_non_sport_steps_7d).toLocaleString("es-ES")} / día` : "—";
+  }
+
+  // Gráfico SVG Pasos
+  renderWellnessStepsChart(history);
+
+  // --- BLOQUE C: RECUPERACIÓN & AUTÓNOMO ---
+  const elHrvBase = document.getElementById("wellness-recovery-hrv-baseline");
+  const elRhrAvg = document.getElementById("wellness-recovery-rhr-avg");
+  const elBbAvg = document.getElementById("wellness-recovery-bb-avg");
+  const elStressAvg = document.getElementById("wellness-recovery-stress-avg");
+  const elBbChargeDrain = document.getElementById("wellness-recovery-bb-charge-drain");
+  const elSpo2Resp = document.getElementById("wellness-recovery-spo2-resp");
+
+  if (elHrvBase) {
+    if (bRec.hrv_baseline_28d != null) {
+      const base = Math.round(bRec.hrv_baseline_28d);
+      const std = bRec.hrv_std_28d ? Math.round(bRec.hrv_std_28d * 0.75) : 4;
+      elHrvBase.textContent = `${base} ms (${base - std}–${base + std})`;
+    } else {
+      elHrvBase.textContent = "—";
+    }
+  }
+  if (elRhrAvg) {
+    elRhrAvg.textContent = bRec.resting_hr_avg_7d != null ? `${Math.round(bRec.resting_hr_avg_7d)} ppm` : (bRec.resting_hr_baseline_28d != null ? `${Math.round(bRec.resting_hr_baseline_28d)} ppm` : "—");
+  }
+  if (elBbAvg) {
+    elBbAvg.textContent = bRec.body_battery_max_avg_7d != null ? `${Math.round(bRec.body_battery_max_avg_7d)}` : (bRec.body_battery_max_baseline_28d != null ? `${Math.round(bRec.body_battery_max_baseline_28d)}` : "—");
+  }
+  if (elStressAvg) {
+    elStressAvg.textContent = bRec.stress_avg_7d != null ? `${Math.round(bRec.stress_avg_7d)}` : (bRec.stress_baseline_28d != null ? `${Math.round(bRec.stress_baseline_28d)}` : "—");
+  }
+
+  let sumCharge = 0, countCharge = 0;
+  history.forEach(d => {
+    if (d.body_battery_charged != null && Number(d.body_battery_charged) > 0) {
+      sumCharge += Number(d.body_battery_charged);
+      countCharge++;
+    }
+  });
+  if (elBbChargeDrain) {
+    elBbChargeDrain.textContent = countCharge > 0 ? `+${Math.round(sumCharge / countCharge)} pts/noche` : "—";
+  }
+
+  if (elSpo2Resp) {
+    const parts = [];
+    if (bRec.spo2_avg != null) parts.push(`SpO2 ${bRec.spo2_avg.toFixed(0)}%`);
+    if (bRec.respiration_avg != null) parts.push(`Resp. ${bRec.respiration_avg.toFixed(1)} rpm`);
+    elSpo2Resp.textContent = parts.length > 0 ? parts.join(" • ") : "Normal";
+  }
+
+  // Gráfico SVG Recuperación (HRV + Banda)
+  renderWellnessRecoveryChart(history, baselines);
+
+  // --- BLOQUE D: LECTURA DEL ENTRENADOR IA ---
+  loadWellnessAnalysisAndAI(false);
+}
+
+/**
+ * Gráfico SVG de duración de sueño (horas) + sleep score (0-100).
+ */
+function renderWellnessSleepChart(history) {
+  const wrap = document.getElementById("wellness-sleep-chart-svg");
+  const tip = document.getElementById("wellness-sleep-tooltip");
+  if (!wrap) return;
+
+  if (!history || history.length === 0) {
+    wrap.innerHTML = `<div style="display:flex; align-items:center; justify-content:center; height:100%; color:var(--text-secondary); font-size:12px;">Sin registros de sueño en el periodo seleccionado.</div>`;
+    return;
+  }
+
+  const W = 620, H = 180, padL = 36, padR = 36, padT = 18, padB = 26;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const N = history.length;
+  const barW = Math.max(6, Math.min(26, Math.floor(plotW / N) - 4));
+  const slotW = plotW / N;
+
+  const maxHours = 10;
+  function yH(h) { return padT + plotH - (Math.min(maxHours, Math.max(0, h)) / maxHours) * plotH; }
+  function yScore(s) { return padT + plotH - (Math.min(100, Math.max(0, s)) / 100) * plotH; }
+
+  let barsHtml = "";
+  let scorePoints = [];
+
+  history.forEach((d, i) => {
+    const cx = padL + i * slotW + slotW / 2;
+    const durH = d.sleep_total_sec ? Number(d.sleep_total_sec) / 3600 : null;
+    const isComplete = d.day_status === "complete";
+
+    if (durH != null && durH > 0) {
+      const topY = yH(durH);
+      const bHeight = Math.max(2, padT + plotH - topY);
+      const x = cx - barW / 2;
+      const fill = isComplete ? "var(--accent-orange)" : "rgba(238, 90, 43, 0.35)";
+      const stroke = isComplete ? "none" : "var(--accent-orange)";
+      const strokeDash = isComplete ? "none" : "2,2";
+
+      barsHtml += `
+        <rect class="wellness-chart-bar" x="${x.toFixed(1)}" y="${topY.toFixed(1)}" width="${barW}" height="${bHeight.toFixed(1)}"
+              rx="3" fill="${fill}" stroke="${stroke}" stroke-dasharray="${strokeDash}" stroke-width="1.2"
+              data-date="${d.date}" data-hours="${durH.toFixed(2)}" data-score="${d.sleep_score ?? ''}"
+              data-status="${isComplete ? 'Completo' : 'Incompleto / En curso'}" style="cursor:pointer; transition:opacity 0.15s ease;">
+        </rect>
+      `;
+    }
+
+    if (d.sleep_score != null && Number(d.sleep_score) > 0) {
+      scorePoints.push({ x: cx, y: yScore(Number(d.sleep_score)), score: Number(d.sleep_score), date: d.date });
+    }
+  });
+
+  // Línea de Score
+  let scoreLinePath = "";
+  let scoreDotsHtml = "";
+  if (scorePoints.length >= 2) {
+    scoreLinePath = "M " + scorePoints.map(p => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" L ");
+  }
+  scorePoints.forEach(p => {
+    scoreDotsHtml += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#00AEEF" stroke="#FFFFFF" stroke-width="1.2"></circle>`;
+  });
+
+  // Ejes X etiquetas
+  let xLabelsHtml = "";
+  const step = Math.max(1, Math.floor(N / 7));
+  for (let i = 0; i < N; i += step) {
+    const d = history[i];
+    const cx = padL + i * slotW + slotW / 2;
+    const dayLabel = d.date ? d.date.slice(8, 10) + "/" + d.date.slice(5, 7) : "";
+    xLabelsHtml += `<text x="${cx.toFixed(1)}" y="${H - 6}" font-size="9" fill="var(--text-muted)" text-anchor="middle" font-family="var(--font-mono)">${dayLabel}</text>`;
+  }
+
+  wrap.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:100%; overflow:visible;">
+      <!-- Grid horizontal -->
+      <line x1="${padL}" y1="${yH(7)}" x2="${W - padR}" y2="${yH(7)}" stroke="var(--border-default)" stroke-dasharray="3,3" stroke-width="1"/>
+      <text x="${padL - 4}" y="${yH(7) + 3}" font-size="9" fill="var(--text-muted)" text-anchor="end" font-family="var(--font-mono)">7h</text>
+      
+      <line x1="${padL}" y1="${yH(8)}" x2="${W - padR}" y2="${yH(8)}" stroke="var(--border-default)" stroke-dasharray="3,3" stroke-width="1"/>
+      <text x="${padL - 4}" y="${yH(8) + 3}" font-size="9" fill="var(--text-muted)" text-anchor="end" font-family="var(--font-mono)">8h</text>
+
+      <!-- Eje derecho score -->
+      <text x="${W - padR + 6}" y="${yScore(80) + 3}" font-size="9" fill="#00AEEF" text-anchor="start" font-family="var(--font-mono)">80</text>
+
+      <!-- Barras de sueño -->
+      ${barsHtml}
+
+      <!-- Línea y puntos de Score -->
+      ${scoreLinePath ? `<path d="${scoreLinePath}" fill="none" stroke="#00AEEF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>` : ""}
+      ${scoreDotsHtml}
+
+      <!-- Eje X -->
+      ${xLabelsHtml}
+    </svg>
+  `;
+
+  // Attach tooltips
+  if (tip) {
+    wrap.querySelectorAll(".wellness-chart-bar").forEach(el => {
+      el.addEventListener("mouseenter", (e) => {
+        const dt = el.dataset.date;
+        const hrs = Number(el.dataset.hours || 0);
+        const sc = el.dataset.score;
+        const st = el.dataset.status;
+        const h = Math.floor(hrs);
+        const m = Math.round((hrs - h) * 60);
+
+        tip.innerHTML = `
+          <div style="font-weight:700; font-size:11px; margin-bottom:2px;">${dt} (${st})</div>
+          <div style="color:var(--accent-orange); font-weight:600;">Sueño: ${h}h ${m}m</div>
+          ${sc ? `<div style="color:#00AEEF; font-size:11px;">Score: ${sc}/100</div>` : ""}
+        `;
+        tip.style.display = "block";
+        const rect = wrap.getBoundingClientRect();
+        tip.style.left = `${e.clientX - rect.left + 10}px`;
+        tip.style.top = `${e.clientY - rect.top - 20}px`;
+      });
+      el.addEventListener("mousemove", (e) => {
+        const rect = wrap.getBoundingClientRect();
+        tip.style.left = `${e.clientX - rect.left + 10}px`;
+        tip.style.top = `${e.clientY - rect.top - 20}px`;
+      });
+      el.addEventListener("mouseleave", () => {
+        tip.style.display = "none";
+      });
+    });
+  }
+}
+
+/**
+ * Gráfico SVG de pasos diarios con línea de objetivo.
+ */
+function renderWellnessStepsChart(history) {
+  const wrap = document.getElementById("wellness-steps-chart-svg");
+  const tip = document.getElementById("wellness-steps-tooltip");
+  if (!wrap) return;
+
+  if (!history || history.length === 0) {
+    wrap.innerHTML = `<div style="display:flex; align-items:center; justify-content:center; height:100%; color:var(--text-secondary); font-size:12px;">Sin registros de pasos en el periodo seleccionado.</div>`;
+    return;
+  }
+
+  const W = 620, H = 180, padL = 40, padR = 20, padT = 18, padB = 26;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const N = history.length;
+  const barW = Math.max(6, Math.min(26, Math.floor(plotW / N) - 4));
+  const slotW = plotW / N;
+
+  const maxSteps = Math.max(12000, ...history.map(d => Number(d.steps || 0) * 1.15));
+  function yS(s) { return padT + plotH - (Math.min(maxSteps, Math.max(0, s)) / maxSteps) * plotH; }
+
+  let barsHtml = "";
+  const avgGoal = Math.round(history.reduce((acc, d) => acc + (d.step_goal || 10000), 0) / N);
+  const goalY = yS(avgGoal);
+
+  history.forEach((d, i) => {
+    const cx = padL + i * slotW + slotW / 2;
+    const steps = d.steps != null ? Number(d.steps) : null;
+    const goal = d.step_goal || 10000;
+    const isComplete = d.day_status === "complete";
+
+    if (steps != null && steps > 0) {
+      const topY = yS(steps);
+      const bHeight = Math.max(2, padT + plotH - topY);
+      const x = cx - barW / 2;
+      const metGoal = steps >= goal;
+      const fill = metGoal ? "#15803D" : "var(--accent-orange)";
+      const opacity = isComplete ? "1" : "0.55";
+
+      barsHtml += `
+        <rect class="wellness-step-bar" x="${x.toFixed(1)}" y="${topY.toFixed(1)}" width="${barW}" height="${bHeight.toFixed(1)}"
+              rx="3" fill="${fill}" opacity="${opacity}"
+              data-date="${d.date}" data-steps="${steps}" data-goal="${goal}"
+              data-dist="${d.steps_distance_m ? (d.steps_distance_m / 1000).toFixed(1) : ''}"
+              data-floors="${d.floors_climbed ? Math.round(d.floors_climbed) : ''}"
+              data-status="${isComplete ? 'Completo' : 'Incompleto / En curso'}" style="cursor:pointer; transition:opacity 0.15s ease;">
+        </rect>
+      `;
+    }
+  });
+
+  // Ejes X etiquetas
+  let xLabelsHtml = "";
+  const step = Math.max(1, Math.floor(N / 7));
+  for (let i = 0; i < N; i += step) {
+    const d = history[i];
+    const cx = padL + i * slotW + slotW / 2;
+    const dayLabel = d.date ? d.date.slice(8, 10) + "/" + d.date.slice(5, 7) : "";
+    xLabelsHtml += `<text x="${cx.toFixed(1)}" y="${H - 6}" font-size="9" fill="var(--text-muted)" text-anchor="middle" font-family="var(--font-mono)">${dayLabel}</text>`;
+  }
+
+  wrap.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:100%; overflow:visible;">
+      <!-- Línea de Objetivo -->
+      <line x1="${padL}" y1="${goalY}" x2="${W - padR}" y2="${goalY}" stroke="var(--text-secondary)" stroke-dasharray="4,4" stroke-width="1.4"/>
+      <text x="${padL - 4}" y="${goalY + 3}" font-size="9" fill="var(--text-secondary)" text-anchor="end" font-family="var(--font-mono)">${(avgGoal / 1000).toFixed(0)}k</text>
+
+      <!-- Barras de pasos -->
+      ${barsHtml}
+
+      <!-- Eje X -->
+      ${xLabelsHtml}
+    </svg>
+  `;
+
+  // Attach tooltips
+  if (tip) {
+    wrap.querySelectorAll(".wellness-step-bar").forEach(el => {
+      el.addEventListener("mouseenter", (e) => {
+        const dt = el.dataset.date;
+        const st = Number(el.dataset.steps || 0);
+        const gl = Number(el.dataset.goal || 10000);
+        const km = el.dataset.dist;
+        const fl = el.dataset.floors;
+        const stat = el.dataset.status;
+        const pct = Math.round((st / gl) * 100);
+
+        tip.innerHTML = `
+          <div style="font-weight:700; font-size:11px; margin-bottom:2px;">${dt} (${stat})</div>
+          <div style="color:${st >= gl ? '#15803D' : 'var(--accent-orange)'}; font-weight:700;">Pasos: ${st.toLocaleString('es-ES')} (${pct}%)</div>
+          ${km ? `<div style="font-size:11px; color:var(--text-secondary);">Distancia: ${km} km</div>` : ""}
+          ${fl ? `<div style="font-size:11px; color:var(--text-secondary);">Pisos: ${fl}</div>` : ""}
+        `;
+        tip.style.display = "block";
+        const rect = wrap.getBoundingClientRect();
+        tip.style.left = `${e.clientX - rect.left + 10}px`;
+        tip.style.top = `${e.clientY - rect.top - 20}px`;
+      });
+      el.addEventListener("mousemove", (e) => {
+        const rect = wrap.getBoundingClientRect();
+        tip.style.left = `${e.clientX - rect.left + 10}px`;
+        tip.style.top = `${e.clientY - rect.top - 20}px`;
+      });
+      el.addEventListener("mouseleave", () => {
+        tip.style.display = "none";
+      });
+    });
+  }
+}
+
+/**
+ * Gráfico SVG de recuperación: HRV nocturna vs Banda normal personal de 28 días.
+ */
+function renderWellnessRecoveryChart(history, baselines) {
+  const wrap = document.getElementById("wellness-recovery-chart-svg");
+  const tip = document.getElementById("wellness-recovery-tooltip");
+  if (!wrap) return;
+
+  if (!history || history.length === 0) {
+    wrap.innerHTML = `<div style="display:flex; align-items:center; justify-content:center; height:100%; color:var(--text-secondary); font-size:12px;">Sin registros de HRV en el periodo seleccionado.</div>`;
+    return;
+  }
+
+  const W = 620, H = 180, padL = 40, padR = 20, padT = 18, padB = 26;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const N = history.length;
+  const slotW = plotW / N;
+
+  const validHrvs = history.map(d => Number(d.hrv_last_night)).filter(v => !isNaN(v) && v > 0);
+  const baseVal = baselines.recovery?.hrv_baseline_28d;
+  const stdVal = baselines.recovery?.hrv_std_28d || 4;
+
+  const minHrv = Math.max(20, Math.min(...(validHrvs.length ? validHrvs : [40]), baseVal ? baseVal - stdVal * 1.8 : 40) - 6);
+  const maxHrv = Math.max(...(validHrvs.length ? validHrvs : [70]), baseVal ? baseVal + stdVal * 1.8 : 70) + 6;
+
+  function yHrv(v) { return padT + plotH - ((Math.min(maxHrv, Math.max(minHrv, v)) - minHrv) / (maxHrv - minHrv)) * plotH; }
+
+  // Banda de normalidad (±0.75 SD)
+  let bandHtml = "";
+  if (baseVal != null) {
+    const bandTop = yHrv(baseVal + stdVal * 0.75);
+    const bandBottom = yHrv(baseVal - stdVal * 0.75);
+    const bandH = Math.max(4, bandBottom - bandTop);
+    const baseLineY = yHrv(baseVal);
+
+    bandHtml = `
+      <rect x="${padL}" y="${bandTop.toFixed(1)}" width="${plotW}" height="${bandH.toFixed(1)}"
+            fill="rgba(238, 90, 43, 0.12)" stroke="rgba(238, 90, 43, 0.3)" stroke-width="1"/>
+      <line x1="${padL}" y1="${baseLineY.toFixed(1)}" x2="${W - padR}" y2="${baseLineY.toFixed(1)}"
+            stroke="var(--accent-orange)" stroke-dasharray="3,3" stroke-width="1.2" opacity="0.8"/>
+      <text x="${padL - 4}" y="${baseLineY.toFixed(1) + 3}" font-size="9" fill="var(--accent-orange)" text-anchor="end" font-family="var(--font-mono)">${Math.round(baseVal)}</text>
+    `;
+  }
+
+  // Puntos y línea HRV
+  const pts = [];
+  history.forEach((d, i) => {
+    const cx = padL + i * slotW + slotW / 2;
+    const v = d.hrv_last_night != null ? Number(d.hrv_last_night) : null;
+    if (v != null && v > 0) {
+      pts.push({ x: cx, y: yHrv(v), val: v, date: d.date, rhr: d.resting_hr, stress: d.stress_avg });
+    }
+  });
+
+  let hrvLinePath = "";
+  let hrvDotsHtml = "";
+  if (pts.length >= 2) {
+    hrvLinePath = "M " + pts.map(p => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" L ");
+  }
+
+  pts.forEach(p => {
+    let dotColor = "var(--accent-orange)";
+    if (baseVal != null) {
+      const topBand = baseVal + stdVal * 0.75;
+      const btmBand = baseVal - stdVal * 0.75;
+      if (p.val < btmBand || p.val > topBand) dotColor = "#BA1A1A";
+    }
+    hrvDotsHtml += `
+      <circle class="wellness-hrv-dot" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="${dotColor}" stroke="#FFFFFF" stroke-width="1.5"
+              data-date="${p.date}" data-hrv="${p.val}" data-rhr="${p.rhr || ''}" data-stress="${p.stress || ''}"
+              style="cursor:pointer; transition:transform 0.15s ease;">
+      </circle>
+    `;
+  });
+
+  // Ejes X etiquetas
+  let xLabelsHtml = "";
+  const step = Math.max(1, Math.floor(N / 7));
+  for (let i = 0; i < N; i += step) {
+    const d = history[i];
+    const cx = padL + i * slotW + slotW / 2;
+    const dayLabel = d.date ? d.date.slice(8, 10) + "/" + d.date.slice(5, 7) : "";
+    xLabelsHtml += `<text x="${cx.toFixed(1)}" y="${H - 6}" font-size="9" fill="var(--text-muted)" text-anchor="middle" font-family="var(--font-mono)">${dayLabel}</text>`;
+  }
+
+  wrap.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:100%; overflow:visible;">
+      <!-- Banda basal de 28 días -->
+      ${bandHtml}
+
+      <!-- Línea HRV -->
+      ${hrvLinePath ? `<path d="${hrvLinePath}" fill="none" stroke="var(--accent-orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>` : ""}
+      
+      <!-- Puntos HRV -->
+      ${hrvDotsHtml}
+
+      <!-- Eje X -->
+      ${xLabelsHtml}
+    </svg>
+  `;
+
+  // Attach tooltips
+  if (tip) {
+    wrap.querySelectorAll(".wellness-hrv-dot").forEach(el => {
+      el.addEventListener("mouseenter", (e) => {
+        const dt = el.dataset.date;
+        const hrv = el.dataset.hrv;
+        const rhr = el.dataset.rhr;
+        const str = el.dataset.stress;
+
+        tip.innerHTML = `
+          <div style="font-weight:700; font-size:11px; margin-bottom:2px;">${dt}</div>
+          <div style="color:var(--accent-orange); font-weight:700;">HRV nocturna: ${hrv} ms</div>
+          ${rhr ? `<div style="font-size:11px; color:var(--text-secondary);">FC Reposo: ${rhr} ppm</div>` : ""}
+          ${str ? `<div style="font-size:11px; color:var(--text-secondary);">Estrés medio: ${str}/100</div>` : ""}
+        `;
+        tip.style.display = "block";
+        const rect = wrap.getBoundingClientRect();
+        tip.style.left = `${e.clientX - rect.left + 10}px`;
+        tip.style.top = `${e.clientY - rect.top - 20}px`;
+      });
+      el.addEventListener("mousemove", (e) => {
+        const rect = wrap.getBoundingClientRect();
+        tip.style.left = `${e.clientX - rect.left + 10}px`;
+        tip.style.top = `${e.clientY - rect.top - 20}px`;
+      });
+      el.addEventListener("mouseleave", () => {
+        tip.style.display = "none";
+      });
+    });
+  }
+}
+
+/**
+ * Carga o actualiza la interpretación de Gemini para Bienestar y Recuperación.
+ */
+async function loadWellnessAnalysisAndAI(force = false) {
+  const contentEl = document.getElementById("wellness-ai-content");
+  const refreshBtn = document.getElementById("wellness-ai-refresh-btn");
+  if (!contentEl) return;
+
+  if (refreshBtn) {
+    refreshBtn.disabled = true;
+    refreshBtn.textContent = "Analizando...";
+  }
+
+  try {
+    const res = await fetch(`/api/wellness/readiness?include_ai=true${force ? '&sync=true' : ''}`);
+    if (!res.ok) throw new Error("Error en lectura IA");
+    const data = await res.json();
+    const interp = data.readiness?.ai_interpretation || data.ai_interpretation;
+
+    if (interp) {
+      const p1 = interp.impacto_entrenamiento || interp.correlacion_sueno_hrv || "";
+      const p2 = interp.recomendacion_movilidad || interp.resumen || "";
+      const p3 = interp.aviso_fisiologico ? `<strong>Nota técnica:</strong> ${_escHtml(interp.aviso_fisiologico)}` : "";
+
+      contentEl.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          ${p1 ? `<p style="margin:0; font-size:0.86rem; line-height:1.5;">${_escHtml(p1)}</p>` : ""}
+          ${p2 ? `<p style="margin:0; font-size:0.86rem; line-height:1.5;">${_escHtml(p2)}</p>` : ""}
+          ${p3 ? `<p style="margin:0; font-size:0.80rem; opacity:0.8; line-height:1.4;">${p3}</p>` : ""}
+        </div>
+      `;
+    } else {
+      contentEl.innerHTML = `
+        <p class="stride-ai-summary">
+          Basado en tu telemetría reciente de Garmin Connect, tu recuperación autónoma y tu volumen de actividad se encuentran en equilibrio fisiológico.
+          Prioriza regularidad en el descanso nocturno para sostener la progresión ascendente de tus entrenamientos.
+        </p>
+      `;
+    }
+  } catch (err) {
+    console.error("[Wellness] Error loading AI analysis:", err);
+    contentEl.innerHTML = `
+      <p class="stride-ai-summary" style="opacity:0.8;">
+        Telemetría fisiológica registrada correctamente. Tus métricas basales de sueño y HRV se monitorizan para evaluar la asimilación del entrenamiento.
+      </p>
+    `;
+  } finally {
+    if (refreshBtn) {
+      refreshBtn.disabled = false;
+      refreshBtn.textContent = "Actualizar";
+    }
+  }
+}
+

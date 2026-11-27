@@ -1276,6 +1276,566 @@ h1, h2, h3, h4, .headline-md, .headline-sm, .greeting-title, .stride-greeting-ti
   font-weight: 700;
 }
 
+/* ==========================================================================
+   AARONFIT — FASE 5.2: BIENESTAR, SUEÑO, MOVILIDAD Y RECUPERACIÓN (STRIDE)
+   ========================================================================== */
+
+/* --- DASHBOARD INICIO: BIENESTAR & RECUPERACIÓN --- */
+.wellness-dash-wrap {
+  margin-top: 18px;
+  margin-bottom: 24px;
+}
+
+.wellness-dash-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 768px) {
+  .wellness-dash-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+.wellness-card {
+  background: var(--surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: var(--stitch-shadow-card);
+  position: relative;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.wellness-card:hover {
+  border-color: var(--border-strong);
+}
+
+.wellness-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.wellness-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.wellness-card-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-orange);
+  flex-shrink: 0;
+}
+
+.wellness-main-stat {
+  font-size: 1.85rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--text-primary);
+  letter-spacing: -0.03em;
+  margin-bottom: 2px;
+}
+
+.wellness-stat-sub {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.wellness-diff-text {
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.wellness-submetrics-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 8px;
+}
+
+.wellness-submetric-box {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.wellness-submetric-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.wellness-submetric-val {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wellness-source-tag {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--text-caption);
+  margin-top: 10px;
+}
+
+/* Progress bar for steps in card */
+.wellness-progress-track {
+  width: 100%;
+  height: 6px;
+  background: var(--surface-elevated);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 6px 0 2px 0;
+}
+
+.wellness-progress-fill {
+  height: 100%;
+  background: var(--accent-orange);
+  border-radius: 999px;
+  transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Readiness Card Specifics */
+.wellness-card-readiness {
+  border-left: 3px solid var(--accent-orange);
+}
+
+.wellness-rec-title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.wellness-rec-text {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  margin: 0 0 8px 0;
+}
+
+.wellness-reasons-list {
+  margin: 6px 0 12px 0;
+  padding-left: 18px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.wellness-readiness-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: auto;
+}
+
+.wellness-confidence-pill {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.checkin-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+}
+
+/* Readiness status badges */
+.pill-readiness {
+  font-weight: 700;
+  font-size: 0.72rem;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+}
+
+.pill-readiness.readiness-listo {
+  background: rgba(21, 128, 61, 0.12);
+  color: #15803D;
+  border: 1px solid rgba(21, 128, 61, 0.25);
+}
+
+.pill-readiness.readiness-precaucion {
+  background: rgba(180, 83, 9, 0.12);
+  color: #B45309;
+  border: 1px solid rgba(180, 83, 9, 0.25);
+}
+
+.pill-readiness.readiness-recuperacion {
+  background: rgba(238, 90, 43, 0.12);
+  color: #EE5A2B;
+  border: 1px solid rgba(238, 90, 43, 0.25);
+}
+
+.pill-readiness.readiness-descanso {
+  background: rgba(186, 26, 26, 0.12);
+  color: #BA1A1A;
+  border: 1px solid rgba(186, 26, 26, 0.25);
+}
+
+.pill-readiness.readiness-insuficiente {
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+}
+
+/* --- SUMMIT ANALYTICS: SECCIÓN DE BIENESTAR Y RECUPERACIÓN --- */
+.wellness-analytics-wrap {
+  margin-top: 24px;
+  margin-bottom: 24px;
+}
+
+.wellness-analytics-container {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 24px;
+}
+
+.wellness-analytics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.wellness-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wellness-block {
+  background: var(--surface-muted);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wellness-block-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.wellness-block-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-orange);
+  box-shadow: var(--stitch-shadow-card);
+  flex-shrink: 0;
+}
+
+.wellness-block-kpis {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.wellness-kpi-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: right;
+}
+
+@media (max-width: 640px) {
+  .wellness-kpi-item {
+    text-align: left;
+  }
+}
+
+.wellness-kpi-item strong {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.wellness-chart-box {
+  background: var(--surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-row);
+  padding: 14px 16px;
+  position: relative;
+}
+
+.wellness-chart-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.wellness-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.wellness-svg-container {
+  width: 100%;
+  position: relative;
+  overflow: visible;
+}
+
+/* Sleep Stages stacked bar */
+.wellness-stages-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .wellness-stages-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.wellness-stages-bar-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.wellness-stages-bar {
+  display: flex;
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-subtle);
+}
+
+.stage-seg {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.stage-deep { background: #15803D; }
+.stage-light { background: #0066B3; }
+.stage-rem { background: #8E24AA; }
+.stage-awake { background: #C9C9C6; }
+
+.wellness-stages-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+
+.wellness-stages-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.wellness-sleep-averages {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-row);
+  padding: 10px 14px;
+}
+
+/* Mobility and Recovery Subgrids */
+.wellness-mobility-subgrid,
+.wellness-recovery-subgrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.wellness-recovery-subgrid {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 768px) {
+  .wellness-mobility-subgrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .wellness-recovery-subgrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Coach AI Dark Reading Box */
+.wellness-ai-card {
+  padding: 24px;
+  border-radius: var(--radius-card);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wellness-ai-body {
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.wellness-ai-body p {
+  margin: 0 0 10px 0;
+}
+
+.wellness-ai-body p:last-child {
+  margin-bottom: 0;
+}
+
+.wellness-ai-footer {
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* --- DAILY CHECK-IN MODAL --- */
+.checkin-modal-card {
+  box-shadow: var(--shadow-floating);
+  border-radius: var(--radius-surface);
+}
+
+.checkin-field-group {
+  margin-bottom: 14px;
+}
+
+.checkin-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.checkin-scale-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.checkin-val-badge {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--accent-orange);
+}
+
+.checkin-scale-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.checkin-btn-scale {
+  flex: 1;
+  padding: 10px 4px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border-default);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.checkin-btn-scale small {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.checkin-btn-scale:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-elevated);
+}
+
+.checkin-btn-scale.active {
+  background: var(--accent-orange);
+  color: #FFFFFF;
+  border-color: var(--accent-orange);
+  box-shadow: 0 2px 8px rgba(238, 90, 43, 0.35);
+}
+
+.checkin-btn-scale.active small {
+  color: rgba(255, 255, 255, 0.9);
+}
+
 
 
 

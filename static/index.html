@@ -212,6 +212,189 @@
               </div>
             </div>
 
+            <!-- ===================== BIENESTAR & RECUPERACIÓN (DASHBOARD INICIO) ===================== -->
+            <section id="wellness-dash-section" class="wellness-dash-wrap" aria-label="Bienestar y Recuperación Diaria">
+              <div class="stride-section-head" style="margin-top:20px; margin-bottom:12px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <h2 class="stride-section-title" style="margin:0;">Bienestar & Recuperación</h2>
+                  <span id="wellness-dash-status-pill" class="pill-tag tabular-num" style="font-size:0.7rem; font-weight:600;">GARMIN REAL</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <a href="/analisis" class="stride-section-link" onclick="navigateTo(event, '/analisis', 'tab-metrics')">Ver análisis →</a>
+                  <button type="button" class="strava-chip-btn" id="btn-sync-wellness-dash" onclick="syncWellnessData(event)" title="Sincronizar telemetría de bienestar desde Garmin" style="font-size:0.74rem; padding:5px 11px; display:inline-flex; align-items:center; gap:5px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    <span id="btn-sync-wellness-label">Sincronizar</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Garmin Disconnected Banner (visible si falta sesión o token) -->
+              <div id="wellness-dash-disconnected-banner" class="banner-box" style="display:none; margin-bottom:12px; background:var(--surface-elevated); border:1px solid var(--border-strong); border-radius:var(--radius-row); padding:12px 16px; align-items:center; justify-content:space-between; gap:12px;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <span style="font-size:1.25rem;" aria-hidden="true">⌚</span>
+                  <div>
+                    <strong style="display:block; font-size:0.86rem; color:var(--text-primary);">Garmin Connect no está sincronizado</strong>
+                    <span style="font-size:0.76rem; color:var(--text-secondary);">Conecta tu cuenta en Perfil para registrar sueño, pasos, HRV nocturna y Body Battery.</span>
+                  </div>
+                </div>
+                <a href="/perfil" class="strava-chip-btn" style="text-decoration:none; padding:6px 12px; font-size:0.76rem; white-space:nowrap;" onclick="navigateTo(event, '/perfil', 'tab-profile')">Conectar Garmin →</a>
+              </div>
+
+              <!-- 4 Modular Cards Grid -->
+              <div class="wellness-dash-grid">
+
+                <!-- 1. SUEÑO -->
+                <article class="wellness-card" id="wellness-dash-sleep" aria-labelledby="card-sleep-title">
+                  <div class="wellness-card-head">
+                    <div class="wellness-card-title-group">
+                      <div class="wellness-card-icon" aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                      </div>
+                      <span id="card-sleep-title">Sueño</span>
+                    </div>
+                    <span id="wellness-dash-sleep-score" class="pill-tag tabular-num" title="Puntuación Garmin (0-100)">Sin datos</span>
+                  </div>
+
+                  <div class="wellness-card-body">
+                    <div class="wellness-main-stat">
+                      <span id="wellness-dash-sleep-duration" class="tabular-num">Pendiente</span>
+                    </div>
+                    <div id="wellness-dash-sleep-diff" class="wellness-diff-text tabular-num">—</div>
+
+                    <!-- Fases de sueño -->
+                    <div class="wellness-submetrics-row">
+                      <div class="wellness-submetric-box">
+                        <span class="wellness-submetric-label">Profundo</span>
+                        <span id="wellness-dash-sleep-deep" class="wellness-submetric-val tabular-num">—</span>
+                      </div>
+                      <div class="wellness-submetric-box">
+                        <span class="wellness-submetric-label">Ligero</span>
+                        <span id="wellness-dash-sleep-light" class="wellness-submetric-val tabular-num">—</span>
+                      </div>
+                      <div class="wellness-submetric-box">
+                        <span class="wellness-submetric-label">REM</span>
+                        <span id="wellness-dash-sleep-rem" class="wellness-submetric-val tabular-num">—</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <span class="wellness-source-tag">Medición real Garmin</span>
+                </article>
+
+                <!-- 2. PASOS & MOVILIDAD -->
+                <article class="wellness-card" id="wellness-dash-steps" aria-labelledby="card-steps-title">
+                  <div class="wellness-card-head">
+                    <div class="wellness-card-title-group">
+                      <div class="wellness-card-icon" aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v-2.38C4 11.5 5.5 10 7.38 10h9.24C18.5 10 20 11.5 20 13.62V16"/><circle cx="12" cy="18" r="2"/><path d="M7 6l5 4 5-4"/></svg>
+                      </div>
+                      <span id="card-steps-title">Pasos</span>
+                    </div>
+                    <span id="wellness-dash-steps-pct" class="pill-tag tabular-num" title="% objetivo diario">—</span>
+                  </div>
+
+                  <div class="wellness-card-body">
+                    <div class="wellness-main-stat" style="display:flex; align-items:baseline; gap:6px;">
+                      <span id="wellness-dash-steps-count" class="tabular-num">Pendiente</span>
+                      <small id="wellness-dash-steps-goal-sub" class="wellness-stat-sub tabular-num">/ — meta</small>
+                    </div>
+                    <div class="wellness-progress-track">
+                      <div id="wellness-dash-steps-bar" class="wellness-progress-fill" style="width:0%;"></div>
+                    </div>
+                    <div id="wellness-dash-steps-diff" class="wellness-diff-text tabular-num" style="margin-top:6px;">—</div>
+
+                    <div class="wellness-submetrics-row">
+                      <div class="wellness-submetric-box">
+                        <span class="wellness-submetric-label">Distancia</span>
+                        <span id="wellness-dash-steps-dist" class="wellness-submetric-val tabular-num">—</span>
+                      </div>
+                      <div class="wellness-submetric-box">
+                        <span class="wellness-submetric-label">Pisos</span>
+                        <span id="wellness-dash-steps-floors" class="wellness-submetric-val tabular-num">—</span>
+                      </div>
+                      <div class="wellness-submetric-box" title="Pasos cotidianos descontando deporte">
+                        <span class="wellness-submetric-label">No dep. (Est.)</span>
+                        <span id="wellness-dash-steps-non-sport" class="wellness-submetric-val tabular-num">—</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <span class="wellness-source-tag">Garmin · Est. no deportiva AaronFit</span>
+                </article>
+
+                <!-- 3. RECUPERACIÓN FISIOLÓGICA -->
+                <article class="wellness-card" id="wellness-dash-recovery" aria-labelledby="card-recovery-title">
+                  <div class="wellness-card-head">
+                    <div class="wellness-card-title-group">
+                      <div class="wellness-card-icon" aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                      </div>
+                      <span id="card-recovery-title">Recuperación</span>
+                    </div>
+                    <span id="wellness-dash-hrv-status" class="pill-tag tabular-num">Sin datos</span>
+                  </div>
+
+                  <div class="wellness-card-body">
+                    <div class="wellness-main-stat" style="display:flex; align-items:baseline; gap:6px;">
+                      <span id="wellness-dash-hrv-val" class="tabular-num">Pendiente</span>
+                      <small class="wellness-stat-sub">HRV nocturna</small>
+                    </div>
+                    <div id="wellness-dash-hrv-baseline" class="wellness-diff-text tabular-num">Basal 28d: Pendiente</div>
+
+                    <div class="wellness-submetrics-row">
+                      <div class="wellness-submetric-box">
+                        <span class="wellness-submetric-label">FC Reposo</span>
+                        <span id="wellness-dash-rhr-val" class="wellness-submetric-val tabular-num">—</span>
+                      </div>
+                      <div class="wellness-submetric-box">
+                        <span class="wellness-submetric-label">Body Battery</span>
+                        <span id="wellness-dash-bb-val" class="wellness-submetric-val tabular-num">—</span>
+                      </div>
+                      <div class="wellness-submetric-box">
+                        <span class="wellness-submetric-label">Estrés medio</span>
+                        <span id="wellness-dash-stress-val" class="wellness-submetric-val tabular-num">—</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <span class="wellness-source-tag">Medición real Garmin (no diagn. médico)</span>
+                </article>
+
+                <!-- 4. ESTADO DIARIO (READINESS ENGINE) -->
+                <article class="wellness-card wellness-card-readiness" id="wellness-dash-readiness" aria-labelledby="card-readiness-title">
+                  <div class="wellness-card-head">
+                    <div class="wellness-card-title-group">
+                      <div class="wellness-card-icon" aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                      </div>
+                      <span id="card-readiness-title">Estado Diario</span>
+                    </div>
+                    <span id="wellness-dash-readiness-badge" class="pill-tag pill-readiness tabular-num">PENDIENTE</span>
+                  </div>
+
+                  <div class="wellness-card-body">
+                    <div id="wellness-dash-rec-title" class="wellness-rec-title">Consultando estado...</div>
+                    <p id="wellness-dash-rec-text" class="wellness-rec-text">Analizando sueño, HRV y telemetría de Garmin para contextualizar el día.</p>
+                    
+                    <ul id="wellness-dash-reasons" class="wellness-reasons-list">
+                      <li>Pendiente de sincronización o datos del reloj.</li>
+                    </ul>
+
+                    <div class="wellness-readiness-footer">
+                      <span id="wellness-dash-confidence" class="wellness-confidence-pill tabular-num">Confianza: —</span>
+                      <button type="button" class="btn btn-secondary checkin-trigger-btn" onclick="openWellnessCheckinModal()">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                        <span>Check-in (1–5)</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <span class="wellness-source-tag">Readiness Engine AaronFit · No modifica el plan sin avisar</span>
+                </article>
+
+              </div>
+            </section>
+
             <!-- Stride "Up next" (Próximos entrenos) -->
             <div id="stride-up-next-wrap" class="stride-up-next-wrap" style="display: none;">
               <div class="stride-section-head">
@@ -530,6 +713,243 @@
             </div>
           </div>
         </div>
+
+        <!-- ===================== ANÁLISIS DE BIENESTAR Y RECUPERACIÓN (SUMMIT) ===================== -->
+        <section id="summit-wellness-section" class="wellness-analytics-wrap" aria-label="Análisis de Bienestar y Recuperación">
+          <div class="glass-card wellness-analytics-container">
+            <div class="wellness-analytics-header">
+              <div>
+                <span class="label-caps" style="color:var(--accent-orange);">TELEMETRÍA REAL GARMIN · FISIOLOGÍA & MOVILIDAD</span>
+                <h2 class="headline-md" style="margin:2px 0 4px 0;">Análisis de Bienestar y Recuperación</h2>
+                <p class="body-sm-muted" style="margin:0;">Sueño, movilidad cotidiana y recuperación autónoma (HRV) frente a tu línea base de 28 días.</p>
+              </div>
+              <div class="wellness-header-actions">
+                <div id="wellness-period-pills" class="stride-period-pills">
+                  <button type="button" class="stride-period-pill" onclick="selectWellnessPeriod(7, this)">7 días</button>
+                  <button type="button" class="stride-period-pill" onclick="selectWellnessPeriod(14, this)">14 días</button>
+                  <button type="button" class="stride-period-pill active" onclick="selectWellnessPeriod(28, this)">28 días</button>
+                </div>
+                <button type="button" class="strava-chip-btn" onclick="syncWellnessData(event)" style="font-size:0.75rem; padding:5px 11px; display:inline-flex; align-items:center; gap:5px;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                  <span>Sincronizar</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- BLOQUE A: SUEÑO -->
+            <div class="wellness-block" id="wellness-block-sleep">
+              <div class="wellness-block-head">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <div class="wellness-block-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                  </div>
+                  <div>
+                    <h3 class="headline-sm" style="margin:0;">A. Sueño & Calidad de Descanso</h3>
+                    <span class="body-xs" style="color:var(--text-secondary);">Duración nocturna, puntuación Garmin (0–100) y fases</span>
+                  </div>
+                </div>
+                <div class="wellness-block-kpis">
+                  <div class="wellness-kpi-item">
+                    <span class="label-caps">DURACIÓN MEDIA</span>
+                    <strong id="wellness-sleep-avg-hours" class="tabular-num">—</strong>
+                  </div>
+                  <div class="wellness-kpi-item">
+                    <span class="label-caps">SCORE MEDIO</span>
+                    <strong id="wellness-sleep-avg-score" class="tabular-num">—</strong>
+                  </div>
+                  <div class="wellness-kpi-item">
+                    <span class="label-caps">REGULARIDAD</span>
+                    <strong id="wellness-sleep-regularity" class="tabular-num">—</strong>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Gráfico interactivo duración + score -->
+              <div class="wellness-chart-box">
+                <div class="wellness-chart-legend">
+                  <span><span class="legend-swatch" style="background:var(--accent-orange);"></span> Duración de sueño (horas)</span>
+                  <span><span class="legend-swatch" style="background:#00AEEF;"></span> Score Garmin (0–100)</span>
+                  <span><span class="legend-swatch" style="background:var(--surface-subtle); border:1px dashed var(--border-strong);"></span> Día incompleto/en curso</span>
+                </div>
+                <div id="wellness-sleep-chart-svg" class="wellness-svg-container" style="height:190px;"></div>
+                <div id="wellness-sleep-tooltip" class="detail-chart-tooltip" style="display:none;"></div>
+              </div>
+
+              <!-- Distribución de fases apiladas y medias 7d vs 28d -->
+              <div class="wellness-stages-row">
+                <div class="wellness-stages-bar-wrap">
+                  <div class="label-caps" style="margin-bottom:6px;">DISTRIBUCIÓN MEDIA DE FASES (PERIODO)</div>
+                  <div id="wellness-stages-bar" class="wellness-stages-bar">
+                    <div id="stage-deep" class="stage-seg stage-deep" style="width:25%;" title="Profundo"></div>
+                    <div id="stage-light" class="stage-seg stage-light" style="width:50%;" title="Ligero"></div>
+                    <div id="stage-rem" class="stage-seg stage-rem" style="width:20%;" title="REM"></div>
+                    <div id="stage-awake" class="stage-seg stage-awake" style="width:5%;" title="Despierto"></div>
+                  </div>
+                  <div id="wellness-stages-legend" class="wellness-stages-legend">
+                    <span><span class="legend-dot" style="background:#15803D;"></span> Profundo: <b id="legend-deep-val" class="tabular-num">—</b></span>
+                    <span><span class="legend-dot" style="background:#0066B3;"></span> Ligero: <b id="legend-light-val" class="tabular-num">—</b></span>
+                    <span><span class="legend-dot" style="background:#8E24AA;"></span> REM: <b id="legend-rem-val" class="tabular-num">—</b></span>
+                    <span><span class="legend-dot" style="background:#C9C9C6;"></span> Despierto: <b id="legend-awake-val" class="tabular-num">—</b></span>
+                  </div>
+                </div>
+                <div class="wellness-sleep-averages">
+                  <div class="wellness-submetric-box">
+                    <span class="wellness-submetric-label">Media 7 días</span>
+                    <span id="wellness-sleep-7d" class="wellness-submetric-val tabular-num">—</span>
+                  </div>
+                  <div class="wellness-submetric-box">
+                    <span class="wellness-submetric-label">Media 28 días</span>
+                    <span id="wellness-sleep-28d" class="wellness-submetric-val tabular-num">—</span>
+                  </div>
+                  <div class="wellness-submetric-box">
+                    <span class="wellness-submetric-label">Horario Habitual</span>
+                    <span id="wellness-sleep-schedule" class="wellness-submetric-val tabular-num" style="font-size:0.82rem;">—</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- BLOQUE B: MOVILIDAD -->
+            <div class="wellness-block" id="wellness-block-mobility">
+              <div class="wellness-block-head">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <div class="wellness-block-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v-2.38C4 11.5 5.5 10 7.38 10h9.24C18.5 10 20 11.5 20 13.62V16"/><circle cx="12" cy="18" r="2"/><path d="M7 6l5 4 5-4"/></svg>
+                  </div>
+                  <div>
+                    <h3 class="headline-sm" style="margin:0;">B. Movilidad & Pasos Diarios</h3>
+                    <span class="body-xs" style="color:var(--text-secondary);">Pasos diarios, cumplimiento de objetivo y minutos de intensidad</span>
+                  </div>
+                </div>
+                <div class="wellness-block-kpis">
+                  <div class="wellness-kpi-item">
+                    <span class="label-caps">MEDIA DIARIA</span>
+                    <strong id="wellness-steps-avg" class="tabular-num">—</strong>
+                  </div>
+                  <div class="wellness-kpi-item">
+                    <span class="label-caps">META CUMPLIDA</span>
+                    <strong id="wellness-steps-goal-rate" class="tabular-num">—</strong>
+                  </div>
+                  <div class="wellness-kpi-item">
+                    <span class="label-caps">TENDENCIA WOW</span>
+                    <strong id="wellness-steps-wow" class="tabular-num">—</strong>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Gráfico de pasos diarios -->
+              <div class="wellness-chart-box">
+                <div class="wellness-chart-legend">
+                  <span><span class="legend-swatch" style="background:#15803D;"></span> Superó objetivo</span>
+                  <span><span class="legend-swatch" style="background:var(--accent-orange);"></span> Debajo de objetivo</span>
+                  <span><span class="legend-swatch" style="background:var(--text-secondary); height:2px;"></span> Línea de meta</span>
+                </div>
+                <div id="wellness-steps-chart-svg" class="wellness-svg-container" style="height:190px;"></div>
+                <div id="wellness-steps-tooltip" class="detail-chart-tooltip" style="display:none;"></div>
+              </div>
+
+              <!-- Métricas complementarias de movilidad -->
+              <div class="wellness-mobility-subgrid">
+                <div class="p-stat-box">
+                  <span class="label-caps">DISTANCIA CAMINADA</span>
+                  <span id="wellness-steps-total-dist" class="p-stat-val tabular-num">— km</span>
+                  <small class="body-xs" style="color:var(--text-secondary);">Acumulado periodo</small>
+                </div>
+                <div class="p-stat-box">
+                  <span class="label-caps">PISOS SUBIDOS</span>
+                  <span id="wellness-steps-total-floors" class="p-stat-val tabular-num">—</span>
+                  <small class="body-xs" style="color:var(--text-secondary);">Total del periodo</small>
+                </div>
+                <div class="p-stat-box">
+                  <span class="label-caps">MIN. INTENSIDAD</span>
+                  <span id="wellness-intensity-mins" class="p-stat-val tabular-num">— min</span>
+                  <small class="body-xs" style="color:var(--text-secondary);">Moderada + Vigorosa</small>
+                </div>
+                <div class="p-stat-box" title="Estimación propia AaronFit descontando ~1250 pasos/km de entrenamientos">
+                  <span class="label-caps">PASOS NO DEPORTIVOS (EST.)</span>
+                  <span id="wellness-steps-non-sport-avg" class="p-stat-val tabular-num">— / día</span>
+                  <small class="body-xs" style="color:var(--accent-orange-hover);">Cálculo propio AaronFit</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- BLOQUE C: RECUPERACIÓN & AUTÓNOMO -->
+            <div class="wellness-block" id="wellness-block-recovery">
+              <div class="wellness-block-head">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <div class="wellness-block-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                  </div>
+                  <div>
+                    <h3 class="headline-sm" style="margin:0;">C. Recuperación Fisiológica (HRV & RHR)</h3>
+                    <span class="body-xs" style="color:var(--text-secondary);">HRV nocturna frente a rango basal de 28 días, FC en reposo y equilibrio energético</span>
+                  </div>
+                </div>
+                <div class="wellness-block-kpis">
+                  <div class="wellness-kpi-item">
+                    <span class="label-caps">HRV BASAL 28D</span>
+                    <strong id="wellness-recovery-hrv-baseline" class="tabular-num">—</strong>
+                  </div>
+                  <div class="wellness-kpi-item">
+                    <span class="label-caps">FC REPOSO MEDIA</span>
+                    <strong id="wellness-recovery-rhr-avg" class="tabular-num">—</strong>
+                  </div>
+                  <div class="wellness-kpi-item">
+                    <span class="label-caps">BODY BATT. MÁX</span>
+                    <strong id="wellness-recovery-bb-avg" class="tabular-num">—</strong>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Gráfico HRV con banda de normalidad -->
+              <div class="wellness-chart-box">
+                <div class="wellness-chart-legend">
+                  <span><span class="legend-swatch" style="background:rgba(238,90,43,0.18); border:1px solid rgba(238,90,43,0.4);"></span> Banda personal 28d (±0.75 SD)</span>
+                  <span><span class="legend-swatch" style="background:var(--accent-orange);"></span> HRV nocturna (ms)</span>
+                  <span><span class="legend-swatch" style="background:#BA1A1A;"></span> Fuera de rango</span>
+                </div>
+                <div id="wellness-recovery-chart-svg" class="wellness-svg-container" style="height:190px;"></div>
+                <div id="wellness-recovery-tooltip" class="detail-chart-tooltip" style="display:none;"></div>
+              </div>
+
+              <div class="wellness-recovery-subgrid">
+                <div class="p-stat-box">
+                  <span class="label-caps">ESTRÉS MEDIO DIARIO</span>
+                  <span id="wellness-recovery-stress-avg" class="p-stat-val tabular-num">—</span>
+                  <small class="body-xs" style="color:var(--text-secondary);">Escala Garmin 0–100</small>
+                </div>
+                <div class="p-stat-box">
+                  <span class="label-caps">CARGA / DESCARGA BATT</span>
+                  <span id="wellness-recovery-bb-charge-drain" class="p-stat-val tabular-num">—</span>
+                  <small class="body-xs" style="color:var(--text-secondary);">Media recarga nocturna</small>
+                </div>
+                <div class="p-stat-box">
+                  <span class="label-caps">SPO2 & RESPIRACIÓN</span>
+                  <span id="wellness-recovery-spo2-resp" class="p-stat-val tabular-num">—</span>
+                  <small class="body-xs" style="color:var(--text-secondary);">No constituye diagn. médico</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- BLOQUE D: LECTURA DEL ENTRENADOR (GEMINI) -->
+            <div class="stride-exp-dark-card wellness-ai-card" id="wellness-block-ai">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <div>
+                  <span class="label-caps" style="color:#FF7A33;">ENTRENADOR IA · LECTURA FISIOLÓGICA INTEGRAL</span>
+                  <h3 class="headline-sm" style="margin:2px 0 0; color:#FFFFFF;">¿Cómo influyen tu descanso y movilidad en tu rendimiento?</h3>
+                </div>
+                <button type="button" id="wellness-ai-refresh-btn" class="stride-ai-refresh-btn" onclick="loadWellnessAnalysisAndAI(true)">Actualizar</button>
+              </div>
+              <div id="wellness-ai-content" class="wellness-ai-body">
+                <p class="stride-ai-summary">Cargando correlación entre tus métricas reales de sueño, pasos, HRV y el entrenamiento reciente...</p>
+              </div>
+              <div class="wellness-ai-footer">
+                <span class="body-xs" style="color:rgba(255,255,255,0.65);">Orientación técnico-atlética basada en telemetría Garmin Connect. No reemplaza criterio médico ni fisioterapéutico.</span>
+              </div>
+            </div>
+
+          </div>
+        </section>
 
         <!-- Garmin Live Wellness & Summary Card -->
         <div id="garmin-wellness-card" class="glass-card">
@@ -1511,8 +1931,115 @@
     <div id="planned-modal-body" style="width:100%; max-width:680px; display:flex; flex-direction:column; gap:14px; padding-bottom:32px;"></div>
   </div>
 
+  <!-- ===================== WELLNESS DAILY CHECK-IN MODAL ===================== -->
+  <div id="wellness-checkin-modal" class="guided-overlay detail-modal-overlay" style="display: none; justify-content: center; align-items: center; padding: 20px; z-index: 37000;">
+    <div class="glass-card checkin-modal-card" style="width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; position: relative; padding: 24px;">
+      <button type="button" onclick="closeWellnessCheckinModal()" class="guided-close-btn" style="position: absolute; top: 16px; right: 16px;" aria-label="Cerrar modal">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+
+      <div style="margin-bottom: 18px; padding-right: 32px;">
+        <span class="label-caps" style="color:var(--accent-orange); font-size:0.72rem;">PERCEPCIÓN DEL ATLETA · SUBJETIVO</span>
+        <h3 class="headline-md" style="margin: 3px 0 4px 0;">Check-in Diario de Sensaciones</h3>
+        <p class="body-xs" style="color:var(--text-secondary); margin:0; line-height:1.45;">Tus sensaciones confirman y modulan la telemetría de Garmin (escala 1 a 5: 1 = Mínimo / Crítico, 5 = Óptimo / Pleno).</p>
+      </div>
+
+      <form id="wellness-checkin-form" onsubmit="handleWellnessCheckinSubmit(event)">
+        <div class="checkin-field-group">
+          <label for="checkin-input-date" class="checkin-label">Fecha del Registro</label>
+          <input type="date" id="checkin-input-date" class="strava-input" style="width: 100%;" required />
+        </div>
+
+        <div class="checkin-field-group">
+          <div class="checkin-scale-head">
+            <span class="checkin-label">Nivel de Energía</span>
+            <span id="checkin-val-energy" class="body-xs tabular-num checkin-val-badge">—</span>
+          </div>
+          <div class="checkin-scale-buttons" data-metric="energy">
+            <button type="button" class="checkin-btn-scale" data-val="1">1<small>Agotado</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="2">2<small>Bajo</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="3">3<small>Normal</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="4">4<small>Bueno</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="5">5<small>Óptimo</small></button>
+          </div>
+        </div>
+
+        <div class="checkin-field-group">
+          <div class="checkin-scale-head">
+            <span class="checkin-label">Calidad Percibida de Sueño</span>
+            <span id="checkin-val-sleep" class="body-xs tabular-num checkin-val-badge">—</span>
+          </div>
+          <div class="checkin-scale-buttons" data-metric="sleep_quality">
+            <button type="button" class="checkin-btn-scale" data-val="1">1<small>Pésimo</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="2">2<small>Malo</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="3">3<small>Aceptable</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="4">4<small>Reparador</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="5">5<small>Perfecto</small></button>
+          </div>
+        </div>
+
+        <div class="checkin-field-group">
+          <div class="checkin-scale-head">
+            <span class="checkin-label">Fatiga Muscular / Pesadez</span>
+            <span id="checkin-val-fatigue" class="body-xs tabular-num checkin-val-badge">—</span>
+          </div>
+          <div class="checkin-scale-buttons" data-metric="muscle_fatigue">
+            <button type="button" class="checkin-btn-scale" data-val="1">1<small>Destrozado</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="2">2<small>Pesado</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="3">3<small>Normal</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="4">4<small>Fresco</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="5">5<small>Ligero</small></button>
+          </div>
+        </div>
+
+        <div class="checkin-field-group">
+          <div class="checkin-scale-head">
+            <span class="checkin-label">Estrés Percibido (Mental / Diario)</span>
+            <span id="checkin-val-stress" class="body-xs tabular-num checkin-val-badge">—</span>
+          </div>
+          <div class="checkin-scale-buttons" data-metric="perceived_stress">
+            <button type="button" class="checkin-btn-scale" data-val="1">1<small>Muy alto</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="2">2<small>Alto</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="3">3<small>Moderado</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="4">4<small>Bajo</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="5">5<small>Zen</small></button>
+          </div>
+        </div>
+
+        <div class="checkin-field-group">
+          <div class="checkin-scale-head">
+            <span class="checkin-label">Sensación General de Rendimiento</span>
+            <span id="checkin-val-feeling" class="body-xs tabular-num checkin-val-badge">—</span>
+          </div>
+          <div class="checkin-scale-buttons" data-metric="general_feeling">
+            <button type="button" class="checkin-btn-scale" data-val="1">1<small>Muy flojo</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="2">2<small>Flojo</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="3">3<small>Neutro</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="4">4<small>Fuerte</small></button>
+            <button type="button" class="checkin-btn-scale" data-val="5">5<small>Imparable</small></button>
+          </div>
+        </div>
+
+        <div class="checkin-field-group">
+          <label for="checkin-input-discomfort" class="checkin-label">Molestias o Dolor Físico (opcional)</label>
+          <input type="text" id="checkin-input-discomfort" class="strava-input" placeholder="Ej. gemelo derecho cargado, molestia en fascia..." style="width: 100%;" />
+        </div>
+
+        <div class="checkin-field-group">
+          <label for="checkin-input-notes" class="checkin-label">Notas Adicionales (opcional)</label>
+          <textarea id="checkin-input-notes" class="strava-input" rows="2" placeholder="Ej. cena copiosa, dormí poco por viaje, día laboral muy intenso..." style="width: 100%; resize: vertical;"></textarea>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" style="flex:1;" onclick="closeWellnessCheckinModal()">Cancelar</button>
+          <button type="submit" id="btn-save-wellness-checkin" class="btn btn-primary" style="flex:2;">Guardar Check-in</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- App Logic script -->
-  <script src="/chart-animations.js?v=128"></script>
-  <script src="/app.js?v=128"></script>
+  <script src="/chart-animations.js?v=130"></script>
+  <script src="/app.js?v=130"></script>
 </body>
 </html>
