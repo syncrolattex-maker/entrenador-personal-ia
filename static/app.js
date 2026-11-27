@@ -453,17 +453,18 @@ function mostrarPantallaSeleccion() {
 }
 
 function renderRecommendation(rec) {
-  elRecTipoLabel.textContent = rec.recomendacion;
-  if (rec.recomendacion === "Fuerza") {
-    elRecTipoLabel.style.color = "var(--accent-fuerza)";
-  } else if (rec.recomendacion === "Carrera") {
-    elRecTipoLabel.style.color = "var(--accent-carrera)";
-  } else {
-    elRecTipoLabel.style.color = "var(--accent-success)";
+  if (elRecTipoLabel) {
+    elRecTipoLabel.textContent = rec.recomendacion;
+    if (rec.recomendacion === "Fuerza") {
+      elRecTipoLabel.style.color = "var(--accent-fuerza)";
+    } else if (rec.recomendacion === "Carrera") {
+      elRecTipoLabel.style.color = "var(--accent-carrera)";
+    } else {
+      elRecTipoLabel.style.color = "var(--accent-success)";
+    }
   }
-  
-  elRecRazonText.textContent = rec.razon;
-  elRecSemanalText.textContent = rec.explicacion_semanal || "";
+  if (elRecRazonText) elRecRazonText.textContent = rec.razon;
+  if (elRecSemanalText) elRecSemanalText.textContent = rec.explicacion_semanal || "";
 
   // Populate last workout context box right inside recommendation card
   const elLastContext = document.getElementById("rec-last-context");
@@ -5009,9 +5010,13 @@ function _paintActivityDetailHeaderAndMap(act) {
   const mapCont = document.getElementById("detail-map-container");
   const segBtn = document.getElementById("btn-create-segment-from-act");
   const gpxBtn = document.getElementById("btn-download-gpx");
+  const flyoverBtn = document.getElementById("btn-play-flyover-3d");
   if (_detailMapInstance) { _detailMapInstance.remove(); _detailMapInstance = null; }
   _detailMapCursorMarker = null;
   _detailMapHighlightLayer = null;
+  if (flyoverBtn) {
+    flyoverBtn.style.display = (act.polyline && act.polyline.length >= 2) ? "inline-flex" : "none";
+  }
   if (window.L && act.polyline && act.polyline.length > 2) {
     mapCont.style.display = "block";
     if (segBtn) {
@@ -7295,6 +7300,53 @@ async function loadWellnessAnalysisAndAI(force = false) {
     if (refreshBtn) {
       refreshBtn.disabled = false;
       refreshBtn.textContent = "Actualizar";
+    }
+  }
+}
+
+let _flyoverScriptsPromise = null;
+function _loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) {
+      resolve();
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = src;
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error(`Error cargando ${src}`));
+    document.head.appendChild(s);
+  });
+}
+
+async function launchActivityFlyover3D() {
+  if (!_currentDetailActivity || !_currentDetailActivity.polyline || _currentDetailActivity.polyline.length < 2) {
+    showSuccessBanner("⚠️ Esta actividad no dispone de trazado GPS.");
+    return;
+  }
+  const btn = document.getElementById("btn-play-flyover-3d");
+  if (btn) {
+    btn.disabled = true;
+    btn.querySelector("span").textContent = "Cargando 3D...";
+  }
+  try {
+    if (!_flyoverScriptsPromise) {
+      _flyoverScriptsPromise = _loadScriptOnce("/flyover-engine.js?v=133")
+        .then(() => _loadScriptOnce("/flyover-3d.js?v=133"));
+    }
+    await _flyoverScriptsPromise;
+    if (window.AaronFlyover3D) {
+      await window.AaronFlyover3D.openFlyover3D(_currentDetailActivity);
+    }
+  } catch (err) {
+    console.error("[Flyover 3D] Launch error:", err);
+    _flyoverScriptsPromise = null;
+    showSuccessBanner("⚠️ No se pudo iniciar el modo Flyover 3D.");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.querySelector("span").textContent = "REPRODUCIR FLYOVER 3D";
     }
   }
 }
