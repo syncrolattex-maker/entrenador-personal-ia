@@ -3459,6 +3459,247 @@ async def api_create_segment(payload: SegmentCreatePayload):
     return {"status": "ok", "segments": database.get_segments_with_efforts()}
 
 
+# ==========================================
+# FASE 5: WELLNESS, DAILY ACTIVITY & READINESS API
+# ==========================================
+from typing import Any, Dict
+import wellness_engine
+
+
+class WellnessSyncPayload(BaseModel):
+    days: int = 14
+    end_date: Optional[str] = None
+    force: bool = False
+
+
+class DailyCheckinPayload(BaseModel):
+    date: Optional[str] = None
+    checkin_date: Optional[str] = None
+    energy: Optional[int] = None
+    sleep_quality: Optional[int] = None
+    muscle_fatigue: Optional[int] = None
+    perceived_stress: Optional[int] = None
+    general_feeling: Optional[int] = None
+    physical_discomfort: Optional[str] = None
+    notes: Optional[str] = None
+
+
+def _build_daily_wellness_context(
+    target_date: Optional[str] = None,
+    sync_if_missing: bool = False,
+    include_ai: bool = False,
+    question: Optional[str] = None,
+) -> Dict[str, Any]:
+    date_str = (target_date or datetime.now().strftime("%Y-%m-%d"))[:10]
+    ref_dt = datetime.strptime(date_str, "%Y-%m-%d").date()
+    row = database.get_daily_wellness(date_str)
+    if (not row or row.get("day_status") in ("pending", "unavailable")) and sync_if_missing:
+        try:
+            wellness_engine.sync_wellness_range(days=1, force=True, ref_date=ref_dt)
+            row = database.get_daily_wellness(date_str)
+        except Exception as exc:
+            print(f"[Wellness API] Sync on-demand error for {date_str}: {exc}")
+
+    start_28d = (ref_dt - timedelta(days=28)).isoformat()
+    history_rows = database.get_daily_wellness_range(start_28d, date_str)
+    if not row:
+        row = {
+            "date": date_str,
+            "source": "garmin",
+            "day_status": "unavailable",
+        }
+    daily_summaries = []
+    try:
+        daily_summaries = database.get_daily_summaries(limit=35)
+    except Exception:
+        pass
+    baselines = wellness_engine.compute_wellness_baselines_and_trends(
+        history_rows,
+        daily_summaries=daily_summaries,
+        ref_date=ref_dt,
+    )
+    checkin = database.get_daily_checkin(date_str)
+
+    # Contexto opcional de carga de entrenamiento y sesión planificada hoy
+    training_ctx: Dict[str, Any] = {}
+    planned_session: Optional[Dict[str, Any]] = None
+    try:
+        acts = database.get_activities(limit=180)
+        if acts:
+            pmc = analytics_engine.calculate_pmc(acts, days=30)
+            if pmc and pmc.get("series"):
+                latest_pmc = pmc["series"][-1]
+                training_ctx = {
+                    "ctl": latest_pmc.get("ctl"),
+                    "atl": latest_pmc.get("atl"),
+                    "tsb": latest_pmc.get("tsb"),
+                }
+        saved_plan = database.get_setting("current_weekly_plan")
+        if saved_plan:
+            plan_obj = json.loads(saved_plan) if isinstance(saved_plan, str) else saved_plan
+            for day_item in (plan_obj.get("days") or []):
+                if str(day_item.get("date", ""))[:10] == date_str:
+                    planned_session = day_item
+                    break
+    except Exception:
+        pass
+
+    readiness = wellness_engine.evaluate_daily_readiness(
+        today_wellness=row,
+        trends=baselines,
+        training_load_latest=training_ctx,
+        checkin=checkin,
+        planned_day=planned_session,
+    )
+    snapshot = wellness_engine.build_ai_wellness_snapshot(
+        today_wellness=row,
+        trends=baselines,
+        readiness=readiness,
+        checkin=checkin,
+    )
+    result: Dict[str, Any] = {
+        "status": "ok",
+        "date": date_str,
+        "day_status": row.get("day_status", "unavailable"),
+        "wellness": row,
+        "checkin": checkin,
+        "baselines": baselines,
+        "readiness": readiness,
+        "snapshot": snapshot,
+    }
+    if include_ai:
+        result["ai_interpretation"] = ai_coach.generate_wellness_and_readiness_interpretation(
+            snapshot,
+            question=question,
+        )
+    return result
+
+
+@app.get("/api/wellness/today")
+def api_get_wellness_today(
+    date: Optional[str] = None,
+    sync: bool = False,
+    include_ai: bool = False,
+):
+    return _build_daily_wellness_context(
+        target_date=date,
+        sync_if_missing=sync,
+        include_ai=include_ai,
+    )
+
+
+@app.get("/api/wellness/history")
+def api_get_wellness_history(
+    days: int = 28,
+    end_date: Optional[str] = None,
+    start_date: Optional[str] = None,
+):
+    bounded_days = max(1, min(int(days or 28), 90))
+    end_str = (end_date or datetime.now().strftime("%Y-%m-%d"))[:10]
+    end_dt = datetime.strptime(end_str, "%Y-%m-%d").date()
+    if start_date:
+        start_str = start_date[:10]
+    else:
+        start_str = (end_dt - timedelta(days=bounded_days - 1)).isoformat()
+
+    rows = database.get_daily_wellness_range(start_str, end_str)
+    checkins = database.get_daily_checkins_range(start_str, end_str)
+    baselines = wellness_engine.compute_wellness_baselines_and_trends(
+        rows,
+        ref_date=end_dt,
+    )
+    return {
+        "status": "ok",
+        "start_date": start_str,
+        "end_date": end_str,
+        "days": bounded_days,
+        "count": len(rows),
+        "history": rows,
+        "checkins": checkins,
+        "baselines": baselines,
+    }
+
+
+@app.get("/api/wellness/readiness")
+def api_get_wellness_readiness(
+    date: Optional[str] = None,
+    include_ai: bool = True,
+    question: Optional[str] = None,
+):
+    ctx = _build_daily_wellness_context(
+        target_date=date,
+        sync_if_missing=False,
+        include_ai=include_ai,
+        question=question,
+    )
+    return {
+        "status": "ok",
+        "date": ctx["date"],
+        "day_status": ctx["day_status"],
+        "readiness": ctx["readiness"],
+        "baselines": ctx["baselines"],
+        "checkin": ctx["checkin"],
+        "ai_interpretation": ctx.get("ai_interpretation"),
+    }
+
+
+@app.post("/api/wellness/sync")
+def api_sync_wellness(payload: Optional[WellnessSyncPayload] = None):
+    req = payload or WellnessSyncPayload()
+    bounded_days = max(1, min(int(req.days or 14), 90))
+    ref_dt = (
+        datetime.strptime(req.end_date[:10], "%Y-%m-%d").date()
+        if req.end_date
+        else None
+    )
+    summary = wellness_engine.sync_wellness_range(
+        days=bounded_days,
+        force=bool(req.force),
+        ref_date=ref_dt,
+    )
+    return {
+        "status": "ok",
+        "sync": summary,
+    }
+
+
+@app.get("/api/wellness/checkin")
+def api_get_wellness_checkin(date: Optional[str] = None):
+    date_str = (date or datetime.now().strftime("%Y-%m-%d"))[:10]
+    checkin = database.get_daily_checkin(date_str)
+    return {
+        "status": "ok",
+        "date": date_str,
+        "checkin": checkin,
+    }
+
+
+@app.post("/api/wellness/checkin")
+def api_save_wellness_checkin(payload: DailyCheckinPayload):
+    date_str = (payload.date or payload.checkin_date or datetime.now().strftime("%Y-%m-%d"))[:10]
+    saved = database.upsert_daily_checkin({
+        "date": date_str,
+        "energy": payload.energy,
+        "sleep_quality": payload.sleep_quality,
+        "muscle_fatigue": payload.muscle_fatigue,
+        "perceived_stress": payload.perceived_stress,
+        "general_feeling": payload.general_feeling,
+        "physical_discomfort": payload.physical_discomfort,
+        "notes": payload.notes,
+    })
+    ctx = _build_daily_wellness_context(
+        target_date=date_str,
+        sync_if_missing=False,
+        include_ai=False,
+    )
+    return {
+        "status": "ok",
+        "date": date_str,
+        "checkin": saved,
+        "readiness": ctx["readiness"],
+    }
+
+
 # Create static folder if it doesn't exist
 os.makedirs("static", exist_ok=True)
 

@@ -353,3 +353,136 @@ def generate_session_deep_interpretation(analysis_summary: Dict[str, Any]) -> Di
         print(f"[AI Coach Session] Gemini fallback triggered: {e}")
         return _deterministic_session_interpretation(compact_summary, mode="deterministic_fallback_on_error")
 
+
+class WellnessCoachResponse(BaseModel):
+    estado_diario: str = Field(..., description="Estado de preparación del día (RECUPERACIÓN FAVORABLE, ESTADO NORMAL, PRECAUCIÓN / FATIGA, DATOS INSUFICIENTES).")
+    lectura_descanso: str = Field(..., description="Análisis del sueño nocturno frente a la media personal de 7 y 28 días.")
+    lectura_recuperacion: str = Field(..., description="Análisis de HRV, FC en reposo, Body Battery y estrés frente al histórico individual.")
+    lectura_movilidad_y_carga: str = Field(..., description="Relación entre pasos/movilidad cotidiana y carga deportiva (CTL/ATL/TSB).")
+    recomendacion_entrenamiento_hoy: str = Field(..., description="Si es razonable mantener o adaptar la sesión prevista hoy, sin modificar el plan automáticamente.")
+    respuesta_pregunta: Optional[str] = Field(default=None, description="Respuesta directa si el usuario formuló una pregunta específica.")
+    fuentes_citadas: List[str] = Field(default_factory=list, description="Separación explícita: Garmin real, cálculo AaronFit y check-in subjetivo.")
+    datos_faltantes: List[str] = Field(default_factory=list, description="Métricas no disponibles hoy.")
+
+
+def _deterministic_wellness_interpretation(
+    wellness_snapshot: Dict[str, Any],
+    question: Optional[str] = None,
+    mode: str = "deterministic_fallback",
+) -> Dict[str, Any]:
+    readiness = wellness_snapshot.get("readiness") or {}
+    trends = wellness_snapshot.get("trends_7d_vs_28d") or {}
+    slp = trends.get("sleep") or {}
+    mob = trends.get("mobility") or {}
+    rec = trends.get("recovery") or {}
+    chk = wellness_snapshot.get("subjective_checkin") or {}
+    sug = readiness.get("sugerencia_plan") or {}
+
+    estado = readiness.get("estado") or "DATOS INSUFICIENTES"
+    missing = list(readiness.get("datos_faltantes") or [])
+
+    slp_last = slp.get("last_night_hours")
+    slp_7 = slp.get("avg_hours_7d")
+    slp_28 = slp.get("avg_hours_28d")
+    slp_scr = slp.get("last_night_score")
+    if slp_last is not None:
+        lectura_descanso = (
+            f"Última noche: {slp_last} h (Garmin real"
+            + (f", puntuación {slp_scr}/100" if slp_scr is not None else "")
+            + f") frente a tu media calculada de 7 días ({slp_7 if slp_7 is not None else 'N/D'} h) y 28 días ({slp_28 if slp_28 is not None else 'N/D'} h)."
+        )
+    else:
+        lectura_descanso = "Sin datos de sueño nocturno registrados hoy en Garmin."
+
+    hrv_last = rec.get("hrv_last_night")
+    hrv_28 = rec.get("hrv_baseline_28d")
+    rhr_today = rec.get("resting_hr_today")
+    rhr_28 = rec.get("resting_hr_baseline_28d")
+    bb_max = rec.get("body_battery_max_today")
+    if any(x is not None for x in (hrv_last, rhr_today, bb_max)):
+        lectura_rec = (
+            f"HRV nocturna: {hrv_last if hrv_last is not None else 'N/D'} ms (referencia personal 28d AaronFit: {hrv_28 if hrv_28 is not None else 'N/D'} ms); "
+            f"FC reposo: {rhr_today if rhr_today is not None else 'N/D'} ppm (base 28d: {rhr_28 if rhr_28 is not None else 'N/D'} ppm); "
+            f"Body Battery máx: {bb_max if bb_max is not None else 'N/D'}/100."
+        )
+    else:
+        lectura_rec = "Sin mediciones de HRV, FC en reposo ni Body Battery disponibles para hoy."
+
+    steps_today = mob.get("today_steps")
+    steps_7 = mob.get("avg_steps_7d")
+    steps_28 = mob.get("avg_steps_28d")
+    tsb = ((readiness.get("metricas_justificativas") or {}).get("aaronfit_calculado") or {}).get("tsb_banister_ewma")
+    lectura_mob = (
+        f"Pasos hoy: {steps_today if steps_today is not None else 'N/D'} (media 7d: {steps_7 if steps_7 is not None else 'N/D'}, 28d: {steps_28 if steps_28 is not None else 'N/D'}). "
+        f"Balance de carga deportiva (TSB Banister EWMA AaronFit): {tsb if tsb is not None else 'N/D'}."
+    )
+
+    fuentes = ["Garmin Connect (sueño, pasos, HRV, FC reposo, Body Battery)", "AaronFit (medias 7d/28d, referencias personales y TSB)"]
+    if chk and any(chk.get(k) is not None for k in ("energy", "sleep_quality", "muscle_fatigue", "general_feeling")):
+        fuentes.append(f"Check-in subjetivo del usuario (energía {chk.get('energy')}/5, fatiga {chk.get('muscle_fatigue')}/5)")
+
+    ans = None
+    if question:
+        ans = f"{readiness.get('recomendacion') or ''} {lectura_descanso} {lectura_rec}".strip()
+
+    return {
+        "estado_diario": estado,
+        "lectura_descanso": lectura_descanso,
+        "lectura_recuperacion": lectura_rec,
+        "lectura_movilidad_y_carga": lectura_mob,
+        "recomendacion_entrenamiento_hoy": sug.get("mensaje") or readiness.get("recomendacion") or "Sin recomendación.",
+        "respuesta_pregunta": ans,
+        "fuentes_citadas": fuentes,
+        "datos_faltantes": missing,
+        "source_mode": mode,
+    }
+
+
+def generate_wellness_and_readiness_interpretation(
+    wellness_snapshot: Dict[str, Any],
+    question: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Section 7: Grounded Gemini interpretation for Daily Wellness, Mobility & Readiness.
+    Strictly separates Garmin measurements, AaronFit calculations, and subjective check-in data.
+    Never invents missing values or emits medical diagnoses.
+    """
+    sanitized = sanitize_snapshot_for_gemini(wellness_snapshot)
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not HAS_GENAI or not api_key:
+        return _deterministic_wellness_interpretation(sanitized, question=question, mode="deterministic_no_key")
+
+    system_instruction = (
+        "Eres el entrenador personal integral de AaronFit. Analizas descanso, recuperación fisiológica, movilidad diaria y carga deportiva.\n"
+        "REGLAS ESTRICTAS:\n"
+        "1. Cita ÚNICAMENTE métricas reales presentes en el JSON y menciona los periodos comparados (última noche vs 7 días vs 28 días).\n"
+        "2. Separa expresamente qué datos provienen de Garmin, cuáles son cálculos propios de AaronFit (medias 7d/28d, TSB) y cuáles del check-in subjetivo.\n"
+        "3. Reconoce explícitamente cualquier dato que falte en 'datos_faltantes'. Prohibido inventar mediciones o asumir 0 cuando es null.\n"
+        "4. No emitas diagnósticos médicos ni uses una única métrica aislada para conclusiones contundentes.\n"
+        "5. No confundas un día de pocos pasos con mala recuperación fisiológica."
+    )
+    prompt_text = f"Analiza este resumen de bienestar y preparación diaria:\n{json.dumps(sanitized, ensure_ascii=False)}"
+    if question:
+        prompt_text += f"\n\nPregunta específica del atleta: {question}"
+
+    try:
+        client = genai.Client(api_key=api_key, http_options={"timeout": 15000})
+        resp = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt_text,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                response_mime_type="application/json",
+                response_schema=WellnessCoachResponse,
+                temperature=0.15,
+            ),
+        )
+        parsed = json.loads(resp.text)
+        validated = WellnessCoachResponse(**parsed).model_dump()
+        validated["source_mode"] = "gemini_live"
+        return validated
+    except Exception as e:
+        print(f"[AI Coach Wellness] Gemini fallback triggered: {e}")
+        return _deterministic_wellness_interpretation(sanitized, question=question, mode="deterministic_fallback_on_error")
+
+

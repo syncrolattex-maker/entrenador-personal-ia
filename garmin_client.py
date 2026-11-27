@@ -75,30 +75,68 @@ def save_personal_key(api_key: str) -> None:
         print(f"[Garmin] Could not persist personal key to file: {e}")
 
 
-def _get_personal_api_token() -> Optional[str]:
-    """Exchanges GARMIN_PERSONAL_API_KEY (GCDC_...) for a short-lived Bearer JWT token, cached in memory & DB."""
+def _extract_jwt_expiration(token: str) -> Optional[float]:
+    """Decodes the JWT payload (without logging the token) to read the real 'exp' epoch claim."""
+    if not token or token.count(".") != 2:
+        return None
+    try:
+        import base64
+        payload_b64 = token.split(".")[1]
+        pad = "=" * ((4 - len(payload_b64) % 4) % 4)
+        raw = base64.urlsafe_b64decode((payload_b64 + pad).encode("ascii"))
+        claims = json.loads(raw.decode("utf-8"))
+        exp_val = claims.get("exp")
+        if exp_val is not None and float(exp_val) > time.time():
+            return float(exp_val)
+    except Exception:
+        pass
+    return None
+
+
+def _invalidate_personal_api_token() -> None:
+    """Clears cached Personal API Bearer JWT in memory and in DB (used on HTTP 401 before re-exchanging API key)."""
+    _personal_token_cache["token"] = None
+    _personal_token_cache["expires_at"] = 0.0
+    try:
+        import database
+        database.set_setting("garmin_jwt_cache", "")
+    except Exception:
+        pass
+
+
+def _get_personal_api_token(force_refresh: bool = False) -> Optional[str]:
+    """
+    Exchanges GARMIN_PERSONAL_API_KEY (GCDC_...) via official endpoint:
+    POST https://personal.connectapi.garmin.com/personalapitoken-service/personal-api/personal-api-key/token
+    for a short-lived Bearer JWT token, cached in memory & PostgreSQL/SQLite (app_settings.garmin_jwt_cache).
+    Reads the real JWT 'exp' claim when present (or defaults to 12h) and refreshes 300s before expiry.
+    """
     api_key = get_saved_personal_key()
     if not api_key:
         return None
 
+    if force_refresh:
+        _invalidate_personal_api_token()
+
     now = time.time()
-    if _personal_token_cache["token"] and now < _personal_token_cache["expires_at"] - 120:
+    if not force_refresh and _personal_token_cache["token"] and now < _personal_token_cache["expires_at"] - 300:
         return _personal_token_cache["token"]
 
     # Check persistent DB cache (avoids POST token exchange on every Vercel cold start)
-    try:
-        import database
-        cached_raw = database.get_setting("garmin_jwt_cache")
-        if cached_raw:
-            cached = json.loads(cached_raw)
-            c_token = cached.get("token")
-            c_exp = float(cached.get("expires_at") or 0.0)
-            if c_token and now < c_exp - 120:
-                _personal_token_cache["token"] = c_token
-                _personal_token_cache["expires_at"] = c_exp
-                return c_token
-    except Exception as e:
-        print(f"[Garmin Personal API] DB JWT cache read error: {e}")
+    if not force_refresh:
+        try:
+            import database
+            cached_raw = database.get_setting("garmin_jwt_cache")
+            if cached_raw:
+                cached = json.loads(cached_raw)
+                c_token = cached.get("token")
+                c_exp = float(cached.get("expires_at") or 0.0)
+                if c_token and now < c_exp - 300:
+                    _personal_token_cache["token"] = c_token
+                    _personal_token_cache["expires_at"] = c_exp
+                    return c_token
+        except Exception as e:
+            print(f"[Garmin Personal API] DB JWT cache read error: {e}")
 
     try:
         resp = requests.post(
@@ -106,11 +144,21 @@ def _get_personal_api_token() -> Optional[str]:
             headers={"Authorization": f"ApiKey {api_key}"},
             timeout=10,
         )
-        if resp.status_code == 200:
-            token = resp.text.strip().strip('"')
-            expires_at = now + 12 * 3600
+        if resp.status_code == 200 and resp.text:
+            raw_text = resp.text.strip()
+            token = raw_text.strip('"')
+            if raw_text.startswith("{"):
+                try:
+                    jd = resp.json()
+                    if isinstance(jd, dict):
+                        token = str(jd.get("access_token") or jd.get("token") or jd.get("jwt") or token).strip()
+                except Exception:
+                    pass
+            if not token:
+                return None
+            jwt_exp = _extract_jwt_expiration(token)
+            expires_at = jwt_exp if jwt_exp is not None else (now + 12 * 3600)
             _personal_token_cache["token"] = token
-            # Tokens are valid up to 24h; refresh proactively every 12h
             _personal_token_cache["expires_at"] = expires_at
             try:
                 import database
@@ -118,10 +166,32 @@ def _get_personal_api_token() -> Optional[str]:
             except Exception as db_err:
                 print(f"[Garmin Personal API] DB JWT cache write error: {db_err}")
             return token
-        print(f"[Garmin Personal API] Token exchange failed: {resp.status_code} {resp.text[:200]}")
+        print(f"[Garmin Personal API] Token exchange failed: HTTP {resp.status_code}")
     except Exception as e:
-        print(f"[Garmin Personal API] Token exchange exception: {e}")
+        print(f"[Garmin Personal API] Token exchange exception: {type(e).__name__}")
     return None
+
+
+def _personal_api_get(
+    path: str,
+    params: Optional[Dict[str, Any]] = None,
+    timeout: int = 10,
+) -> Optional[requests.Response]:
+    """
+    Executes an authenticated GET against PERSONAL_API_BASE (https://personal.connectapi.garmin.com).
+    If HTTP 401 is returned, invalidates the cached JWT, exchanges the Personal API Key for a new
+    Bearer token, and retries once automatically.
+    """
+    token = _get_personal_api_token(force_refresh=False)
+    if not token:
+        return None
+    url = f"{PERSONAL_API_BASE}{path}" if path.startswith("/") else f"{PERSONAL_API_BASE}/{path}"
+    resp = requests.get(url, params=params, headers={"Authorization": f"Bearer {token}"}, timeout=timeout)
+    if resp.status_code == 401:
+        fresh_token = _get_personal_api_token(force_refresh=True)
+        if fresh_token:
+            resp = requests.get(url, params=params, headers={"Authorization": f"Bearer {fresh_token}"}, timeout=timeout)
+    return resp
 
 
 def _map_garmin_type(type_key: str) -> str:
@@ -1236,3 +1306,219 @@ def get_garmin_activity_details(activity_id: str, max_chart_size: int = 1500) ->
             "power_w": chart_power,
         },
     }
+
+
+def fetch_garmin_daily_wellness_raw(target_date: str) -> Dict[str, Any]:
+    """
+    Fase 5 & 5.1: Fetches raw daily wellness payloads (user summary, sleep, HRV, Body Battery, stress,
+    and optional dailyHeartRate / spo2acclimation) for a given YYYY-MM-DD local date.
+    Prioritizes official Garmin Connect Personal API routes under https://personal.connectapi.garmin.com
+    (with automatic 401 JWT refresh), and falls back to legacy Garmin Connect routes via garth/garminconnect.
+    Never logs credentials or personal tokens.
+    """
+    d_str = str(target_date or date.today().isoformat())[:10]
+    bundle: Dict[str, Any] = {
+        "date": d_str,
+        "summary": None,
+        "sleep": None,
+        "hrv": None,
+        "body_battery": None,
+        "stress": None,
+        "daily_hr": None,
+        "spo2": None,
+        "auth_method": None,
+        "endpoints_used": {},
+        "errors": [],
+    }
+
+    bearer = _get_personal_api_token()
+    if bearer:
+        bundle["auth_method"] = "garmin_personal_api"
+
+        # 1. Daily user summary (steps, goal, calories, RHR, stress, floors, intensity minutes, BB, SpO2, respiration)
+        # Official Personal API routes:
+        #   - GET /usersummary-service/usersummary/daily?calendarDate=YYYY-MM-DD
+        #   - GET /usersummary-service/v2/dailysummaries?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+        for sum_path, sum_params in (
+            ("/usersummary-service/usersummary/daily", {"calendarDate": d_str}),
+            ("/usersummary-service/v2/dailysummaries", {"startDate": d_str, "endDate": d_str}),
+        ):
+            try:
+                r = _personal_api_get(sum_path, params=sum_params, timeout=10)
+                if r is not None and r.status_code == 200 and r.text:
+                    jd = r.json()
+                    if isinstance(jd, list) and jd and isinstance(jd[0], dict):
+                        bundle["summary"] = jd[0]
+                        bundle["endpoints_used"]["summary"] = f"personal_api:{sum_path}"
+                        break
+                    elif isinstance(jd, dict) and jd:
+                        if isinstance(jd.get("dailySummaries"), list) and jd["dailySummaries"]:
+                            bundle["summary"] = jd["dailySummaries"][0]
+                        else:
+                            bundle["summary"] = jd
+                        bundle["endpoints_used"]["summary"] = f"personal_api:{sum_path}"
+                        break
+            except Exception as e:
+                bundle["errors"].append(f"summary:{type(e).__name__}")
+
+        # 2. Sleep (Official Personal API sleep-service first, then wellness-service fallback)
+        #   - GET /sleep-service/sleep/dailySleep?date=YYYY-MM-DD
+        #   - GET /sleep-service/sleep/dailySleepData?date=YYYY-MM-DD&nonBufferMillis=60000
+        #   - GET /sleep-service/sleep/dailySleepSummariesByDate?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+        for slp_path, slp_params in (
+            ("/sleep-service/sleep/dailySleep", {"date": d_str}),
+            ("/sleep-service/sleep/dailySleepData", {"date": d_str, "nonBufferMillis": 60000}),
+            ("/sleep-service/sleep/dailySleepSummariesByDate", {"startDate": d_str, "endDate": d_str}),
+            ("/wellness-service/wellness/dailySleepData", {"date": d_str, "nonBufferMillis": 60000}),
+        ):
+            try:
+                r = _personal_api_get(slp_path, params=slp_params, timeout=10)
+                if r is not None and r.status_code == 200 and r.text:
+                    jd = r.json()
+                    if isinstance(jd, list) and jd and isinstance(jd[0], dict):
+                        jd = jd[0]
+                    if isinstance(jd, dict) and (
+                        jd.get("dailySleepDTO")
+                        or jd.get("sleepTimeSeconds") is not None
+                        or (isinstance(jd.get("dailySleepSummaries"), list) and jd["dailySleepSummaries"])
+                    ):
+                        bundle["sleep"] = jd
+                        bundle["endpoints_used"]["sleep"] = f"personal_api:{slp_path}"
+                        break
+            except Exception as e:
+                bundle["errors"].append(f"sleep:{type(e).__name__}")
+
+        # 3. HRV (Official Personal API hrv-service)
+        #   - GET /hrv-service/hrv/{calendarDate}
+        #   - GET /hrv-service/hrv/daily/{fromDate}/{toDate}
+        for hrv_path in (
+            f"/hrv-service/hrv/{d_str}",
+            f"/hrv-service/hrv/daily/{d_str}/{d_str}",
+        ):
+            try:
+                r = _personal_api_get(hrv_path, timeout=10)
+                if r is not None and r.status_code == 200 and r.text:
+                    jd = r.json()
+                    if isinstance(jd, dict) and jd:
+                        bundle["hrv"] = jd
+                        bundle["endpoints_used"]["hrv"] = f"personal_api:{hrv_path}"
+                        break
+            except Exception as e:
+                bundle["errors"].append(f"hrv:{type(e).__name__}")
+
+        # 4. Body Battery (Official Personal API wellness-service)
+        #   - GET /wellness-service/wellness/bodyBattery/reports/daily?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+        try:
+            bb_path = "/wellness-service/wellness/bodyBattery/reports/daily"
+            r = _personal_api_get(bb_path, params={"startDate": d_str, "endDate": d_str}, timeout=10)
+            if r is not None and r.status_code == 200 and r.text:
+                bundle["body_battery"] = r.json()
+                bundle["endpoints_used"]["body_battery"] = f"personal_api:{bb_path}"
+        except Exception as e:
+            bundle["errors"].append(f"body_battery:{type(e).__name__}")
+
+        # 5. Daily Stress (Official Personal API usersummary-service first, then legacy wellness-service)
+        #   - GET /usersummary-service/stats/stress/daily/{startDate}/{endDate}
+        #   - GET /wellness-service/wellness/dailyStress/{calendarDate}
+        sum_dict = bundle["summary"] if isinstance(bundle["summary"], dict) else {}
+        if sum_dict.get("averageStressLevel") is None:
+            for str_path in (
+                f"/usersummary-service/stats/stress/daily/{d_str}/{d_str}",
+                f"/wellness-service/wellness/dailyStress/{d_str}",
+            ):
+                try:
+                    r = _personal_api_get(str_path, timeout=10)
+                    if r is not None and r.status_code == 200 and r.text:
+                        jd = r.json()
+                        if jd:
+                            bundle["stress"] = jd
+                            bundle["endpoints_used"]["stress"] = f"personal_api:{str_path}"
+                            break
+                except Exception as e:
+                    bundle["errors"].append(f"stress:{type(e).__name__}")
+
+        # 6. Optional Daily Heart Rate & SpO2 acclimation if missing from summary
+        if sum_dict.get("restingHeartRate") is None and sum_dict.get("currentDayRestingHeartRate") is None:
+            try:
+                hr_path = "/wellness-service/wellness/dailyHeartRate"
+                r = _personal_api_get(hr_path, params={"date": d_str}, timeout=10)
+                if r is not None and r.status_code == 200 and r.text:
+                    bundle["daily_hr"] = r.json()
+                    bundle["endpoints_used"]["daily_hr"] = f"personal_api:{hr_path}"
+            except Exception as e:
+                bundle["errors"].append(f"daily_hr:{type(e).__name__}")
+
+        if sum_dict.get("averageSpo2") is None:
+            try:
+                spo2_path = f"/wellness-service/wellness/daily/spo2acclimation/{d_str}"
+                r = _personal_api_get(spo2_path, timeout=10)
+                if r is not None and r.status_code == 200 and r.text:
+                    bundle["spo2"] = r.json()
+                    bundle["endpoints_used"]["spo2"] = f"personal_api:{spo2_path}"
+            except Exception as e:
+                bundle["errors"].append(f"spo2:{type(e).__name__}")
+
+    # Supplement missing blocks via legacy garth OAuth or garminconnect if connected
+    g_client = _get_garth_client()
+    if g_client is not None:
+        if not bundle["auth_method"]:
+            bundle["auth_method"] = "garmin_garth_oauth"
+        if not bundle["summary"]:
+            try:
+                uname = getattr(g_client, "username", None)
+                ep = f"/usersummary-service/usersummary/daily/{uname}" if uname else "/usersummary-service/usersummary/daily"
+                bundle["summary"] = g_client.connectapi(ep, params={"calendarDate": d_str})
+                bundle["endpoints_used"]["summary"] = f"garth_legacy:{ep}"
+            except Exception as e:
+                bundle["errors"].append(f"garth_summary:{type(e).__name__}")
+        if not bundle["sleep"]:
+            try:
+                uname = getattr(g_client, "username", None)
+                ep = f"/wellness-service/wellness/dailySleepData/{uname}" if uname else "/wellness-service/wellness/dailySleepData"
+                bundle["sleep"] = g_client.connectapi(ep, params={"date": d_str, "nonBufferMillis": 60000})
+                bundle["endpoints_used"]["sleep"] = f"garth_legacy:{ep}"
+            except Exception as e:
+                bundle["errors"].append(f"garth_sleep:{type(e).__name__}")
+        if not bundle["hrv"]:
+            try:
+                ep = f"/hrv-service/hrv/{d_str}"
+                bundle["hrv"] = g_client.connectapi(ep)
+                bundle["endpoints_used"]["hrv"] = f"garth_legacy:{ep}"
+            except Exception as e:
+                bundle["errors"].append(f"garth_hrv:{type(e).__name__}")
+        if not bundle["body_battery"]:
+            try:
+                ep = "/wellness-service/wellness/bodyBattery/reports/daily"
+                bundle["body_battery"] = g_client.connectapi(
+                    ep,
+                    params={"startDate": d_str, "endDate": d_str},
+                )
+                bundle["endpoints_used"]["body_battery"] = f"garth_legacy:{ep}"
+            except Exception as e:
+                bundle["errors"].append(f"garth_bb:{type(e).__name__}")
+
+    gc_client = get_garmin_client() if (not bundle["summary"] and not bundle["sleep"]) else None
+    if gc_client is not None:
+        if not bundle["auth_method"]:
+            bundle["auth_method"] = "garminconnect_oauth"
+        if not bundle["summary"]:
+            try:
+                bundle["summary"] = gc_client.get_stats(d_str)
+                bundle["endpoints_used"]["summary"] = "garminconnect:get_stats"
+            except Exception as e:
+                bundle["errors"].append(f"gc_stats:{type(e).__name__}")
+        if not bundle["sleep"]:
+            try:
+                bundle["sleep"] = gc_client.get_sleep_data(d_str)
+                bundle["endpoints_used"]["sleep"] = "garminconnect:get_sleep_data"
+            except Exception as e:
+                bundle["errors"].append(f"gc_sleep:{type(e).__name__}")
+        if not bundle["hrv"]:
+            try:
+                bundle["hrv"] = gc_client.get_hrv_data(d_str)
+                bundle["endpoints_used"]["hrv"] = "garminconnect:get_hrv_data"
+            except Exception as e:
+                bundle["errors"].append(f"gc_hrv:{type(e).__name__}")
+
+    return bundle
+

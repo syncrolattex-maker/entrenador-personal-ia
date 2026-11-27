@@ -141,9 +141,22 @@ def test_ai_empty_incomplete_error_and_invalid_json():
             assert (t2 - t1) < 0.01  # instant cache hit
 
 
+import unittest
+
+
+class TestPhase4AiAndAnalytics(unittest.TestCase):
+    def test_1_6w_efficiency_and_variability_band(self):
+        test_6w_efficiency_and_variability_band()
+
+    def test_2_ewma_rest_vs_unconfirmed_days(self):
+        test_ewma_rest_vs_unconfirmed_days()
+
+    def test_3_privacy_sanitization_strips_forbidden_keys(self):
+        test_privacy_sanitization_strips_forbidden_keys()
+
+    def test_4_ai_empty_incomplete_error_and_invalid_json(self):
+        test_ai_empty_incomplete_error_and_invalid_json()
+
+
 if __name__ == "__main__":
-    test_6w_efficiency_and_variability_band()
-    test_ewma_rest_vs_unconfirmed_days()
-    test_privacy_sanitization_strips_forbidden_keys()
-    test_ai_empty_incomplete_error_and_invalid_json()
-    print("ALL_PHASE4_TESTS_OK")
+    unittest.main()

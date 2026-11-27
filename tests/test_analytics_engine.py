@@ -128,10 +128,25 @@ def test_incomplete_activities_and_snapshot():
     assert "metric_catalog" in snap and "aerobic_efficiency" in snap["metric_catalog"]
 
 
+import unittest
+
+
+class TestPhase3AnalyticsEngine(unittest.TestCase):
+    def test_1_period_comparisons_and_custom_range(self):
+        test_period_comparisons_and_custom_range()
+
+    def test_2_aerobic_efficiency_improvement_and_insufficient_sample(self):
+        test_aerobic_efficiency_improvement_and_insufficient_sample()
+
+    def test_3_training_load_ewma_zero_seed_and_insufficient(self):
+        test_training_load_ewma_zero_seed_and_insufficient()
+
+    def test_4_hr_zones_100_percent_and_incomplete_data(self):
+        test_hr_zones_100_percent_and_incomplete_data()
+
+    def test_5_incomplete_activities_and_snapshot(self):
+        test_incomplete_activities_and_snapshot()
+
+
 if __name__ == "__main__":
-    test_period_comparisons_and_custom_range()
-    test_aerobic_efficiency_improvement_and_insufficient_sample()
-    test_training_load_ewma_zero_seed_and_insufficient()
-    test_hr_zones_100_percent_and_incomplete_data()
-    test_incomplete_activities_and_snapshot()
-    print("ALL_ANALYTICS_ENGINE_TESTS_OK")
+    unittest.main()

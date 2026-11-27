@@ -256,12 +256,75 @@ def init_db() -> None:
     """)
 
     # Performance indexes for paginated history, date-range analytics, and deduplication
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS daily_wellness (
+            date TEXT PRIMARY KEY,
+            timezone TEXT DEFAULT 'Europe/Madrid',
+            sleep_total_sec INTEGER,
+            sleep_start_local TEXT,
+            sleep_end_local TEXT,
+            time_in_bed_sec INTEGER,
+            sleep_score INTEGER,
+            deep_sleep_sec INTEGER,
+            light_sleep_sec INTEGER,
+            rem_sleep_sec INTEGER,
+            awake_sec INTEGER,
+            interruptions_count INTEGER,
+            nap_sec INTEGER,
+            steps INTEGER,
+            step_goal INTEGER,
+            steps_distance_m REAL,
+            floors_climbed REAL,
+            moderate_intensity_min INTEGER,
+            vigorous_intensity_min INTEGER,
+            active_calories INTEGER,
+            total_calories INTEGER,
+            sedentary_sec INTEGER,
+            hrv_last_night REAL,
+            hrv_weekly_avg REAL,
+            hrv_status TEXT,
+            resting_hr INTEGER,
+            avg_hr INTEGER,
+            stress_avg INTEGER,
+            stress_max INTEGER,
+            body_battery_most_recent INTEGER,
+            body_battery_max INTEGER,
+            body_battery_min INTEGER,
+            body_battery_charged INTEGER,
+            body_battery_drained INTEGER,
+            respiration_avg REAL,
+            spo2_avg REAL,
+            day_status TEXT DEFAULT 'pending',
+            data_quality_json TEXT,
+            sources_json TEXT,
+            synced_at TEXT
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS daily_checkins (
+            date TEXT PRIMARY KEY,
+            energy INTEGER,
+            sleep_quality INTEGER,
+            muscle_fatigue INTEGER,
+            perceived_stress INTEGER,
+            general_feeling INTEGER,
+            physical_discomfort TEXT,
+            notes TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+    """)
+
     for idx_sql in [
         "CREATE INDEX IF NOT EXISTS idx_activities_start_date ON activities (start_date DESC)",
         "CREATE INDEX IF NOT EXISTS idx_activities_sport_date ON activities (sport_type, start_date DESC)",
         "CREATE INDEX IF NOT EXISTS idx_activities_source ON activities (source)",
         "CREATE INDEX IF NOT EXISTS idx_activities_strava_id ON activities (strava_id)",
         "CREATE INDEX IF NOT EXISTS idx_daily_summaries_date ON daily_summaries (date DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_daily_wellness_date ON daily_wellness (date DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_daily_wellness_status ON daily_wellness (day_status)",
+        "CREATE INDEX IF NOT EXISTS idx_daily_checkins_date ON daily_checkins (date DESC)",
     ]:
         try:
             cur.execute(idx_sql)
@@ -1514,3 +1577,264 @@ def set_setting(key: str, value: str) -> None:
         cur.execute(f"INSERT INTO app_settings (key, value) VALUES ({p}, {p})", (key, value))
     conn.commit()
     conn.close()
+
+
+# ==============================================================================
+# FASE 5 — DAILY WELLNESS & SUBJECTIVE CHECK-INS PERSISTENCE
+# ==============================================================================
+
+_WELLNESS_COLS = [
+    "date", "timezone",
+    "sleep_total_sec", "sleep_start_local", "sleep_end_local", "time_in_bed_sec",
+    "sleep_score", "deep_sleep_sec", "light_sleep_sec", "rem_sleep_sec",
+    "awake_sec", "interruptions_count", "nap_sec",
+    "steps", "step_goal", "steps_distance_m", "floors_climbed",
+    "moderate_intensity_min", "vigorous_intensity_min", "active_calories",
+    "total_calories", "sedentary_sec",
+    "hrv_last_night", "hrv_weekly_avg", "hrv_status",
+    "resting_hr", "avg_hr", "stress_avg", "stress_max",
+    "body_battery_most_recent", "body_battery_max", "body_battery_min",
+    "body_battery_charged", "body_battery_drained",
+    "respiration_avg", "spo2_avg",
+    "day_status", "data_quality_json", "sources_json", "synced_at",
+]
+
+
+def _deserialize_wellness_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    out = dict(row)
+    for jcol in ("data_quality_json", "sources_json"):
+        raw = out.get(jcol)
+        key = jcol.replace("_json", "")
+        if isinstance(raw, str) and raw:
+            try:
+                out[key] = json.loads(raw)
+            except Exception:
+                out[key] = {}
+        elif isinstance(raw, dict):
+            out[key] = raw
+        else:
+            out[key] = {}
+    return out
+
+
+def upsert_daily_wellness(records: List[Dict[str, Any]]) -> int:
+    """
+    Idempotent UPSERT into daily_wellness using COALESCE on non-null fields so partial
+    syncs never overwrite previously stored valid measurements with NULL.
+    Never stores raw personal payloads.
+    """
+    if not records:
+        return 0
+    from datetime import datetime, timezone as dt_tz
+    init_db()
+    conn = _get_conn()
+    cur = conn.cursor()
+    p = _ph(conn)
+    now_iso = datetime.now(dt_tz.utc).isoformat()
+    touched = 0
+
+    update_cols = [c for c in _WELLNESS_COLS if c != "date"]
+    set_clauses = ", ".join(
+        f"{c} = COALESCE(EXCLUDED.{c}, daily_wellness.{c})"
+        for c in update_cols
+    )
+    placeholders = ", ".join([p] * len(_WELLNESS_COLS))
+    sql = f"""
+        INSERT INTO daily_wellness ({', '.join(_WELLNESS_COLS)})
+        VALUES ({placeholders})
+        ON CONFLICT (date) DO UPDATE SET {set_clauses}
+    """
+
+    for rec in records:
+        d_str = str(rec.get("date") or rec.get("fecha") or "")[:10]
+        if not d_str:
+            continue
+        dq = rec.get("data_quality") or rec.get("data_quality_json")
+        if isinstance(dq, dict):
+            dq_str = json.dumps(dq)
+        elif isinstance(dq, str):
+            dq_str = dq
+        else:
+            dq_str = None
+
+        src = rec.get("sources") or rec.get("sources_json")
+        if isinstance(src, dict):
+            src_str = json.dumps(src)
+        elif isinstance(src, str):
+            src_str = src
+        else:
+            src_str = None
+
+        vals = [
+            d_str,
+            rec.get("timezone") or "Europe/Madrid",
+            rec.get("sleep_total_sec"),
+            rec.get("sleep_start_local"),
+            rec.get("sleep_end_local"),
+            rec.get("time_in_bed_sec"),
+            rec.get("sleep_score"),
+            rec.get("deep_sleep_sec"),
+            rec.get("light_sleep_sec"),
+            rec.get("rem_sleep_sec"),
+            rec.get("awake_sec"),
+            rec.get("interruptions_count"),
+            rec.get("nap_sec"),
+            rec.get("steps"),
+            rec.get("step_goal"),
+            rec.get("steps_distance_m"),
+            rec.get("floors_climbed"),
+            rec.get("moderate_intensity_min"),
+            rec.get("vigorous_intensity_min"),
+            rec.get("active_calories"),
+            rec.get("total_calories"),
+            rec.get("sedentary_sec"),
+            rec.get("hrv_last_night"),
+            rec.get("hrv_weekly_avg"),
+            rec.get("hrv_status"),
+            rec.get("resting_hr"),
+            rec.get("avg_hr"),
+            rec.get("stress_avg"),
+            rec.get("stress_max"),
+            rec.get("body_battery_most_recent"),
+            rec.get("body_battery_max"),
+            rec.get("body_battery_min"),
+            rec.get("body_battery_charged"),
+            rec.get("body_battery_drained"),
+            rec.get("respiration_avg"),
+            rec.get("spo2_avg"),
+            rec.get("day_status") or "pending",
+            dq_str,
+            src_str,
+            rec.get("synced_at") or now_iso,
+        ]
+        cur.execute(sql, tuple(vals))
+        touched += 1
+
+    conn.commit()
+    conn.close()
+    return touched
+
+
+def get_daily_wellness(target_date: str) -> Optional[Dict[str, Any]]:
+    init_db()
+    conn = _get_conn()
+    cur = conn.cursor()
+    p = _ph(conn)
+    cur.execute(f"SELECT * FROM daily_wellness WHERE date = {p}", (str(target_date)[:10],))
+    rows = _rows_to_dicts(cur, cur.fetchall())
+    conn.close()
+    return _deserialize_wellness_row(rows[0]) if rows else None
+
+
+def get_daily_wellness_range(
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    limit: int = 365,
+) -> List[Dict[str, Any]]:
+    init_db()
+    conn = _get_conn()
+    cur = conn.cursor()
+    p = _ph(conn)
+    clauses: List[str] = []
+    params: List[Any] = []
+    if date_from:
+        clauses.append(f"date >= {p}")
+        params.append(str(date_from)[:10])
+    if date_to:
+        clauses.append(f"date <= {p}")
+        params.append(str(date_to)[:10])
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    params.append(max(1, min(1000, int(limit))))
+    cur.execute(
+        f"SELECT * FROM daily_wellness {where_sql} ORDER BY date ASC LIMIT {p}",
+        tuple(params),
+    )
+    rows = _rows_to_dicts(cur, cur.fetchall())
+    conn.close()
+    return [_deserialize_wellness_row(r) for r in rows]
+
+
+def get_complete_wellness_dates(date_from: str, date_to: str) -> set:
+    """Returns dates already marked as 'complete' so incremental sync skips redundant API requests."""
+    init_db()
+    conn = _get_conn()
+    cur = conn.cursor()
+    p = _ph(conn)
+    cur.execute(
+        f"SELECT date FROM daily_wellness WHERE date >= {p} AND date <= {p} AND day_status = 'complete'",
+        (str(date_from)[:10], str(date_to)[:10]),
+    )
+    done = {str(r[0]) for r in cur.fetchall() if r[0]}
+    conn.close()
+    return done
+
+
+def upsert_daily_checkin(checkin: Dict[str, Any]) -> Dict[str, Any]:
+    """Saves or updates a voluntary subjective check-in (1-5 ratings + optional discomfort/notes)."""
+    from datetime import datetime, timezone as dt_tz
+    init_db()
+    d_str = str(checkin.get("date") or date.today().isoformat())[:10]
+    now_iso = datetime.now(dt_tz.utc).isoformat()
+
+    def _clamp_1_5(val: Any) -> Optional[int]:
+        if val is None or val == "":
+            return None
+        v = int(val)
+        return max(1, min(5, v))
+
+    energy = _clamp_1_5(checkin.get("energy"))
+    sleep_q = _clamp_1_5(checkin.get("sleep_quality"))
+    fatigue = _clamp_1_5(checkin.get("muscle_fatigue"))
+    stress = _clamp_1_5(checkin.get("perceived_stress"))
+    feeling = _clamp_1_5(checkin.get("general_feeling"))
+    discomfort = (str(checkin.get("physical_discomfort")).strip()[:500]) if checkin.get("physical_discomfort") else None
+    notes = (str(checkin.get("notes")).strip()[:1000]) if checkin.get("notes") else None
+
+    conn = _get_conn()
+    cur = conn.cursor()
+    p = _ph(conn)
+    cur.execute(
+        f"""
+        INSERT INTO daily_checkins
+        (date, energy, sleep_quality, muscle_fatigue, perceived_stress, general_feeling, physical_discomfort, notes, created_at, updated_at)
+        VALUES ({','.join([p]*10)})
+        ON CONFLICT (date) DO UPDATE SET
+            energy = COALESCE(EXCLUDED.energy, daily_checkins.energy),
+            sleep_quality = COALESCE(EXCLUDED.sleep_quality, daily_checkins.sleep_quality),
+            muscle_fatigue = COALESCE(EXCLUDED.muscle_fatigue, daily_checkins.muscle_fatigue),
+            perceived_stress = COALESCE(EXCLUDED.perceived_stress, daily_checkins.perceived_stress),
+            general_feeling = COALESCE(EXCLUDED.general_feeling, daily_checkins.general_feeling),
+            physical_discomfort = COALESCE(EXCLUDED.physical_discomfort, daily_checkins.physical_discomfort),
+            notes = COALESCE(EXCLUDED.notes, daily_checkins.notes),
+            updated_at = EXCLUDED.updated_at
+        """,
+        (d_str, energy, sleep_q, fatigue, stress, feeling, discomfort, notes, now_iso, now_iso),
+    )
+    conn.commit()
+    conn.close()
+    return get_daily_checkin(d_str) or {"date": d_str}
+
+
+def get_daily_checkin(target_date: str) -> Optional[Dict[str, Any]]:
+    init_db()
+    conn = _get_conn()
+    cur = conn.cursor()
+    p = _ph(conn)
+    cur.execute(f"SELECT * FROM daily_checkins WHERE date = {p}", (str(target_date)[:10],))
+    rows = _rows_to_dicts(cur, cur.fetchall())
+    conn.close()
+    return rows[0] if rows else None
+
+
+def get_daily_checkins_range(date_from: str, date_to: str) -> List[Dict[str, Any]]:
+    init_db()
+    conn = _get_conn()
+    cur = conn.cursor()
+    p = _ph(conn)
+    cur.execute(
+        f"SELECT * FROM daily_checkins WHERE date >= {p} AND date <= {p} ORDER BY date ASC",
+        (str(date_from)[:10], str(date_to)[:10]),
+    )
+    rows = _rows_to_dicts(cur, cur.fetchall())
+    conn.close()
+    return rows
