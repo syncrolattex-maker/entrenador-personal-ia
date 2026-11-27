@@ -24,6 +24,8 @@
   let _smoothedZoom = null;
   let _baseLayerStyle = "satellite"; // 'satellite' | 'voyager'
   let _reducedMotion = false;
+  let _lastHighlightedSegIdx = -1;
+  let _demChecked = false;
 
   if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
     _reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -138,61 +140,142 @@
     };
   }
 
-  function _getRouteGeoJson(pts, splitIdx) {
-    const allCoords = pts.map(p => [p.lon, p.lat]);
-    const doneCoords = pts.slice(0, Math.max(2, splitIdx + 1)).map(p => [p.lon, p.lat]);
-    return {
-      full: {
-        type: "Feature",
-        geometry: { type: "LineString", coordinates: allCoords }
-      },
-      done: {
-        type: "Feature",
-        geometry: { type: "LineString", coordinates: doneCoords }
-      }
-    };
+  function _getActiveColorProperty() {
+    if (!_track || !_controller) return null;
+    const an = _track.analytics || {};
+    if (_controller.colorMode === "pace_speed" && an.hasPaceSpeed) return "paceColor";
+    if (_controller.colorMode === "grade" && an.hasGrade) return "gradeColor";
+    return null;
+  }
+
+  function _getElevationBoundsAndSource(track) {
+    if (!track || !track.points) return { source: "none", valid: [], minE: 0, maxE: 10, spanE: 10 };
+    const isGarmin = !!track.hasElevation;
+    const isDem = !isGarmin && track.analytics && track.analytics.gradeSource === "dem";
+    const source = isGarmin ? "garmin" : (isDem ? "dem" : "none");
+    if (source === "none") return { source, valid: [], minE: 0, maxE: 10, spanE: 10 };
+
+    const valid = track.points
+      .map((p, i) => ({ i, e: isGarmin ? p.elev_m : p.dem_elev_m }))
+      .filter(x => x.e != null && isFinite(x.e));
+    if (valid.length < 2) return { source: "none", valid: [], minE: 0, maxE: 10, spanE: 10 };
+
+    const minE = Math.min(...valid.map(v => v.e));
+    const maxE = Math.max(...valid.map(v => v.e));
+    const spanE = Math.max(10, maxE - minE);
+    return { source, valid, minE, maxE, spanE };
+  }
+
+  function _syncColorModeUI() {
+    if (!_track || !_controller) return;
+    const an = _track.analytics || {};
+    const btnPace = document.getElementById("flyover-mode-pace");
+    const btnGrade = document.getElementById("flyover-mode-grade");
+    const legendEl = document.getElementById("flyover-legend");
+
+    if (btnPace) {
+      btnPace.disabled = !an.hasPaceSpeed;
+      btnPace.title = an.hasPaceSpeed
+        ? (an.isCycling ? "Colorear recorrido por velocidad (km/h)" : "Colorear recorrido por ritmo (/km)")
+        : "No disponible: la actividad no tiene datos de ritmo o velocidad";
+      btnPace.classList.toggle("active", _controller.colorMode === "pace_speed" && an.hasPaceSpeed);
+    }
+    if (btnGrade) {
+      btnGrade.disabled = !an.hasGrade;
+      btnGrade.title = an.hasGrade
+        ? (an.gradeSource === "dem" ? "Pendiente estimada mediante terreno DEM" : "Pendiente calculada con altitud Garmin")
+        : "No disponible: sin fuente fiable de elevación";
+      btnGrade.classList.toggle("active", _controller.colorMode === "grade" && an.hasGrade);
+    }
+
+    if (!legendEl) return;
+    if (_controller.colorMode === "pace_speed" && an.hasPaceSpeed && an.paceScale) {
+      const sc = an.paceScale;
+      const pauseChip = sc.hasPauses
+        ? `<span class="flyover-legend-chip"><span class="flyover-legend-dot" style="background:#9CA3AF"></span>Parada</span>`
+        : "";
+      legendEl.innerHTML = `
+        <span class="flyover-legend-ramp">
+          <span>Lento (${sc.slowLabel})</span>
+          <span class="flyover-legend-bar flyover-legend-bar--pace" aria-hidden="true"></span>
+          <span>Rápido (${sc.fastLabel})</span>
+        </span>
+        ${pauseChip}
+      `;
+    } else if (_controller.colorMode === "grade" && an.hasGrade) {
+      const demChip = an.gradeSource === "dem"
+        ? `<span class="flyover-legend-chip" title="Estimación basada en terreno DEM (sin altitud Garmin)">Est. DEM</span>`
+        : "";
+      legendEl.innerHTML = `
+        <span class="flyover-legend-ramp">
+          <span>Bajada (-6%)</span>
+          <span class="flyover-legend-bar flyover-legend-bar--grade" aria-hidden="true"></span>
+          <span>Llano (0%)</span>
+          <span>Subida (+12%+)</span>
+        </span>
+        ${demChip}
+      `;
+    } else {
+      legendEl.innerHTML = `<span class="flyover-legend-chip">Trazado geométrico (sin datos de ritmo ni pendiente)</span>`;
+    }
+  }
+
+  function _applyMapColorMode() {
+    if (_map && _map.getLayer("route-colored")) {
+      const prop = _getActiveColorProperty();
+      _map.setPaintProperty("route-colored", "line-color", prop ? ["get", prop] : "#EE5A2B");
+    }
   }
 
   function _renderElevationProfileSvg(track) {
     const wrap = document.getElementById("flyover-elev-svg-wrap");
     if (!wrap) return;
-    if (!track.hasElevation) {
+    const { source, valid, minE, spanE } = _getElevationBoundsAndSource(track);
+    if (source === "none" || valid.length < 2) {
       wrap.innerHTML = `<div class="flyover-elev-empty">Perfil de elevación no disponible en este archivo (solo trazado GPS).</div>`;
       return;
     }
 
     const pts = track.points;
-    const valid = pts.map((p, i) => ({ i, e: p.elev_m })).filter(x => x.e != null);
-    if (valid.length < 2) {
-      wrap.innerHTML = `<div class="flyover-elev-empty">Sin datos suficientes de altitud Garmin.</div>`;
-      return;
-    }
-
-    const minE = Math.min(...valid.map(v => v.e));
-    const maxE = Math.max(...valid.map(v => v.e));
-    const spanE = Math.max(10, maxE - minE);
+    const segs = track.segments || [];
+    const prop = _getActiveColorProperty();
     const W = 640, H = 68, padT = 8, padB = 6;
     const plotH = H - padT - padB;
 
-    const coords = valid.map(v => {
+    const areaCoords = valid.map(v => {
       const x = (v.i / Math.max(1, pts.length - 1)) * W;
       const y = padT + plotH - ((v.e - minE) / spanE) * plotH;
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     });
+    const areaD = `M ${areaCoords.join(" L ")} L ${W},${H} L 0,${H} Z`;
 
-    const lineD = "M " + coords.join(" L ");
-    const areaD = `${lineD} L ${W},${H} L 0,${H} Z`;
+    // Build colored line segments matching the active map color scale
+    const step = Math.max(1, Math.floor(valid.length / 260));
+    const segLines = [];
+    for (let k = 0; k < valid.length - 1; k += step) {
+      const nextK = Math.min(valid.length - 1, k + step);
+      const v0 = valid[k];
+      const v1 = valid[nextK];
+      const x0 = ((v0.i / Math.max(1, pts.length - 1)) * W).toFixed(1);
+      const y0 = (padT + plotH - ((v0.e - minE) / spanE) * plotH).toFixed(1);
+      const x1 = ((v1.i / Math.max(1, pts.length - 1)) * W).toFixed(1);
+      const y1 = (padT + plotH - ((v1.e - minE) / spanE) * plotH).toFixed(1);
+      const segIdx = Math.min(segs.length - 1, v0.i);
+      const segObj = segs[segIdx];
+      const col = (prop && segObj && segObj[prop]) ? segObj[prop] : "#EE5A2B";
+      segLines.push(`<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="${col}" stroke-width="2.4" stroke-linecap="round"/>`);
+    }
 
     wrap.innerHTML = `
-      <svg id="flyover-elev-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%; height:100%; display:block; cursor:pointer;">
+      <svg id="flyover-elev-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%; height:100%; display:block; cursor:pointer;" aria-label="Perfil de elevación interactivo">
         <defs>
           <linearGradient id="flyoverElevGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#EE5A2B" stop-opacity="0.45"/>
-            <stop offset="100%" stop-color="#EE5A2B" stop-opacity="0.03"/>
+            <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.16"/>
+            <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.02"/>
           </linearGradient>
         </defs>
         <path d="${areaD}" fill="url(#flyoverElevGrad)"/>
-        <path d="${lineD}" fill="none" stroke="#EE5A2B" stroke-width="2" stroke-linejoin="round"/>
+        <g id="flyover-elev-segments">${segLines.join("")}</g>
         <line id="flyover-elev-cursor" x1="0" y1="0" x2="0" y2="${H}" stroke="#FFFFFF" stroke-width="1.8" stroke-dasharray="2,2"/>
         <circle id="flyover-elev-dot" cx="0" cy="${H / 2}" r="4.5" fill="#EE5A2B" stroke="#FFFFFF" stroke-width="2"/>
       </svg>
@@ -219,7 +302,32 @@
   function _updateElevationCursor(sample) {
     const cursor = document.getElementById("flyover-elev-cursor");
     const dot = document.getElementById("flyover-elev-dot");
-    if (!cursor || !dot || !_track || !_track.hasElevation || !sample) return;
+    const readout = document.getElementById("flyover-elev-readout");
+    if (!_track || !sample) return;
+
+    const { source, minE, spanE } = _getElevationBoundsAndSource(_track);
+    const curElev = source === "garmin" ? sample.elev_m : (source === "dem" ? sample.dem_elev_m : null);
+
+    if (readout) {
+      const parts = [`Dist: ${sample.dist_km.toFixed(2)} km`];
+      if (curElev != null) {
+        parts.push(`${source === "dem" ? "Terreno (DEM)" : "Altitud (Garmin)"}: ${Math.round(curElev)} m`);
+      }
+      if (sample.grade_percent != null) {
+        const sign = sample.grade_percent > 0 ? "+" : "";
+        parts.push(`Pendiente: ${sign}${sample.grade_percent.toFixed(1)}%`);
+      }
+      if (sample.is_pause) {
+        parts.push("Parada");
+      } else if (_track.analytics && _track.analytics.isCycling && sample.speed_mps != null) {
+        parts.push(`Vel: ${(sample.speed_mps * 3.6).toFixed(1)} km/h`);
+      } else if (_track.hasStreams && sample.pace_sec != null) {
+        parts.push(`Ritmo: ${_fmtPace(sample.pace_sec)}`);
+      }
+      readout.textContent = parts.join(" · ");
+    }
+
+    if (!cursor || !dot || source === "none" || curElev == null) return;
 
     const W = 640, H = 68, padT = 8, padB = 6;
     const plotH = H - padT - padB;
@@ -227,15 +335,13 @@
     cursor.setAttribute("x1", x.toFixed(1));
     cursor.setAttribute("x2", x.toFixed(1));
 
-    const valid = _track.points.map(p => p.elev_m).filter(e => e != null);
-    if (valid.length && sample.elev_m != null) {
-      const minE = Math.min(...valid);
-      const maxE = Math.max(...valid);
-      const spanE = Math.max(10, maxE - minE);
-      const y = padT + plotH - ((sample.elev_m - minE) / spanE) * plotH;
-      dot.setAttribute("cx", x.toFixed(1));
-      dot.setAttribute("cy", y.toFixed(1));
-    }
+    const y = padT + plotH - ((curElev - minE) / spanE) * plotH;
+    dot.setAttribute("cx", x.toFixed(1));
+    dot.setAttribute("cy", y.toFixed(1));
+
+    const prop = _getActiveColorProperty();
+    const seg = _track.segments && _track.segments[sample.segIndex || 0];
+    dot.setAttribute("fill", (prop && seg && seg[prop]) ? seg[prop] : "#EE5A2B");
   }
 
   function _updateMetricsHud(sample) {
@@ -284,13 +390,41 @@
       if (elTimeTotal) elTimeTotal.textContent = `${_track.totalDistanceKm.toFixed(2)} km`;
     }
 
-    if (elPace) elPace.textContent = _track.hasStreams ? _fmtPace(sample.pace_sec) : "—";
-    if (elAvgPace) elAvgPace.textContent = (_activity && _activity.avg_pace_str) ? _activity.avg_pace_str : "—";
+    const isCycling = !!(_track.analytics && _track.analytics.isCycling);
+    if (elPace) {
+      const paceCell = elPace.closest(".flyover-stat-cell");
+      if (paceCell) paceCell.style.display = isCycling ? "none" : "flex";
+      elPace.textContent = isCycling ? "—" : (sample.is_pause ? "Parada" : (_track.hasStreams ? _fmtPace(sample.pace_sec) : "—"));
+    }
+    if (elAvgPace) {
+      const avgPaceCell = elAvgPace.closest(".flyover-stat-cell");
+      if (avgPaceCell) avgPaceCell.style.display = isCycling ? "none" : "flex";
+      elAvgPace.textContent = (!isCycling && _activity && _activity.avg_pace_str) ? _activity.avg_pace_str : "—";
+    }
 
     if (elSpeed) {
-      elSpeed.textContent = (_track.hasStreams && sample.speed_mps != null)
-        ? `${(sample.speed_mps * 3.6).toFixed(1)} km/h`
-        : "—";
+      elSpeed.textContent = sample.is_pause
+        ? "0.0 km/h"
+        : ((_track.hasStreams && sample.speed_mps != null)
+          ? `${(sample.speed_mps * 3.6).toFixed(1)} km/h`
+          : "—");
+    }
+
+    const elGrade = document.getElementById("flyover-stat-grade");
+    const elGradeLabel = document.getElementById("flyover-stat-grade-label");
+    if (elGrade) {
+      const an = _track.analytics || {};
+      if (elGradeLabel) {
+        elGradeLabel.textContent = an.gradeSource === "dem"
+          ? "PENDIENTE (DEM)"
+          : (an.gradeSource === "garmin" ? "PENDIENTE (GARMIN)" : "PENDIENTE");
+      }
+      if (sample.grade_percent != null) {
+        const sign = sample.grade_percent > 0 ? "+" : "";
+        elGrade.textContent = `${sign}${sample.grade_percent.toFixed(1)}%`;
+      } else {
+        elGrade.textContent = "—";
+      }
     }
 
     // Altitude: prefer Garmin stream, fallback to DEM terrain query clearly labeled
@@ -348,16 +482,20 @@
           geometry: { type: "Point", coordinates: [sample.lon, sample.lat] }
         });
       }
-      const doneSrc = _map.getSource("route-done");
-      if (doneSrc) {
-        const doneCoords = _track.points
-          .slice(0, Math.max(1, sample.index + 1))
-          .map(p => [p.lon, p.lat]);
-        doneCoords.push([sample.lon, sample.lat]);
-        doneSrc.setData({
-          type: "Feature",
-          geometry: { type: "LineString", coordinates: doneCoords }
-        });
+      const curSegIdx = sample.segIndex != null ? sample.segIndex : Math.max(0, sample.index);
+      if (curSegIdx !== _lastHighlightedSegIdx) {
+        _lastHighlightedSegIdx = curSegIdx;
+        if (_map.getLayer("route-active-seg")) {
+          _map.setFilter("route-active-seg", ["==", ["get", "segIndex"], curSegIdx]);
+        }
+        if (_map.getLayer("route-colored")) {
+          _map.setPaintProperty("route-colored", "line-opacity", [
+            "case",
+            ["<=", ["get", "segIndex"], curSegIdx],
+            0.96,
+            0.42
+          ]);
+        }
       }
 
       if (_controller && _controller.cameraMode === "chase") {
@@ -449,10 +587,11 @@
 
     _map.on("load", () => {
       if (!_map || !_track) return;
-      const geo = _getRouteGeoJson(_track.points, 0);
+      const Engine = global.AaronFlyoverEngine;
+      const segGeoJson = Engine.buildSegmentsGeoJson(_track);
+      const activeProp = _getActiveColorProperty();
 
-      _map.addSource("route-full", { type: "geojson", data: geo.full });
-      _map.addSource("route-done", { type: "geojson", data: geo.done });
+      _map.addSource("route-segments", { type: "geojson", data: segGeoJson });
       _map.addSource("runner-marker", {
         type: "geojson",
         data: {
@@ -464,25 +603,34 @@
       _map.addLayer({
         id: "route-casing",
         type: "line",
-        source: "route-full",
+        source: "route-segments",
         layout: { "line-join": "round", "line-cap": "round" },
-        paint: { "line-color": "rgba(17,17,17,0.7)", "line-width": 7 }
+        paint: { "line-color": "rgba(17,17,17,0.75)", "line-width": 7.5 }
       });
 
       _map.addLayer({
-        id: "route-remaining",
+        id: "route-colored",
         type: "line",
-        source: "route-full",
+        source: "route-segments",
         layout: { "line-join": "round", "line-cap": "round" },
-        paint: { "line-color": "rgba(255,255,255,0.42)", "line-width": 4 }
+        paint: {
+          "line-color": activeProp ? ["get", activeProp] : "#EE5A2B",
+          "line-width": 5,
+          "line-opacity": 0.92
+        }
       });
 
       _map.addLayer({
-        id: "route-completed",
+        id: "route-active-seg",
         type: "line",
-        source: "route-done",
+        source: "route-segments",
+        filter: ["==", ["get", "segIndex"], 0],
         layout: { "line-join": "round", "line-cap": "round" },
-        paint: { "line-color": "#EE5A2B", "line-width": 5 }
+        paint: {
+          "line-color": "#FFFFFF",
+          "line-width": 8.5,
+          "line-opacity": 0.65
+        }
       });
 
       _map.addLayer({
@@ -509,7 +657,24 @@
         }
       });
 
+      _lastHighlightedSegIdx = -1;
       _updateVisualState(_controller.getCurrentSample());
+
+      // If Garmin elevation is absent, check already-loaded DEM terrain once idle for optional grade estimation
+      if (!_track.hasElevation && !_demChecked && typeof _map.queryTerrainElevation === "function") {
+        _map.once("idle", () => {
+          if (!_map || !_track || _track.hasElevation || _demChecked) return;
+          _demChecked = true;
+          const demElevs = _track.points.map(p => _map.queryTerrainElevation([p.lon, p.lat]));
+          if (Engine.applyDemElevationToTrack(_track, demElevs)) {
+            const src = _map.getSource("route-segments");
+            if (src) src.setData(Engine.buildSegmentsGeoJson(_track));
+            _syncColorModeUI();
+            _renderElevationProfileSvg(_track);
+            _updateVisualState(_controller.getCurrentSample());
+          }
+        });
+      }
     });
 
     // Switch to free camera automatically when user manually interacts
@@ -604,6 +769,8 @@
     _controller.setCameraMode("overview"); // Start in overview until user hits Play
     _smoothedBearing = null;
     _smoothedZoom = null;
+    _lastHighlightedSegIdx = -1;
+    _demChecked = false;
 
     // Header & badges
     const titleEl = document.getElementById("flyover-title");
@@ -632,6 +799,7 @@
     modal.style.display = "flex";
     document.body.style.overflow = "hidden";
 
+    _syncColorModeUI();
     _renderElevationProfileSvg(_track);
     _updateVisualState(_controller.getCurrentSample());
 
@@ -750,6 +918,18 @@
     }
   }
 
+  function setFlyoverColorMode(mode) {
+    if (!_controller || !_track) return;
+    const an = _track.analytics || {};
+    if (mode === "pace_speed" && !an.hasPaceSpeed) return;
+    if (mode === "grade" && !an.hasGrade) return;
+    _controller.setColorMode(mode);
+    _applyMapColorMode();
+    _syncColorModeUI();
+    _renderElevationProfileSvg(_track);
+    _updateVisualState(_controller.getCurrentSample());
+  }
+
   function onFlyoverScrub(val0To1000) {
     if (!_controller) return;
     const sample = _controller.seek(Number(val0To1000) / 1000.0);
@@ -763,6 +943,7 @@
     restartFlyover,
     setFlyoverSpeed,
     setFlyoverCameraMode,
+    setFlyoverColorMode,
     zoomFlyover,
     toggleFlyoverLayer,
     onFlyoverScrub,

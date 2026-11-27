@@ -245,6 +245,240 @@ class TestFlyover3D(unittest.TestCase):
         self.assertIsNone(res["bMidCad"])
         self.assertEqual(res["bStartCad"], 85)
 
+    def test_9_running_pace_scale_inversion_pauses_and_invalid_gaps(self):
+        res = _run_node_engine_test("""
+            const act = {
+                sport_type: "Carrera",
+                polyline: [
+                    [40.4000, -3.7000],
+                    [40.4020, -3.7000],
+                    [40.4040, -3.7000],
+                    [40.40401, -3.7000], // pause (<0.5m? wait: >0.5m to survive dedup, ~1.1m in 20s = 0.055 m/s)
+                    [40.4060, -3.7000],
+                    [40.4080, -3.7000],
+                ],
+                chart_series: {
+                    dist_km: [0.0, 0.22, 0.44, 0.442, 0.66, 0.88],
+                    time_sec: [0, 80, 140, 170, 220, 265],
+                    pace_sec: [360, 360, 240, null, 240, 240],
+                    speed_mps: [2.78, 2.78, 4.17, 0.05, 4.17, 4.17],
+                }
+            };
+            const track = Engine.buildFlyoverTrack(act);
+            const segs = track.segments;
+            return {
+                hasPaceSpeed: track.analytics.hasPaceSpeed,
+                isCycling: track.analytics.isCycling,
+                slowNorm: segs[0].paceNorm,
+                slowColor: segs[0].paceColor,
+                pauseFlag: segs[2].isPause,
+                pauseColor: segs[2].paceColor,
+                fastNorm: segs[4].paceNorm,
+                fastColor: segs[4].paceColor,
+                scale: track.analytics.paceScale,
+            };
+        """)
+        self.assertTrue(res["hasPaceSpeed"])
+        self.assertFalse(res["isCycling"])
+        self.assertLess(res["slowNorm"], res["fastNorm"])
+        self.assertEqual(res["slowColor"], "#EF4444")
+        self.assertEqual(res["fastColor"], "#14B8A6")
+        self.assertTrue(res["pauseFlag"])
+        self.assertEqual(res["pauseColor"], "#9CA3AF")
+        self.assertTrue(res["scale"]["hasPauses"])
+
+    def test_10_cycling_speed_scale_and_outliers(self):
+        res = _run_node_engine_test("""
+            const pts = [];
+            const distKm = [];
+            const timeSec = [];
+            const speedMps = [];
+            for (let i = 0; i < 25; i++) {
+                pts.push([40.400 + i * 0.002, -3.700]);
+                distKm.push(i * 0.222);
+                timeSec.push(i * 25);
+                // Mostly 6..12 m/s, with 1 extreme outlier (25 m/s = 90 km/h)
+                speedMps.push(i === 12 ? 25.0 : (6.0 + (i % 5) * 1.5));
+            }
+            const track = Engine.buildFlyoverTrack({
+                sport_type: "Ciclismo",
+                polyline: pts,
+                chart_series: { dist_km: distKm, time_sec: timeSec, speed_mps: speedMps }
+            });
+            return {
+                hasPaceSpeed: track.analytics.hasPaceSpeed,
+                isCycling: track.analytics.isCycling,
+                pLow: track.analytics.paceScale.pLow,
+                pHigh: track.analytics.paceScale.pHigh,
+                slowColor: track.segments[0].paceColor,
+                fastNormalColor: track.segments[4].paceColor,
+            };
+        """)
+        self.assertTrue(res["hasPaceSpeed"])
+        self.assertTrue(res["isCycling"])
+        # P95 prevents the single 90 km/h outlier from stretching pHigh to 90
+        self.assertLess(res["pHigh"], 60.0)
+        self.assertEqual(res["slowColor"], "#EF4444")
+
+    def test_11_grade_positive_negative_flat_and_dem_separation(self):
+        res = _run_node_engine_test("""
+            // Up (+8%), flat (0%), down (-6%) over 1.2 km
+            const pts = [];
+            const distKm = [];
+            const elevM = [];
+            for (let i = 0; i <= 24; i++) {
+                pts.push([40.400 + i * 0.00045, -3.700]);
+                const d = i * 0.05; // 50m per step
+                distKm.push(d);
+                if (i <= 8) elevM.push(100 + i * 4);        // +8%
+                else if (i <= 16) elevM.push(132);           // 0%
+                else elevM.push(132 - (i - 16) * 3);         // -6%
+            }
+            const track = Engine.buildFlyoverTrack({
+                sport_type: "Carrera",
+                polyline: pts,
+                chart_series: { dist_km: distKm, time_sec: distKm.map(d => d * 300), elevation_m: elevM }
+            });
+            const upSample = Engine.sampleTrackAtProgress(track, 0.16);
+            const flatSample = Engine.sampleTrackAtProgress(track, 0.5);
+            const downSample = Engine.sampleTrackAtProgress(track, 0.85);
+
+            // Also test geometry-only + DEM separation
+            const noElevTrack = Engine.buildFlyoverTrack({ polyline: pts });
+            const demApplied = Engine.applyDemElevationToTrack(noElevTrack, elevM);
+            return {
+                hasGrade: track.analytics.hasGrade,
+                gradeSource: track.analytics.gradeSource,
+                upGrade: upSample.grade_percent,
+                flatGrade: flatSample.grade_percent,
+                downGrade: downSample.grade_percent,
+                upColor: track.segments[3].gradeColor,
+                flatColor: track.segments[12].gradeColor,
+                downColor: track.segments[20].gradeColor,
+                demApplied,
+                demHasElevFlag: noElevTrack.hasElevation,
+                demGradeSource: noElevTrack.analytics.gradeSource,
+                demHasGrade: noElevTrack.analytics.hasGrade,
+            };
+        """)
+        self.assertTrue(res["hasGrade"])
+        self.assertEqual(res["gradeSource"], "garmin")
+        self.assertGreater(res["upGrade"], 4.0)
+        self.assertAlmostEqual(res["flatGrade"], 0.0, delta=1.5)
+        self.assertLess(res["downGrade"], -3.0)
+        self.assertEqual(res["flatColor"], "#14B8A6")
+        self.assertTrue(res["demApplied"])
+        self.assertFalse(res["demHasElevFlag"])
+        self.assertEqual(res["demGradeSource"], "dem")
+        self.assertTrue(res["demHasGrade"])
+
+    def test_12_mode_switching_geometry_only_and_1500_point_perf(self):
+        res = _run_node_engine_test("""
+            // Geometry-only activity must not invent pace or grade colors
+            const polyOnly = Engine.buildFlyoverTrack({
+                polyline: [[40.400, -3.700], [40.405, -3.700], [40.410, -3.700]]
+            });
+
+            // 1500-point track performance & GeoJSON build + mode switching while playing
+            const pts = [];
+            const distKm = [];
+            const timeSec = [];
+            const elevM = [];
+            const paceSec = [];
+            for (let i = 0; i < 1500; i++) {
+                pts.push([40.4 + i * 0.0001, -3.7 + Math.sin(i * 0.03) * 0.001]);
+                distKm.push(i * 0.011);
+                timeSec.push(i * 3.2);
+                elevM.push(200 + Math.sin(i * 0.02) * 35);
+                paceSec.push(280 + (i % 40));
+            }
+            const t0 = Date.now();
+            const track = Engine.buildFlyoverTrack({
+                sport_type: "Carrera",
+                polyline: pts,
+                chart_series: { dist_km: distKm, time_sec: timeSec, elevation_m: elevM, pace_sec: paceSec }
+            });
+            const geo = Engine.buildSegmentsGeoJson(track);
+            const elapsedMs = Date.now() - t0;
+
+            const ctrl = new Engine.FlyoverPlayerController(track, 20000);
+            ctrl.play();
+            ctrl.step(4000);
+            const beforeMode = ctrl.colorMode;
+            ctrl.setColorMode("grade");
+            const afterMode = ctrl.colorMode;
+
+            return {
+                polyHasPace: polyOnly.analytics.hasPaceSpeed,
+                polyHasGrade: polyOnly.analytics.hasGrade,
+                polySegColor: Engine.buildSegmentsGeoJson(polyOnly).features[0].properties.paceColor,
+                featCount: geo.features.length,
+                elapsedMs,
+                beforeMode,
+                afterMode,
+                stillPlaying: ctrl.isPlaying,
+                progress: ctrl.progress,
+            };
+        """)
+        self.assertFalse(res["polyHasPace"])
+        self.assertFalse(res["polyHasGrade"])
+        self.assertEqual(res["polySegColor"], "#EE5A2B")
+        self.assertEqual(res["featCount"], 1499)
+        self.assertLess(res["elapsedMs"], 500)
+        self.assertEqual(res["beforeMode"], "pace_speed")
+        self.assertEqual(res["afterMode"], "grade")
+        self.assertTrue(res["stillPlaying"])
+        self.assertAlmostEqual(res["progress"], 0.2, places=3)
+
+    def test_13_prolonged_pause_vs_telemetry_gap_and_discipline_variants(self):
+        res = _run_node_engine_test("""
+            // Prolonged pause (180s, ~2m) vs telemetry gap while moving (150s, ~500m) vs normal moving
+            const act = {
+                sport_type: "road_biking",
+                polyline: [
+                    [40.4000, -3.7000],
+                    [40.4050, -3.7000],  // seg 0: moving (9.26 -> 9.26 m/s)
+                    [40.40502, -3.7000], // seg 1: transition into pause
+                    [40.40504, -3.7000], // seg 2: prolonged pause (~2.2m in 180s, 0.0 -> 0.0 m/s)
+                    [40.4100, -3.7000],  // seg 3: telemetry gap while moving (~551m in 150s, 0.0 -> 12.35 m/s)
+                    [40.4150, -3.7000],  // seg 4: moving (12.35 -> 12.35 m/s)
+                ],
+                chart_series: {
+                    dist_km: [0.0, 0.556, 0.558, 0.560, 1.111, 1.667],
+                    time_sec: [0, 60, 65, 245, 395, 440],
+                    speed_mps: [9.26, 9.26, 0.0, 0.0, 12.35, 12.35],
+                    pace_sec: [108, 108, null, null, 81, 81],
+                }
+            };
+            const track = Engine.buildFlyoverTrack(act);
+            return {
+                isCycling: track.analytics.isCycling,
+                unit: track.analytics.paceScale && track.analytics.paceScale.unit,
+                seg0: { pause: track.segments[0].isPause, gap: track.segments[0].isGap, color: track.segments[0].paceColor },
+                seg2: { pause: track.segments[2].isPause, gap: track.segments[2].isGap, color: track.segments[2].paceColor },
+                seg3: { pause: track.segments[3].isPause, gap: track.segments[3].isGap, color: track.segments[3].paceColor },
+                seg4: { pause: track.segments[4].isPause, gap: track.segments[4].isGap, color: track.segments[4].paceColor },
+            };
+        """)
+        self.assertTrue(res["isCycling"])
+        self.assertEqual(res["unit"], "km/h")
+        # seg 0: moving (slowest valid -> Red)
+        self.assertFalse(res["seg0"]["pause"])
+        self.assertFalse(res["seg0"]["gap"])
+        self.assertEqual(res["seg0"]["color"], "#EF4444")
+        # seg 2: prolonged 180s stationary pause -> Grey (#9CA3AF), NOT gap
+        self.assertTrue(res["seg2"]["pause"])
+        self.assertFalse(res["seg2"]["gap"])
+        self.assertEqual(res["seg2"]["color"], "#9CA3AF")
+        # seg 3: 150s telemetry gap while moving -> Slate (#64748B), NOT pause
+        self.assertFalse(res["seg3"]["pause"])
+        self.assertTrue(res["seg3"]["gap"])
+        self.assertEqual(res["seg3"]["color"], "#64748B")
+        # seg 4: moving (fastest valid -> Turquoise)
+        self.assertFalse(res["seg4"]["pause"])
+        self.assertFalse(res["seg4"]["gap"])
+        self.assertEqual(res["seg4"]["color"], "#14B8A6")
+
 
 if __name__ == "__main__":
     unittest.main()

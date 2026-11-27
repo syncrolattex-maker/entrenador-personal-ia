@@ -7332,8 +7332,8 @@ async function launchActivityFlyover3D() {
   }
   try {
     if (!_flyoverScriptsPromise) {
-      _flyoverScriptsPromise = _loadScriptOnce("/flyover-engine.js?v=133")
-        .then(() => _loadScriptOnce("/flyover-3d.js?v=133"));
+      _flyoverScriptsPromise = _loadScriptOnce("/flyover-engine.js?v=135")
+        .then(() => _loadScriptOnce("/flyover-3d.js?v=135"));
     }
     await _flyoverScriptsPromise;
     if (window.AaronFlyover3D) {

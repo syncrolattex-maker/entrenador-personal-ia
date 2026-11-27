@@ -277,13 +277,386 @@
     return nearest != null ? Math.round(Number(nearest)) : null;
   }
 
+  const PAUSE_COLOR = "#9CA3AF";
+  const INVALID_COLOR = "#64748B";
+  const DEFAULT_ROUTE_COLOR = "#EE5A2B";
+
+  const PACE_SPEED_STOPS = [
+    [0.0, "#EF4444"],   // Red: slowest
+    [0.25, "#F97316"],  // Orange: slow
+    [0.5, "#FACC15"],   // Yellow: intermediate
+    [0.75, "#22C55E"],  // Green: fast
+    [1.0, "#14B8A6"],   // Turquoise: fastest
+  ];
+
+  const GRADE_STOPS = [
+    [-6.0, "#2563EB"],  // Deep Blue: steep descent
+    [-2.0, "#3B82F6"],  // Blue: descent
+    [0.0, "#14B8A6"],   // Turquoise: flat
+    [2.0, "#14B8A6"],   // Turquoise: flat
+    [5.0, "#FACC15"],   // Yellow: moderate climb
+    [9.0, "#F97316"],   // Orange: steep climb
+    [14.0, "#EF4444"],  // Red: very steep climb
+  ];
+
+  function _hexToRgb(hex) {
+    const clean = hex.replace("#", "");
+    return [
+      parseInt(clean.slice(0, 2), 16),
+      parseInt(clean.slice(2, 4), 16),
+      parseInt(clean.slice(4, 6), 16),
+    ];
+  }
+
+  function _rgbToHex(r, g, b) {
+    const toHex = (n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, "0");
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+  }
+
+  function interpolateColorStops(stops, val) {
+    if (val == null || isNaN(val)) return INVALID_COLOR;
+    const v = Number(val);
+    if (v <= stops[0][0]) return stops[0][1];
+    const last = stops[stops.length - 1];
+    if (v >= last[0]) return last[1];
+    for (let i = 0; i < stops.length - 1; i++) {
+      const [x0, c0] = stops[i];
+      const [x1, c1] = stops[i + 1];
+      if (v >= x0 && v <= x1) {
+        const span = x1 - x0;
+        const t = span > 1e-9 ? (v - x0) / span : 0;
+        const [r0, g0, b0] = _hexToRgb(c0);
+        const [r1, g1, b1] = _hexToRgb(c1);
+        return _rgbToHex(r0 + (r1 - r0) * t, g0 + (g1 - g0) * t, b0 + (b1 - b0) * t);
+      }
+    }
+    return last[1];
+  }
+
+  function computePercentile(sortedArr, p01) {
+    if (!Array.isArray(sortedArr) || sortedArr.length === 0) return null;
+    if (sortedArr.length === 1) return sortedArr[0];
+    const pos = Math.max(0, Math.min(1, p01)) * (sortedArr.length - 1);
+    const lo = Math.floor(pos);
+    const hi = Math.min(sortedArr.length - 1, Math.ceil(pos));
+    const t = pos - lo;
+    return sortedArr[lo] + (sortedArr[hi] - sortedArr[lo]) * t;
+  }
+
+  function formatPaceLabel(secPerKm) {
+    if (secPerKm == null || isNaN(secPerKm) || secPerKm <= 0) return "—";
+    const s = Math.round(Number(secPerKm));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} /km`;
+  }
+
+  /**
+   * Distance-based elevation smoothing for grade calculation (does not alter Garmin official elev_m).
+   */
+  function smoothElevationByDistance(pts, elevGetter, radiusM = 30) {
+    const n = pts.length;
+    const out = new Array(n).fill(null);
+    let left = 0;
+    let right = -1;
+    let sum = 0;
+    let cnt = 0;
+
+    for (let i = 0; i < n; i++) {
+      const di = pts[i].dist_m;
+      while (right + 1 < n && pts[right + 1].dist_m - di <= radiusM) {
+        right++;
+        const v = elevGetter(pts[right]);
+        if (v != null && isFinite(v)) {
+          sum += Number(v);
+          cnt++;
+        }
+      }
+      while (left < n && di - pts[left].dist_m > radiusM) {
+        const v = elevGetter(pts[left]);
+        if (v != null && isFinite(v)) {
+          sum -= Number(v);
+          cnt--;
+        }
+        left++;
+      }
+      const raw = elevGetter(pts[i]);
+      if (raw != null && isFinite(raw) && cnt > 0) {
+        out[i] = sum / cnt;
+      }
+    }
+    return out;
+  }
+
+  function _computeGradeSegments(pts, smoothedElevs) {
+    const n = pts.length;
+    const segGrades = new Array(Math.max(0, n - 1)).fill(null);
+    const ptGrades = new Array(n).fill(null);
+    let validCount = 0;
+    const minWindowM = 40.0;
+
+    for (let i = 0; i < n - 1; i++) {
+      let lo = i;
+      let hi = i + 1;
+      while ((pts[hi].dist_m - pts[lo].dist_m) < minWindowM && (lo > 0 || hi < n - 1)) {
+        if (lo > 0) lo--;
+        if ((pts[hi].dist_m - pts[lo].dist_m) < minWindowM && hi < n - 1) hi++;
+      }
+      const horizM = pts[hi].dist_m - pts[lo].dist_m;
+      const e0 = smoothedElevs[lo];
+      const e1 = smoothedElevs[hi];
+      if (horizM >= 10.0 && e0 != null && e1 != null && isFinite(e0) && isFinite(e1)) {
+        const g = ((e1 - e0) / horizM) * 100.0;
+        if (isFinite(g) && Math.abs(g) <= 45.0) {
+          const rounded = Math.round(g * 10) / 10;
+          segGrades[i] = rounded;
+          validCount++;
+        }
+      }
+    }
+
+    for (let i = 0; i < n; i++) {
+      if (i < n - 1 && segGrades[i] != null) ptGrades[i] = segGrades[i];
+      else if (i > 0 && segGrades[i - 1] != null) ptGrades[i] = segGrades[i - 1];
+    }
+    return { segGrades, ptGrades, validCount };
+  }
+
+  /**
+   * Builds precomputed segment telemetry (pace/speed percentiles, pauses, gaps, grade).
+   */
+  function computeTrackSegments(pts, options) {
+    const opts = options || {};
+    const isCycling = !!opts.isCycling;
+    const hasStreams = !!opts.hasStreams;
+    const hasElevation = !!opts.hasElevation;
+    const n = pts.length;
+    const segments = [];
+    if (n < 2) {
+      return {
+        segments,
+        analytics: {
+          hasPaceSpeed: false,
+          hasGrade: false,
+          gradeSource: "none",
+          isCycling,
+          paceScale: null,
+          gradeScale: { minLabel: "-6%", flatLabel: "0%", midClimbLabel: "+5%", steepLabel: "+12%" },
+        },
+      };
+    }
+
+    const minMoveMps = isCycling ? 0.8 : 0.45;
+    const validMetrics = [];
+    let hasPauses = false;
+
+    for (let i = 0; i < n - 1; i++) {
+      const a = pts[i];
+      const b = pts[i + 1];
+      const segDistM = Math.max(0, b.dist_m - a.dist_m);
+      const dt = (a.time_sec != null && b.time_sec != null) ? (b.time_sec - a.time_sec) : null;
+
+      // 1. Real pause/stop: minimal displacement or both endpoints stationary (regardless of pause duration)
+      const isLowMoveByDt = (dt != null && dt > 0 && (segDistM / dt) < minMoveMps && segDistM < 25);
+      const isLowSpeedBoth = (a.speed_mps != null && b.speed_mps != null && a.speed_mps < minMoveMps && b.speed_mps < minMoveMps);
+      const isPause = isLowMoveByDt || isLowSpeedBoth;
+
+      // 2. Real telemetry gap / discontinuity: missing/invalid endpoint or large jump with zero/invalid telemetry
+      const hasValidEndpoints = isCycling
+        ? (a.speed_mps != null && b.speed_mps != null && a.speed_mps >= minMoveMps && b.speed_mps >= minMoveMps)
+        : (a.pace_sec != null && b.pace_sec != null && a.pace_sec >= 120 && a.pace_sec <= 1200 && b.pace_sec >= 120 && b.pace_sec <= 1200);
+      const isGap = !isPause && (!hasValidEndpoints || (dt != null && dt > 120 && segDistM >= 25 && (a.speed_mps === 0 || b.speed_mps === 0)));
+
+      if (isPause) hasPauses = true;
+
+      let metricVal = null;
+      if (hasStreams && !isGap && !isPause) {
+        if (isCycling) {
+          if (a.speed_mps != null && b.speed_mps != null && a.speed_mps >= minMoveMps && b.speed_mps >= minMoveMps) {
+            const kmh = ((a.speed_mps + b.speed_mps) * 0.5) * 3.6;
+            if (kmh >= 2.0 && kmh <= 95.0) metricVal = kmh;
+          }
+        } else {
+          if (a.pace_sec != null && b.pace_sec != null && a.pace_sec >= 120 && a.pace_sec <= 1200 && b.pace_sec >= 120 && b.pace_sec <= 1200) {
+            metricVal = (a.pace_sec + b.pace_sec) * 0.5;
+          }
+        }
+      }
+
+      if (metricVal != null) validMetrics.push(metricVal);
+
+      segments.push({
+        segIndex: i,
+        isPause,
+        isGap,
+        metricVal,
+        paceNorm: null,
+        paceColor: isPause ? PAUSE_COLOR : (hasStreams ? INVALID_COLOR : DEFAULT_ROUTE_COLOR),
+        gradePct: null,
+        gradeColor: DEFAULT_ROUTE_COLOR,
+      });
+    }
+
+    // Pace / Speed scale via P5..P95 percentiles
+    let paceScale = null;
+    const hasPaceSpeed = hasStreams && validMetrics.length >= 2;
+    if (hasPaceSpeed) {
+      const sorted = validMetrics.slice().sort((x, y) => x - y);
+      let pLow = sorted.length >= 5 ? computePercentile(sorted, 0.05) : sorted[0];
+      let pHigh = sorted.length >= 5 ? computePercentile(sorted, 0.95) : sorted[sorted.length - 1];
+      if (Math.abs(pHigh - pLow) < 1e-3) {
+        const pad = isCycling ? 1.0 : 10.0;
+        pLow = Math.max(0.1, pLow - pad);
+        pHigh = pHigh + pad;
+      }
+      const span = pHigh - pLow;
+
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        if (seg.isPause) {
+          seg.paceColor = PAUSE_COLOR;
+        } else if (seg.isGap || seg.metricVal == null) {
+          seg.paceColor = INVALID_COLOR;
+        } else {
+          // Running: smaller pace_sec is faster (norm=1); Cycling: larger km/h is faster (norm=1)
+          const rawNorm = isCycling
+            ? (seg.metricVal - pLow) / span
+            : (pHigh - seg.metricVal) / span;
+          const norm = Math.max(0, Math.min(1, rawNorm));
+          seg.paceNorm = Math.round(norm * 1000) / 1000;
+          seg.paceColor = interpolateColorStops(PACE_SPEED_STOPS, norm);
+        }
+      }
+
+      const midVal = (pLow + pHigh) * 0.5;
+      paceScale = isCycling
+        ? {
+            unit: "km/h",
+            pLow: Math.round(pLow * 10) / 10,
+            pHigh: Math.round(pHigh * 10) / 10,
+            slowLabel: `${pLow.toFixed(1)} km/h`,
+            midLabel: `${midVal.toFixed(1)} km/h`,
+            fastLabel: `${pHigh.toFixed(1)} km/h`,
+            hasPauses,
+          }
+        : {
+            unit: "/km",
+            pLow: Math.round(pLow),
+            pHigh: Math.round(pHigh),
+            slowLabel: formatPaceLabel(pHigh),
+            midLabel: formatPaceLabel(midVal),
+            fastLabel: formatPaceLabel(pLow),
+            hasPauses,
+          };
+    }
+
+    // Grade scale from Garmin elevation when available
+    let hasGrade = false;
+    let gradeSource = "none";
+    if (hasElevation) {
+      const smoothed = smoothElevationByDistance(pts, (p) => p.elev_m, 30);
+      const { segGrades, ptGrades, validCount } = _computeGradeSegments(pts, smoothed);
+      if (validCount >= 2) {
+        hasGrade = true;
+        gradeSource = "garmin";
+        for (let i = 0; i < segments.length; i++) {
+          segments[i].gradePct = segGrades[i];
+          segments[i].gradeColor = segGrades[i] != null ? interpolateColorStops(GRADE_STOPS, segGrades[i]) : INVALID_COLOR;
+        }
+        for (let i = 0; i < n; i++) {
+          pts[i].grade_percent = ptGrades[i];
+        }
+      }
+    }
+
+    return {
+      segments,
+      analytics: {
+        hasPaceSpeed,
+        hasGrade,
+        gradeSource,
+        isCycling,
+        paceScale,
+        gradeScale: { minLabel: "-6%", flatLabel: "0%", midClimbLabel: "+5%", steepLabel: "+12%" },
+      },
+    };
+  }
+
+  /**
+   * Optionally populates grade estimation from MapLibre DEM elevations ONLY when Garmin elevation is absent.
+   * Keeps track.hasElevation=false so Garmin altitude and DEM terrain remain strictly separated.
+   */
+  function applyDemElevationToTrack(track, demElevs) {
+    if (!track || track.hasElevation || !Array.isArray(demElevs) || demElevs.length !== track.points.length) {
+      return false;
+    }
+    const pts = track.points;
+    const validCountPts = demElevs.filter(v => v != null && isFinite(v)).length;
+    if (validCountPts < 3) return false;
+
+    const idxMap = new Map();
+    for (let i = 0; i < pts.length; i++) idxMap.set(pts[i], i);
+    const smoothedDem = smoothElevationByDistance(pts, (p) => demElevs[idxMap.get(p)], 35);
+
+    const { segGrades, ptGrades, validCount } = _computeGradeSegments(pts, smoothedDem);
+    if (validCount < 2) return false;
+
+    for (let i = 0; i < track.segments.length; i++) {
+      track.segments[i].gradePct = segGrades[i];
+      track.segments[i].gradeColor = segGrades[i] != null ? interpolateColorStops(GRADE_STOPS, segGrades[i]) : INVALID_COLOR;
+    }
+    for (let i = 0; i < pts.length; i++) {
+      pts[i].dem_elev_m = demElevs[i] != null && isFinite(demElevs[i]) ? Math.round(demElevs[i] * 10) / 10 : null;
+      pts[i].grade_percent = ptGrades[i];
+    }
+    track.analytics.hasGrade = true;
+    track.analytics.gradeSource = "dem";
+    return true;
+  }
+
+  /**
+   * Builds a single GeoJSON FeatureCollection of route segments with precomputed color properties.
+   */
+  function buildSegmentsGeoJson(track) {
+    if (!track || !Array.isArray(track.points) || track.points.length < 2) {
+      return { type: "FeatureCollection", features: [] };
+    }
+    const pts = track.points;
+    const segs = track.segments || [];
+    const features = new Array(pts.length - 1);
+    for (let i = 0; i < pts.length - 1; i++) {
+      const seg = segs[i] || {};
+      features[i] = {
+        type: "Feature",
+        properties: {
+          segIndex: i,
+          paceColor: seg.paceColor || DEFAULT_ROUTE_COLOR,
+          gradeColor: seg.gradeColor || DEFAULT_ROUTE_COLOR,
+          isPause: !!seg.isPause,
+          gradePct: seg.gradePct != null ? seg.gradePct : null,
+        },
+        geometry: {
+          type: "LineString",
+          coordinates: [
+            [pts[i].lon, pts[i].lat],
+            [pts[i + 1].lon, pts[i + 1].lat],
+          ],
+        },
+      };
+    }
+    return { type: "FeatureCollection", features };
+  }
+
   /**
    * Builds a synchronized Flyover track from an AaronFit activity object.
    * Handles all 4 data completeness cases (A: full, B: partial, C: geometry_only, D: none).
    */
   function buildFlyoverTrack(activity) {
     if (!activity || typeof activity !== "object") {
-      return { mode: "none", points: [], totalDistanceM: 0, totalTimeSec: 0, bounds: null, hasStreams: false, hasTimestamps: false, hasElevation: false, hasHr: false, hasCadence: false };
+      return {
+        mode: "none", points: [], segments: [],
+        analytics: { hasPaceSpeed: false, hasGrade: false, gradeSource: "none", isCycling: false, paceScale: null },
+        totalDistanceM: 0, totalTimeSec: 0, bounds: null,
+        hasStreams: false, hasTimestamps: false, hasElevation: false, hasHr: false, hasCadence: false
+      };
     }
 
     let rawPoly = activity.polyline;
@@ -292,7 +665,12 @@
     }
     const cleanPts = deduplicateAndOrderTrack(rawPoly || []);
     if (cleanPts.length < 2) {
-      return { mode: "none", points: [], totalDistanceM: 0, totalTimeSec: 0, bounds: null, hasStreams: false, hasTimestamps: false, hasElevation: false, hasHr: false, hasCadence: false };
+      return {
+        mode: "none", points: [], segments: [],
+        analytics: { hasPaceSpeed: false, hasGrade: false, gradeSource: "none", isCycling: false, paceScale: null },
+        totalDistanceM: 0, totalTimeSec: 0, bounds: null,
+        hasStreams: false, hasTimestamps: false, hasElevation: false, hasHr: false, hasCadence: false
+      };
     }
 
     const pts = simplifyTrackDouglasPeucker(cleanPts, 1500, 0.00002);
@@ -326,7 +704,8 @@
     const hasTimestamps = hasPointTs || hasStreamTime;
     const hasElevation = csElev.some(v => v != null && !isNaN(Number(v)));
     const hasHr = csHr.some(v => v != null && Number(v) > 30);
-    const isCycling = String(activity.sport_type || "").toLowerCase().includes("cicl");
+    const spLower = String(activity.sport_type || "").toLowerCase();
+    const isCycling = /cicl|cycl|bike|biking|ride/.test(spLower);
     const hasCadence = csCad.some(v => _isValidCadence(v, isCycling));
     const hasPaceOrSpeed = csPace.some(v => v != null && Number(v) > 0) || csSpeed.some(v => v != null && Number(v) > 0);
     const hasStreams = csDist.length >= 2 && (hasStreamTime || hasElevation || hasHr || hasPaceOrSpeed);
@@ -426,9 +805,17 @@
     const lastTime = pts[pts.length - 1].time_sec;
     const totalTimeSec = hasTimestamps && lastTime != null ? Number(lastTime) : 0;
 
+    const segData = computeTrackSegments(pts, {
+      isCycling,
+      hasStreams,
+      hasElevation,
+    });
+
     return {
       mode,
       points: pts,
+      segments: segData.segments,
+      analytics: segData.analytics,
       totalDistanceM: Math.round(officialDistKm * 1000.0),
       totalDistanceKm: Math.round(officialDistKm * 100) / 100,
       totalTimeSec,
@@ -471,8 +858,12 @@
       : a.bearing;
 
     const interpDistKm = lerp(a.dist_km, b.dist_km);
+    const segIdx = Math.min(Math.max(0, pts.length - 2), i0);
+    const seg = track.segments && track.segments[segIdx];
+    const gradeVal = (seg && seg.gradePct != null) ? seg.gradePct : lerp(a.grade_percent, b.grade_percent);
     return {
       index: i0,
+      segIndex: segIdx,
       progress: cl,
       lat: lerp(a.lat, b.lat),
       lon: lerp(a.lon, b.lon),
@@ -480,7 +871,10 @@
       dist_km: Math.round(interpDistKm * 100) / 100,
       time_sec: lerp(a.time_sec, b.time_sec),
       elev_m: lerp(a.elev_m, b.elev_m),
+      dem_elev_m: lerp(a.dem_elev_m, b.dem_elev_m),
       elev_gain_m: lerp(a.elev_gain_m, b.elev_gain_m) != null ? Math.round(lerp(a.elev_gain_m, b.elev_gain_m)) : null,
+      grade_percent: gradeVal != null ? Math.round(gradeVal * 10) / 10 : null,
+      is_pause: !!(seg && seg.isPause),
       hr: lerp(a.hr, b.hr),
       cadence: (a.cadence != null && b.cadence != null)
         ? Math.round(lerp(a.cadence, b.cadence))
@@ -525,6 +919,8 @@
       this.speed = 1;
       this.progress = 0;
       this.cameraMode = "chase"; // 'chase' | 'overview' | 'free'
+      const an = (track && track.analytics) || {};
+      this.colorMode = an.hasPaceSpeed ? "pace_speed" : (an.hasGrade ? "grade" : "default");
     }
 
     play() {
@@ -558,6 +954,12 @@
       }
     }
 
+    setColorMode(mode) {
+      if (["pace_speed", "grade", "default"].includes(mode)) {
+        this.colorMode = mode;
+      }
+    }
+
     step(deltaMs) {
       if (!this.isPlaying) return this.getCurrentSample();
       const inc = (Math.max(0, deltaMs) * this.speed) / this.baseDurationMs;
@@ -574,6 +976,11 @@
   }
 
   return {
+    PAUSE_COLOR,
+    INVALID_COLOR,
+    DEFAULT_ROUTE_COLOR,
+    PACE_SPEED_STOPS,
+    GRADE_STOPS,
     haversineMeters,
     computeBearing,
     smoothBearingAngle,
@@ -581,6 +988,12 @@
     deduplicateAndOrderTrack,
     simplifyTrackDouglasPeucker,
     smoothElevationArray,
+    smoothElevationByDistance,
+    interpolateColorStops,
+    computePercentile,
+    computeTrackSegments,
+    applyDemElevationToTrack,
+    buildSegmentsGeoJson,
     buildFlyoverTrack,
     sampleTrackAtProgress,
     sampleTrackAtTime,

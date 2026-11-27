@@ -2081,8 +2081,20 @@
 
     <!-- Bottom Playback & Telemetry HUD -->
     <div class="flyover-hud-bottom">
-      <!-- Synchronized Elevation Profile -->
-      <div id="flyover-elev-svg-wrap" class="flyover-elev-wrap"></div>
+      <!-- Color Mode Selector & Legend -->
+      <div id="flyover-color-bar" class="flyover-color-bar">
+        <div class="flyover-mode-group" role="group" aria-label="Modo de visualización del recorrido">
+          <button type="button" id="flyover-mode-pace" class="flyover-mode-btn active" data-colormode="pace_speed" onclick="window.AaronFlyover3D && AaronFlyover3D.setFlyoverColorMode('pace_speed')">RITMO / VELOCIDAD</button>
+          <button type="button" id="flyover-mode-grade" class="flyover-mode-btn" data-colormode="grade" onclick="window.AaronFlyover3D && AaronFlyover3D.setFlyoverColorMode('grade')">PENDIENTE</button>
+        </div>
+        <div id="flyover-legend" class="flyover-legend" aria-live="polite"></div>
+      </div>
+
+      <!-- Synchronized Elevation Profile + Point Readout -->
+      <div class="flyover-elev-section">
+        <div id="flyover-elev-readout" class="flyover-elev-readout tabular-num"></div>
+        <div id="flyover-elev-svg-wrap" class="flyover-elev-wrap"></div>
+      </div>
 
       <!-- Scrubber + Transport Bar -->
       <div class="flyover-controls-bar">
@@ -2137,6 +2149,10 @@
           <span id="flyover-stat-gain-label" class="flyover-stat-label">DESNIVEL +</span>
           <strong id="flyover-stat-gain" class="flyover-stat-val tabular-num">—</strong>
         </div>
+        <div class="flyover-stat-cell" id="flyover-box-grade">
+          <span id="flyover-stat-grade-label" class="flyover-stat-label">PENDIENTE</span>
+          <strong id="flyover-stat-grade" class="flyover-stat-val tabular-num">—</strong>
+        </div>
         <div class="flyover-stat-cell" id="flyover-box-hr" style="display:none;">
           <span class="flyover-stat-label">FC</span>
           <strong id="flyover-stat-hr" class="flyover-stat-val tabular-num">—</strong>
@@ -2150,7 +2166,7 @@
   </div>
 
   <!-- App Logic script -->
-  <script src="/chart-animations.js?v=134"></script>
-  <script src="/app.js?v=134"></script>
+  <script src="/chart-animations.js?v=135"></script>
+  <script src="/app.js?v=135"></script>
 </body>
 </html>
