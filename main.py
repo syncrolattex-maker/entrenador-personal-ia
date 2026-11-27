@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,6 +7,7 @@ from typing import List, Literal, Optional, Any
 import os
 import re
 import json
+import time
 import httpx
 import requests
 from dotenv import load_dotenv
@@ -20,6 +21,7 @@ import fit_encoder
 import database
 import analytics_engine
 import ai_coach
+import perf_monitor
 
 # ── ExerciseDB RapidAPI (AscendAPI) ──────────────────────────────────────────
 EXERCISEDB_KEY  = os.getenv("EXERCISEDB_KEY", "")
@@ -35,6 +37,39 @@ _edb_name_cache: dict = {}
 _edb_id_cache:   dict = {}
 
 app = FastAPI(title="Fitness PWA Backend")
+
+_DASHBOARD_SUMMARY_CACHE: dict = {"expires_at": 0.0, "data": None}
+
+
+def invalidate_dashboard_cache() -> None:
+    _DASHBOARD_SUMMARY_CACHE["expires_at"] = 0.0
+    _DASHBOARD_SUMMARY_CACHE["data"] = None
+
+
+@app.middleware("http")
+async def perf_and_db_session_middleware(request: Request, call_next):
+    path = request.url.path
+    # Skip static asset noise; instrument all API and data routes
+    is_static = path.startswith(("/static/", "/fonts/", "/icons/")) or path.endswith(
+        (".css", ".js", ".woff2", ".png", ".svg", ".ico", ".json")
+    )
+    if is_static and not path.startswith("/api/"):
+        return await call_next(request)
+
+    perf_monitor.start_request_perf(path, request.method)
+    with database.db_session():
+        response = await call_next(request)
+    summary = perf_monitor.finish_request_perf(response.status_code)
+    if summary:
+        response.headers["X-Request-Id"] = summary["request_id"]
+        response.headers["Server-Timing"] = perf_monitor.format_server_timing(summary)
+        if path.startswith("/api/") or path in (
+            "/estado-db",
+            "/recomendacion-hoy",
+            "/historial-actividades",
+        ):
+            perf_monitor.log_perf_summary(summary)
+    return response
 
 # Enable CORS for local testing
 app.add_middleware(
@@ -1961,9 +1996,9 @@ async def garmin_set_key(payload: GarminKeyPayload):
 
 @app.get("/api/garmin/status")
 async def garmin_status():
-    connected = garmin_client.is_garmin_connected()
     write_connected = garmin_client.has_garmin_write_session()
-    profile = garmin_client.get_garmin_athlete_profile() if connected else {}
+    connected = bool(garmin_client.get_saved_personal_key()) or write_connected
+    profile = garmin_client.get_garmin_athlete_profile(use_cache=True) if connected else {}
     return {
         "connected": connected,
         "write_connected": write_connected,
@@ -2067,13 +2102,16 @@ async def garmin_sync(backfill: bool = False, max_batches: int = 4):
             inserted_strava = database.upsert_activities(strava_acts)
 
     wellness = garmin_client.get_garmin_wellness()
-    profile = garmin_client.get_garmin_athlete_profile()
+    profile = garmin_client.get_garmin_athlete_profile(use_cache=False)
     wellness_sync = None
     if garmin_client.is_garmin_connected():
         try:
             wellness_sync = wellness_engine.sync_wellness_range(days=14, force=False)
         except Exception as w_err:
             print(f"[Garmin Sync] Daily wellness sync note: {w_err}")
+
+    invalidate_dashboard_cache()
+    ai_coach.invalidate_ai_cache()
 
     return {
         "status": "ok",
@@ -2726,6 +2764,7 @@ async def post_cancel_plan_day(payload: CancelPlanDayPayload):
     state_data = _load_plan_state()
     history = await get_intervals_history()
     plan = _get_or_create_locked_weekly_plan(history, state_data.get("carrera_objetivo"), force_rebuild=False)
+    invalidate_dashboard_cache()
     return {"status": "ok", "plan": plan}
 
 
@@ -3389,6 +3428,7 @@ async def api_add_gear(payload: GearCreatePayload):
     gear = database.add_or_update_gear(
         payload.name, payload.gear_type, payload.brand, payload.initial_km, payload.alert_km
     )
+    invalidate_dashboard_cache()
     return {"status": "ok", "gear": gear}
 
 
@@ -3403,6 +3443,7 @@ async def api_set_activity_rpe(external_id: str, payload: ActivityRpePayload):
     res = database.update_activity_rpe(external_id, payload.rpe)
     if not res:
         raise HTTPException(status_code=404, detail="Actividad no encontrada")
+    invalidate_dashboard_cache()
     return {"status": "ok", **res}
 
 
@@ -3586,7 +3627,7 @@ def _build_daily_wellness_context(
 @app.get("/api/wellness/today")
 def api_get_wellness_today(
     date: Optional[str] = None,
-    sync: bool = True,
+    sync: bool = False,
     include_ai: bool = False,
 ):
     return _build_daily_wellness_context(
@@ -3665,6 +3706,8 @@ def api_sync_wellness(payload: Optional[WellnessSyncPayload] = None):
         force=bool(req.force),
         ref_date=ref_dt,
     )
+    invalidate_dashboard_cache()
+    ai_coach.invalidate_ai_cache()
     return {
         "status": "ok",
         "sync": summary,
@@ -3700,12 +3743,117 @@ def api_save_wellness_checkin(payload: DailyCheckinPayload):
         sync_if_missing=False,
         include_ai=False,
     )
+    invalidate_dashboard_cache()
     return {
         "status": "ok",
         "date": date_str,
         "checkin": saved,
         "readiness": ctx["readiness"],
     }
+
+
+@app.get("/api/dashboard/summary")
+async def api_dashboard_summary(refresh: bool = False):
+    """
+    Phase 5.3: Consolidated Dashboard Summary endpoint.
+    Reads strictly from DB (zero external Garmin/Gemini calls) reusing 1 single db_session() connection.
+    Short 45s in-memory TTL cache invalidated on any sync/mutation.
+    """
+    from datetime import date, datetime as dt_cls, timezone as dt_tz
+
+    now_ts = time.time()
+    if not refresh and _DASHBOARD_SUMMARY_CACHE["data"] and now_ts < _DASHBOARD_SUMMARY_CACHE["expires_at"]:
+        perf_monitor.mark_cache_hit(True)
+        cached = dict(_DASHBOARD_SUMMARY_CACHE["data"])
+        cached["cache_hit"] = True
+        return cached
+
+    # 1. Garmin status (cached profile, zero external calls)
+    write_connected = garmin_client.has_garmin_write_session()
+    connected = bool(garmin_client.get_saved_personal_key()) or write_connected
+    profile = garmin_client.get_garmin_athlete_profile(use_cache=True) if connected else {}
+
+    # 2. Recent activities (lightweight projection, no polylines, no raw payloads)
+    db_acts = database.get_all_activities(limit=30, include_polyline=False)
+    history_items = [
+        {
+            "tipo": a["sport_type"],
+            "raw_tipo": a.get("sport_type"),
+            "nombre": a["name"],
+            "fecha": (a.get("start_date") or "")[:10],
+            "duracion_minutos": float(a.get("duration_min") or 0),
+            "frecuencia_cardiaca_media": a.get("avg_hr"),
+            "frecuencia_cardiaca_max": a.get("max_hr"),
+            "calorias_activas": a.get("calories"),
+            "distancia_km": a.get("distance_km"),
+            "ritmo_medio": a.get("avg_pace_str"),
+            "efecto_aerobico": a.get("aerobic_te"),
+            "fuente": a.get("source") or "Garmin Connect",
+        }
+        for a in db_acts
+    ]
+
+    # 3. Athlete status + Weekly plan
+    estado = await calcular_estado_atleta()
+    state_data = _load_plan_state()
+    weekly_plan = _get_or_create_locked_weekly_plan(
+        history_items,
+        state_data.get("carrera_objetivo"),
+        force_rebuild=False,
+    )
+
+    # 4. Wellness today (DB only, sync=False)
+    wellness_ctx = _build_daily_wellness_context(
+        target_date=None,
+        sync_if_missing=False,
+        include_ai=False,
+    )
+
+    # 5. Lightweight Training Load + Aerobic Efficiency summary
+    with perf_monitor.measure_stage("analytics_ms"):
+        today_dt = date.today()
+        acts_90 = database.get_activities_for_analytics(days=90)
+        summaries = database.get_daily_summaries()
+        ewma = analytics_engine.compute_training_load_ewma(summaries, ref_date=today_dt, output_days=14)
+        eff = analytics_engine.compute_aerobic_efficiency(acts_90, recent_days=42, baseline_days=42)
+        latest_load = (ewma.get("curve") or [{}])[-1] if ewma.get("curve") else {}
+
+    # 6. Gear
+    gear_list = database.get_gear_list()
+
+    updated_at = dt_cls.now(dt_tz.utc).isoformat()
+    payload = {
+        "status": "ok",
+        "cache_hit": False,
+        "updated_at": updated_at,
+        "garmin_status": {
+            "connected": connected,
+            "write_connected": write_connected,
+            "profile": profile,
+        },
+        "estado_atleta": estado,
+        "historial_entrenamientos": history_items,
+        "weekly_plan": weekly_plan,
+        "wellness_today": {
+            "status": wellness_ctx["status"],
+            "date": wellness_ctx["date"],
+            "day_status": wellness_ctx["day_status"],
+            "wellness": wellness_ctx["wellness"],
+            "checkin": wellness_ctx["checkin"],
+            "baselines": wellness_ctx["baselines"],
+            "readiness": wellness_ctx["readiness"],
+        },
+        "training_load": {
+            "latest": latest_load,
+            "sample_quality": ewma.get("sample_quality"),
+            "source": ewma.get("source"),
+            "aerobic_efficiency": eff,
+        },
+        "gear": gear_list,
+    }
+    _DASHBOARD_SUMMARY_CACHE["data"] = payload
+    _DASHBOARD_SUMMARY_CACHE["expires_at"] = now_ts + 30.0
+    return payload
 
 
 # Create static folder if it doesn't exist

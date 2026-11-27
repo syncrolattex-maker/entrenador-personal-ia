@@ -172,14 +172,12 @@ const CIRCUMFERENCE = 2 * Math.PI * 54; // r=54
 // ============================================================
 // INIT
 // ============================================================
+let _summitLoadedOnce = false;
+
 document.addEventListener("DOMContentLoaded", () => {
+  loadDashboardSummary();
   initApp();
-  checkGarminStatus();
-  loadWeeklyPlanAndRaceGoal();
-  loadSummitAnalytics();
   loadActivitiesFeed();
-  loadGearList();
-  loadWellnessToday();
   initWellnessCheckinEvents();
   syncRouteFromLocation();
   window.addEventListener("popstate", syncRouteFromLocation);
@@ -247,12 +245,69 @@ function renderStrideHomeHeader() {
   }
 }
 
+async function loadDashboardSummary(force = false) {
+  try {
+    const res = await fetch(force ? "/api/dashboard/summary?refresh=true" : "/api/dashboard/summary");
+    if (!res.ok) {
+      // Fallback to individual endpoints if consolidated summary is unavailable
+      checkGarminStatus();
+      loadWeeklyPlanAndRaceGoal();
+      loadGearList();
+      loadWellnessToday(force);
+      return;
+    }
+    const data = await res.json();
+    if (data.garmin_status) {
+      updateGarminUI(
+        data.garmin_status.connected,
+        data.garmin_status.profile,
+        data.garmin_status.write_connected
+      );
+    }
+    if (data.estado_atleta) {
+      state.db = data.estado_atleta;
+      updateStatsBanner();
+    }
+    if (Array.isArray(data.historial_entrenamientos)) {
+      state.history = data.historial_entrenamientos;
+    }
+    if (data.weekly_plan) {
+      renderWeeklyPlan(data.weekly_plan);
+    }
+    if (data.wellness_today) {
+      _wellnessCache.today = data.wellness_today;
+      _wellnessCache.todayFetchedAt = Date.now();
+      state.wellnessToday = data.wellness_today;
+      renderWellnessTodayDashboard(data.wellness_today);
+    }
+    if (data.updated_at) {
+      const pill = document.getElementById("wellness-dash-status-pill");
+      if (pill) {
+        const dt = new Date(data.updated_at);
+        const hhmm = isNaN(dt.getTime()) ? "" : dt.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+        pill.textContent = hhmm ? `GARMIN REAL · ${hhmm}` : "GARMIN REAL";
+      }
+    }
+    if (data.training_load) {
+      renderHomeTrainingLoad(data.training_load, data.training_load.aerobic_efficiency);
+    }
+    if (Array.isArray(data.gear)) {
+      renderGearListItems(data.gear);
+    }
+  } catch (err) {
+    console.warn("[Dashboard] Consolidated summary failed, falling back:", err);
+    checkGarminStatus();
+    loadWeeklyPlanAndRaceGoal();
+    loadGearList();
+    loadWellnessToday(force);
+  }
+}
+
 async function initApp() {
   if (window.lucide) lucide.createIcons();
   renderStrideHomeHeader();
   hideSuccessBanner();
   mostrarPantallaSeleccion();
-  loadWellnessToday();
 
   const elRecommendationBox = document.getElementById("recommendation-box");
   const elRecTipoLabel = document.getElementById("rec-tipo-label");
@@ -274,20 +329,8 @@ async function initApp() {
   loadThresholdPace();
 
   try {
-    // 1. Get database status
-    const dbRes = await fetch("/estado-db");
-    if (dbRes.ok) { state.db = await dbRes.json(); updateStatsBanner(); }
-
-    // 2. Clear cache if version changed (cache buster)
-    const APP_VERSION = "v100"; // Add Garmin OAuth local token import fallback for Vercel 401 SSO blocks
-
-
-
-
-
-
-
-
+    // 1. Clear cache if version changed (cache buster)
+    const APP_VERSION = "v100";
     const cachedVersion = localStorage.getItem("cached_version");
     if (cachedVersion !== APP_VERSION) {
       localStorage.removeItem("cached_recommendation");
@@ -297,19 +340,7 @@ async function initApp() {
       localStorage.setItem("cached_version", APP_VERSION);
     }
 
-    // 3. Fetch real activity history immediately for Metrics Tab
-    fetch("/historial-actividades")
-      .then(res => res.json())
-      .then(data => {
-        if (data.status === "ok" && data.historial) {
-          state.history = data.historial;
-          renderMetricsTab(data.historial, state.lastCoachText || "");
-        }
-      })
-      .catch(e => console.error("Error fetching real history:", e));
-
-
-    // 4. Read cached recommendation for today
+    // 2. Read cached recommendation for today (instant render)
     const todayStr = new Date().toDateString();
     const cachedRec = localStorage.getItem("cached_recommendation");
     const cachedRecDate = localStorage.getItem("cached_recommendation_date");
@@ -333,28 +364,21 @@ async function initApp() {
       }
     }
 
-    // 5. Fetch new recommendation from server
+    // 3. Fetch recommendation in background (non-blocking for rest of dashboard)
     const recRes = await fetch("/recomendacion-hoy");
     if (recRes.ok) {
       const recommendation = await recRes.json();
       if (recommendation.historial_real) {
         state.history = recommendation.historial_real;
       }
-      
+
       const rLower = (recommendation.razon || "").toLowerCase();
       if (recommendation.razon && !rLower.includes("error") && !rLower.includes("interrupción")) {
         localStorage.setItem("cached_recommendation", JSON.stringify(recommendation));
         localStorage.setItem("cached_recommendation_date", todayStr);
       }
-      
+
       renderRecommendation(recommendation);
-
-      // ✅ Re-fetch db AFTER recommendation (backend has now synced db with real history)
-      try {
-        const dbRes2 = await fetch("/estado-db");
-        if (dbRes2.ok) { state.db = await dbRes2.json(); updateStatsBanner(); }
-      } catch (e) { console.warn("Could not refresh stats banner:", e); }
-
     } else {
       const day = new Date().getDay();
       let offRec = (day === 0) ? "Descanso" : (day % 2 === 0) ? "Carrera" : "Fuerza";
@@ -2813,16 +2837,24 @@ function switchTab(tabId, updateUrl = true) {
   if (window.lucide) lucide.createIcons();
 
   if (tabId === "tab-metrics") {
+    if (!_summitLoadedOnce) {
+      _summitLoadedOnce = true;
+      loadSummitAnalytics();
+    }
     loadWellnessHistory(state.wellnessHistoryDays || 28);
-    fetch("/historial-actividades")
-      .then(res => res.json())
-      .then(data => {
-        if (data.status === "ok" && data.historial) {
-          state.history = data.historial;
-          renderMetricsTab(data.historial, state.lastCoachText || "");
-        }
-      })
-      .catch(e => console.error("Error fetching real history on tab switch:", e));
+    if (Array.isArray(state.history) && state.history.length > 0) {
+      renderMetricsTab(state.history, state.lastCoachText || "");
+    } else {
+      fetch("/historial-actividades")
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === "ok" && data.historial) {
+            state.history = data.historial;
+            renderMetricsTab(data.historial, state.lastCoachText || "");
+          }
+        })
+        .catch(e => console.error("Error fetching real history on tab switch:", e));
+    }
   }
 }
 
@@ -3572,9 +3604,13 @@ async function syncGarminNow() {
     }
     const data = await res.json();
     showSuccessBanner(`✅ Sincronizadas ${data.activities_count} actividades y telemetría de Garmin.`);
-    await initApp();
-    await loadWellnessToday(true);
-    if (state.wellnessHistoryDays) {
+    _summitLoadedOnce = false;
+    await Promise.all([
+      loadDashboardSummary(true),
+      loadActivitiesFeed(),
+      initApp(),
+    ]);
+    if (state.wellnessHistoryDays && _lastTabId === "tab-metrics") {
       await loadWellnessHistory(state.wellnessHistoryDays, true);
     }
   } catch (e) {
@@ -5184,6 +5220,31 @@ async function setActivityRpe(externalId, rpe) {
 // ============================================================
 // FASE 4: GEAR TRACKER (ZAPATILLAS & BICI)
 // ============================================================
+function renderGearListItems(list) {
+  const cont = document.getElementById("gear-list-container");
+  const dashCont = document.getElementById("dashboard-gear-list");
+  if (!cont && !dashCont) return;
+  const safeList = Array.isArray(list) ? list : [];
+  const html = safeList.map(g => {
+    const pct = Math.min(100, Math.round((g.total_km / (g.alert_km || 650)) * 100));
+    const warn = g.total_km >= (g.alert_km || 650) * 0.9;
+    return `
+      <div style="background:var(--surface-dim); border:1px solid ${warn ? '#FC5200' : 'var(--border-glass)'}; border-radius:8px; padding:10px 12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+          <strong style="font-size:0.85rem; color:var(--on-surface);">${g.gear_type === 'shoes' ? '👟' : '🚴'} ${g.name}</strong>
+          <span class="label-caps tabular-num" style="color:${warn ? '#FC5200' : 'var(--text-secondary)'}; font-size:0.74rem;">${g.total_km} / ${g.alert_km} km</span>
+        </div>
+        <div class="progress-bar-wrap" style="margin-top:6px;">
+          <div class="progress-fill" style="width:${pct}%; background:${warn ? '#FC5200' : '#0077CC'};"></div>
+        </div>
+        ${warn ? `<span class="body-xs" style="color:#FC5200; margin-top:4px; display:block;">⚠️ Cerca del límite de desgaste recomendado</span>` : ""}
+      </div>
+    `;
+  }).join("");
+  if (cont) cont.innerHTML = html;
+  if (dashCont) dashCont.innerHTML = html || `<p class="body-xs" style="color:var(--text-muted);">Sin material registrado.</p>`;
+}
+
 async function loadGearList() {
   const cont = document.getElementById("gear-list-container");
   const dashCont = document.getElementById("dashboard-gear-list");
@@ -5192,25 +5253,7 @@ async function loadGearList() {
     const res = await fetch("/api/gear");
     if (!res.ok) return;
     const data = await res.json();
-    const list = data.gear || [];
-    const html = list.map(g => {
-      const pct = Math.min(100, Math.round((g.total_km / (g.alert_km || 650)) * 100));
-      const warn = g.total_km >= (g.alert_km || 650) * 0.9;
-      return `
-        <div style="background:var(--surface-dim); border:1px solid ${warn ? '#FC5200' : 'var(--border-glass)'}; border-radius:8px; padding:10px 12px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
-            <strong style="font-size:0.85rem; color:var(--on-surface);">${g.gear_type === 'shoes' ? '👟' : '🚴'} ${g.name}</strong>
-            <span class="label-caps tabular-num" style="color:${warn ? '#FC5200' : 'var(--text-secondary)'}; font-size:0.74rem;">${g.total_km} / ${g.alert_km} km</span>
-          </div>
-          <div class="progress-bar-wrap" style="margin-top:6px;">
-            <div class="progress-fill" style="width:${pct}%; background:${warn ? '#FC5200' : '#0077CC'};"></div>
-          </div>
-          ${warn ? `<span class="body-xs" style="color:#FC5200; margin-top:4px; display:block;">⚠️ Cerca del límite de desgaste recomendado</span>` : ""}
-        </div>
-      `;
-    }).join("");
-    if (cont) cont.innerHTML = html;
-    if (dashCont) dashCont.innerHTML = html || `<p class="body-xs" style="color:var(--text-muted);">Sin material registrado.</p>`;
+    renderGearListItems(data.gear || []);
   } catch (e) {}
 }
 
@@ -5873,32 +5916,34 @@ async function loadAnalyticsOverviewAndAI(forceRefresh = false) {
     refreshBtn.textContent = "Actualizando...";
   }
 
+  const aiUrl = forceRefresh
+    ? "/api/analytics/ai-interpretation?days=730&refresh=1"
+    : "/api/analytics/ai-interpretation?days=730";
+
   try {
-    const overviewRes = await fetch("/api/analytics/overview?days=730");
-    if (overviewRes.ok) {
+    const [overviewRes, aiRes] = await Promise.all([
+      fetch("/api/analytics/overview?days=730").catch(() => null),
+      fetch(aiUrl).catch(() => null),
+    ]);
+
+    if (overviewRes && overviewRes.ok) {
       _analyticsOverviewData = await overviewRes.json();
       renderHomeTrainingLoad(_analyticsOverviewData.training_load, _analyticsOverviewData.aerobic_efficiency);
       renderAnalyticsComparisons(_analyticsPeriodKey);
       renderAerobicEfficiencyCard(_analyticsOverviewData.aerobic_efficiency);
       renderProfileRunnerStats(_analyticsOverviewData);
     }
-  } catch (e) {
-    console.warn("Analytics overview load failed:", e);
-  }
 
-  try {
-    const aiUrl = forceRefresh
-      ? "/api/analytics/ai-interpretation?days=730&refresh=1"
-      : "/api/analytics/ai-interpretation?days=730";
-    const aiRes = await fetch(aiUrl);
-    if (aiRes.status === 401) {
-      renderAIAuthRequired();
-    } else if (aiRes.ok) {
-      const aiPayload = await aiRes.json();
-      renderAIInterpretationCards(aiPayload);
+    if (aiRes) {
+      if (aiRes.status === 401) {
+        renderAIAuthRequired();
+      } else if (aiRes.ok) {
+        const aiPayload = await aiRes.json();
+        renderAIInterpretationCards(aiPayload);
+      }
     }
   } catch (e) {
-    console.warn("AI interpretation load failed:", e);
+    console.warn("Analytics overview/AI parallel load failed:", e);
   } finally {
     if (refreshBtn) {
       refreshBtn.disabled = false;

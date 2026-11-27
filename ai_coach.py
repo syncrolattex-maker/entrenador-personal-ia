@@ -8,6 +8,7 @@ import os
 import time
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
+import perf_monitor
 
 try:
     from google import genai
@@ -29,8 +30,14 @@ _AI_CACHE: Dict[str, Any] = {"key": None, "expires_at": 0.0, "data": None}
 
 
 def invalidate_ai_cache() -> None:
-    """Clears the in-memory AI interpretation cache when sports data updates."""
+    """Clears the in-memory and DB AI interpretation cache when sports/wellness data updates."""
     _AI_CACHE.update({"key": None, "expires_at": 0.0, "data": None})
+    try:
+        import database
+        database.set_setting("analytics_ai_cache_v1", "")
+        database.set_setting("wellness_ai_cache_v1", "")
+    except Exception:
+        pass
 
 
 class AnalyticsInterpretationResponse(BaseModel):
@@ -165,7 +172,26 @@ def generate_analytics_interpretation(
 
     now = time.time()
     if use_cache and _AI_CACHE["key"] == cache_key and now < _AI_CACHE["expires_at"] and _AI_CACHE["data"]:
+        perf_monitor.mark_cache_hit(True)
         return _AI_CACHE["data"]
+
+    if use_cache:
+        try:
+            import database
+            raw_db_cache = database.get_setting("analytics_ai_cache_v1")
+            if raw_db_cache:
+                db_obj = json.loads(raw_db_cache)
+                if (
+                    isinstance(db_obj, dict)
+                    and db_obj.get("key") == cache_key
+                    and now < float(db_obj.get("expires_at") or 0)
+                    and isinstance(db_obj.get("data"), dict)
+                ):
+                    _AI_CACHE.update({"key": cache_key, "expires_at": float(db_obj["expires_at"]), "data": db_obj["data"]})
+                    perf_monitor.mark_cache_hit(True)
+                    return db_obj["data"]
+        except Exception:
+            pass
 
     if (sanitized.get("data_scope") or {}).get("activities_analyzed", 0) == 0:
         res = _deterministic_fallback_interpretation(sanitized, mode="insufficient_data")
@@ -189,22 +215,32 @@ def generate_analytics_interpretation(
     )
 
     try:
-        client = genai.Client(api_key=api_key, http_options={"timeout": 20000})
-        resp = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=f"Analiza este snapshot del motor analítico AaronFit:\n{json.dumps(sanitized, ensure_ascii=False)}",
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                response_mime_type="application/json",
-                response_schema=AnalyticsInterpretationResponse,
-                temperature=0.2,
-            ),
-        )
+        with perf_monitor.measure_stage("gemini_ms"):
+            client = genai.Client(api_key=api_key, http_options={"timeout": 20000})
+            resp = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=f"Analiza este snapshot del motor analítico AaronFit:\n{json.dumps(sanitized, ensure_ascii=False)}",
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    response_mime_type="application/json",
+                    response_schema=AnalyticsInterpretationResponse,
+                    temperature=0.2,
+                ),
+            )
         parsed = json.loads(resp.text)
         validated = AnalyticsInterpretationResponse(**parsed).model_dump()
         validated["source_mode"] = "gemini_live"
         if use_cache:
+            db_ttl = max(cache_ttl_sec, 3600)
             _AI_CACHE.update({"key": cache_key, "expires_at": now + cache_ttl_sec, "data": validated})
+            try:
+                import database
+                database.set_setting(
+                    "analytics_ai_cache_v1",
+                    json.dumps({"key": cache_key, "expires_at": now + db_ttl, "data": validated}, ensure_ascii=False),
+                )
+            except Exception:
+                pass
         return validated
     except Exception as e:
         print(f"[AI Coach] Gemini fallback triggered: {e}")
@@ -438,9 +474,14 @@ def _deterministic_wellness_interpretation(
     }
 
 
+_WELLNESS_AI_CACHE: Dict[str, Any] = {"key": None, "expires_at": 0.0, "data": None}
+
+
 def generate_wellness_and_readiness_interpretation(
     wellness_snapshot: Dict[str, Any],
     question: Optional[str] = None,
+    use_cache: bool = True,
+    cache_ttl_sec: int = 1800,
 ) -> Dict[str, Any]:
     """
     Section 7: Grounded Gemini interpretation for Daily Wellness, Mobility & Readiness.
@@ -448,6 +489,38 @@ def generate_wellness_and_readiness_interpretation(
     Never invents missing values or emits medical diagnoses.
     """
     sanitized = sanitize_snapshot_for_gemini(wellness_snapshot)
+    cache_key = None
+    now = time.time()
+    if use_cache and not question:
+        cache_key = json.dumps(
+            {
+                "date": sanitized.get("date"),
+                "readiness": (sanitized.get("readiness") or {}).get("estado"),
+                "garmin": sanitized.get("garmin_real"),
+                "checkin": sanitized.get("subjetivo_usuario"),
+            },
+            sort_keys=True,
+        )
+        if _WELLNESS_AI_CACHE["key"] == cache_key and now < _WELLNESS_AI_CACHE["expires_at"] and _WELLNESS_AI_CACHE["data"]:
+            perf_monitor.mark_cache_hit(True)
+            return _WELLNESS_AI_CACHE["data"]
+        try:
+            import database
+            raw_db = database.get_setting("wellness_ai_cache_v1")
+            if raw_db:
+                db_obj = json.loads(raw_db)
+                if (
+                    isinstance(db_obj, dict)
+                    and db_obj.get("key") == cache_key
+                    and now < float(db_obj.get("expires_at") or 0)
+                    and isinstance(db_obj.get("data"), dict)
+                ):
+                    _WELLNESS_AI_CACHE.update({"key": cache_key, "expires_at": float(db_obj["expires_at"]), "data": db_obj["data"]})
+                    perf_monitor.mark_cache_hit(True)
+                    return db_obj["data"]
+        except Exception:
+            pass
+
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not HAS_GENAI or not api_key:
         return _deterministic_wellness_interpretation(sanitized, question=question, mode="deterministic_no_key")
@@ -466,20 +539,31 @@ def generate_wellness_and_readiness_interpretation(
         prompt_text += f"\n\nPregunta específica del atleta: {question}"
 
     try:
-        client = genai.Client(api_key=api_key, http_options={"timeout": 15000})
-        resp = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt_text,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                response_mime_type="application/json",
-                response_schema=WellnessCoachResponse,
-                temperature=0.15,
-            ),
-        )
+        with perf_monitor.measure_stage("gemini_ms"):
+            client = genai.Client(api_key=api_key, http_options={"timeout": 15000})
+            resp = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt_text,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    response_mime_type="application/json",
+                    response_schema=WellnessCoachResponse,
+                    temperature=0.15,
+                ),
+            )
         parsed = json.loads(resp.text)
         validated = WellnessCoachResponse(**parsed).model_dump()
         validated["source_mode"] = "gemini_live"
+        if use_cache and cache_key:
+            _WELLNESS_AI_CACHE.update({"key": cache_key, "expires_at": now + cache_ttl_sec, "data": validated})
+            try:
+                import database
+                database.set_setting(
+                    "wellness_ai_cache_v1",
+                    json.dumps({"key": cache_key, "expires_at": now + cache_ttl_sec, "data": validated}, ensure_ascii=False),
+                )
+            except Exception:
+                pass
         return validated
     except Exception as e:
         print(f"[AI Coach Wellness] Gemini fallback triggered: {e}")

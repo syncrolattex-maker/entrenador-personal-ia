@@ -1,10 +1,15 @@
 import os
 import json
 import math
+import time
 import sqlite3
+import threading
+import contextvars
+from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
+import perf_monitor
 
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 
@@ -14,35 +19,200 @@ LOCAL_DB_PATH = (
     else Path(__file__).parent / "data" / "aaronfit.db"
 )
 
+_PG_POOL = None
+_PG_POOL_LOCK = threading.Lock()
+_SESSION_CONN_VAR: contextvars.ContextVar[Optional[Any]] = contextvars.ContextVar(
+    "aaronfit_db_session_conn", default=None
+)
+
+
+class _TimedCursor:
+    """Thin cursor proxy that records SQL execution timing per request."""
+    def __init__(self, cur):
+        self._cur = cur
+
+    def execute(self, sql, params=None):
+        t0 = time.perf_counter()
+        try:
+            if params is None:
+                return self._cur.execute(sql)
+            return self._cur.execute(sql, params)
+        finally:
+            perf_monitor.add_metric("sql_ms", (time.perf_counter() - t0) * 1000.0, count_key="sql_count")
+
+    def executemany(self, sql, seq_of_params):
+        t0 = time.perf_counter()
+        try:
+            return self._cur.executemany(sql, seq_of_params)
+        finally:
+            perf_monitor.add_metric("sql_ms", (time.perf_counter() - t0) * 1000.0, count_key="sql_count")
+
+    def __getattr__(self, name):
+        return getattr(self._cur, name)
+
+    def __iter__(self):
+        return iter(self._cur)
+
+
+class _PooledConnProxy:
+    """Connection proxy supporting request-scoped reuse and pool return on close."""
+    def __init__(self, raw_conn, is_sqlite: bool, is_session: bool = False, release_cb=None):
+        self._raw = raw_conn
+        self._is_sqlite = is_sqlite
+        self._is_session = is_session
+        self._release_cb = release_cb
+        self._closed = False
+
+    def cursor(self):
+        return _TimedCursor(self._raw.cursor())
+
+    def commit(self):
+        return self._raw.commit()
+
+    def rollback(self):
+        return self._raw.rollback()
+
+    def close(self):
+        if self._is_session or self._closed:
+            return
+        self._closed = True
+        if self._release_cb:
+            self._release_cb(self._raw)
+        else:
+            try:
+                self._raw.close()
+            except Exception:
+                pass
+
+    def __getattr__(self, name):
+        return getattr(self._raw, name)
+
 
 def _use_postgres() -> bool:
     return bool(DATABASE_URL and DATABASE_URL.startswith(("postgres://", "postgresql://")))
+
+
+def _get_pg_pool():
+    global _PG_POOL
+    if _PG_POOL is not None:
+        return _PG_POOL
+    with _PG_POOL_LOCK:
+        if _PG_POOL is not None:
+            return _PG_POOL
+        try:
+            from psycopg2 import pool as pg_pool
+            max_pg_conns = 2 if os.getenv("VERCEL") else 4
+            _PG_POOL = pg_pool.ThreadedConnectionPool(
+                minconn=0,
+                maxconn=max_pg_conns,
+                dsn=DATABASE_URL,
+                connect_timeout=8,
+            )
+            return _PG_POOL
+        except Exception as e:
+            print(f"[DB] ThreadedConnectionPool init fallback: {e}")
+            return None
+
+
+def _acquire_raw_conn() -> Tuple[Any, bool, Any]:
+    t0 = time.perf_counter()
+    if _use_postgres():
+        pg_pool = _get_pg_pool()
+        if pg_pool is not None:
+            try:
+                raw = pg_pool.getconn()
+                # Verify connection is alive
+                if getattr(raw, "closed", 0):
+                    pg_pool.putconn(raw, close=True)
+                    raw = pg_pool.getconn()
+                perf_monitor.add_metric("db_connect_ms", (time.perf_counter() - t0) * 1000.0, count_key="db_connect_count")
+
+                def _release_pg(c):
+                    try:
+                        if getattr(c, "closed", 0):
+                            pg_pool.putconn(c, close=True)
+                        else:
+                            try:
+                                c.rollback()
+                            except Exception:
+                                pass
+                            pg_pool.putconn(c)
+                    except Exception:
+                        pass
+
+                return raw, False, _release_pg
+            except Exception as pool_err:
+                print(f"[DB] Pool acquire warning: {pool_err}")
+        try:
+            import psycopg
+            raw = psycopg.connect(DATABASE_URL)
+            perf_monitor.add_metric("db_connect_ms", (time.perf_counter() - t0) * 1000.0, count_key="db_connect_count")
+            return raw, False, lambda c: c.close()
+        except ImportError:
+            try:
+                import psycopg2
+                raw = psycopg2.connect(DATABASE_URL)
+                perf_monitor.add_metric("db_connect_ms", (time.perf_counter() - t0) * 1000.0, count_key="db_connect_count")
+                return raw, False, lambda c: c.close()
+            except ImportError:
+                print("[DB] psycopg/psycopg2 not installed, falling back to SQLite.")
+    LOCAL_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    raw = sqlite3.connect(str(LOCAL_DB_PATH), check_same_thread=False)
+    raw.row_factory = sqlite3.Row
+    perf_monitor.add_metric("db_connect_ms", (time.perf_counter() - t0) * 1000.0, count_key="db_connect_count")
+    return raw, True, lambda c: c.close()
+
+
+@contextmanager
+def db_session():
+    """
+    Lazy request-scoped DB session:
+    - Acquires a pooled connection only if the request actually touches the DB (0ms on cache hits).
+    - Reuses that single connection across all database.py calls in the request.
+    """
+    existing = _SESSION_CONN_VAR.get()
+    if existing is not None:
+        yield existing
+        return
+    slot: Dict[str, Any] = {"proxy": None, "thread_id": None}
+    token = _SESSION_CONN_VAR.set(slot)
+    try:
+        yield slot
+    finally:
+        _SESSION_CONN_VAR.reset(token)
+        proxy = slot.get("proxy")
+        if proxy is not None:
+            proxy._is_session = False
+            proxy.close()
 
 
 def is_postgres_active() -> bool:
     if not _use_postgres():
         return False
     conn = _get_conn()
-    active = not isinstance(conn, sqlite3.Connection)
+    active = not getattr(conn, "_is_sqlite", isinstance(conn, sqlite3.Connection))
     conn.close()
     return active
 
 
 def _get_conn():
-    if _use_postgres():
-        try:
-            import psycopg
-            return psycopg.connect(DATABASE_URL)
-        except ImportError:
-            try:
-                import psycopg2
-                return psycopg2.connect(DATABASE_URL)
-            except ImportError:
-                print("[DB] psycopg/psycopg2 not installed, falling back to SQLite.")
-    LOCAL_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(LOCAL_DB_PATH))
-    conn.row_factory = sqlite3.Row
-    return conn
+    session_slot = _SESSION_CONN_VAR.get()
+    if isinstance(session_slot, dict):
+        cur_tid = threading.get_ident()
+        existing_proxy = session_slot.get("proxy")
+        if existing_proxy is not None:
+            # Reuse if Postgres or same thread for SQLite
+            if not existing_proxy._is_sqlite or session_slot.get("thread_id") == cur_tid:
+                perf_monitor.inc_counter("db_reused_count", 1)
+                return existing_proxy
+        else:
+            raw, is_sqlite, release_cb = _acquire_raw_conn()
+            proxy = _PooledConnProxy(raw, is_sqlite=is_sqlite, is_session=True, release_cb=release_cb)
+            session_slot["proxy"] = proxy
+            session_slot["thread_id"] = cur_tid
+            return proxy
+    raw, is_sqlite, release_cb = _acquire_raw_conn()
+    return _PooledConnProxy(raw, is_sqlite=is_sqlite, is_session=False, release_cb=release_cb)
 
 
 _DB_INITIALIZED = False
@@ -55,7 +225,22 @@ def init_db() -> None:
         return
     conn = _get_conn()
     cur = conn.cursor()
-    is_pg = _use_postgres() and not isinstance(conn, sqlite3.Connection)
+    is_pg = _use_postgres() and not getattr(conn, "_is_sqlite", isinstance(conn, sqlite3.Connection))
+
+    # Fast-path on Vercel cold starts when schema is already at version 5.3
+    try:
+        cur.execute("SELECT value FROM app_settings WHERE key = 'schema_version_5_3'")
+        row = cur.fetchone()
+        if row and str(row[0]) == "1":
+            conn.close()
+            _DB_INITIALIZED = True
+            return
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+
     id_col = "SERIAL PRIMARY KEY" if is_pg else "INTEGER PRIMARY KEY AUTOINCREMENT"
 
     cur.execute(f"""
@@ -345,13 +530,23 @@ def init_db() -> None:
             ("Bici de Carretera", "bike", "Cadena / Cubiertas", 0.0, 0.0, 3000.0, 1),
         )
 
+    ph = "%s" if is_pg else "?"
+    try:
+        cur.execute(
+            f"INSERT INTO app_settings (key, value) VALUES ({ph}, {ph}) "
+            f"ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+            ("schema_version_5_3", "1"),
+        )
+    except Exception:
+        pass
+
     conn.commit()
     conn.close()
     _DB_INITIALIZED = True
 
 
 def _ph(conn) -> str:
-    return "?" if isinstance(conn, sqlite3.Connection) else "%s"
+    return "?" if getattr(conn, "_is_sqlite", isinstance(conn, sqlite3.Connection)) else "%s"
 
 
 def _rows_to_dicts(cur, rows) -> List[Dict[str, Any]]:
@@ -1014,15 +1209,6 @@ def get_daily_summaries(date_from: Optional[str] = None, date_to: Optional[str] 
     conn = _get_conn()
     cur = conn.cursor()
     p = _ph(conn)
-    cur.execute("SELECT COUNT(*) FROM daily_summaries")
-    cnt = int(cur.fetchone()[0] or 0)
-    if cnt == 0:
-        cur.execute("SELECT COUNT(*) FROM activities")
-        if int(cur.fetchone()[0] or 0) > 0:
-            conn.close()
-            rebuild_daily_summaries()
-            conn = _get_conn()
-            cur = conn.cursor()
 
     clauses = []
     params: List[Any] = []
@@ -1035,6 +1221,20 @@ def get_daily_summaries(date_from: Optional[str] = None, date_to: Optional[str] 
     where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     cur.execute(f"SELECT * FROM daily_summaries {where_sql} ORDER BY date ASC", tuple(params))
     rows = _rows_to_dicts(cur, cur.fetchall())
+
+    if not rows:
+        cur.execute("SELECT COUNT(*) FROM daily_summaries")
+        cnt = int(cur.fetchone()[0] or 0)
+        if cnt == 0:
+            cur.execute("SELECT COUNT(*) FROM activities")
+            if int(cur.fetchone()[0] or 0) > 0:
+                conn.close()
+                rebuild_daily_summaries()
+                conn = _get_conn()
+                cur = conn.cursor()
+                cur.execute(f"SELECT * FROM daily_summaries {where_sql} ORDER BY date ASC", tuple(params))
+                rows = _rows_to_dicts(cur, cur.fetchall())
+
     conn.close()
     return rows
 

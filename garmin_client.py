@@ -674,8 +674,11 @@ def get_garmin_wellness(target_date: Optional[str] = None) -> Dict[str, Any]:
     return wellness
 
 
-def get_garmin_athlete_profile() -> Dict[str, Any]:
-    """Fetches user profile & body metrics from Garmin Connect."""
+_PROFILE_MEM_CACHE: Dict[str, Any] = {"expires_at": 0.0, "data": None}
+
+
+def get_garmin_athlete_profile(use_cache: bool = True) -> Dict[str, Any]:
+    """Fetches user profile & body metrics from Garmin Connect (cached 6h in DB/memory)."""
     if get_saved_personal_key():
         return {
             "nombre": "Aarón",
@@ -684,6 +687,23 @@ def get_garmin_athlete_profile() -> Dict[str, Any]:
             "peso_kg": 93.0,
             "fuente": "Garmin Personal API",
         }
+
+    now = time.time()
+    if use_cache and _PROFILE_MEM_CACHE["data"] and now < _PROFILE_MEM_CACHE["expires_at"]:
+        return _PROFILE_MEM_CACHE["data"]
+
+    if use_cache:
+        try:
+            import database
+            raw_cached = database.get_setting("garmin_athlete_profile_cache")
+            if raw_cached:
+                cached_obj = json.loads(raw_cached)
+                if isinstance(cached_obj, dict) and cached_obj.get("data") and now < float(cached_obj.get("expires_at") or 0):
+                    _PROFILE_MEM_CACHE["data"] = cached_obj["data"]
+                    _PROFILE_MEM_CACHE["expires_at"] = float(cached_obj["expires_at"])
+                    return cached_obj["data"]
+        except Exception:
+            pass
 
     client = get_garmin_client()
     if not client:
@@ -711,6 +731,16 @@ def get_garmin_athlete_profile() -> Dict[str, Any]:
                 profile["fecha_nacimiento"] = user_data["birthDate"]
     except Exception as e:
         print(f"[Garmin] User profile fetch error: {e}")
+
+    if profile:
+        exp = now + 21600.0  # 6 hours
+        _PROFILE_MEM_CACHE["data"] = profile
+        _PROFILE_MEM_CACHE["expires_at"] = exp
+        try:
+            import database
+            database.set_setting("garmin_athlete_profile_cache", json.dumps({"expires_at": exp, "data": profile}))
+        except Exception:
+            pass
 
     return profile
 
