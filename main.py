@@ -2068,6 +2068,13 @@ async def garmin_sync(backfill: bool = False, max_batches: int = 4):
 
     wellness = garmin_client.get_garmin_wellness()
     profile = garmin_client.get_garmin_athlete_profile()
+    wellness_sync = None
+    if garmin_client.is_garmin_connected():
+        try:
+            wellness_sync = wellness_engine.sync_wellness_range(days=14, force=False)
+        except Exception as w_err:
+            print(f"[Garmin Sync] Daily wellness sync note: {w_err}")
+
     return {
         "status": "ok",
         "activities_count": len(activities),
@@ -2075,6 +2082,7 @@ async def garmin_sync(backfill: bool = False, max_batches: int = 4):
         "inserted_strava": inserted_strava,
         "backfill": backfill,
         "wellness": wellness,
+        "wellness_sync": wellness_sync,
         "profile": profile,
     }
 
@@ -3578,7 +3586,7 @@ def _build_daily_wellness_context(
 @app.get("/api/wellness/today")
 def api_get_wellness_today(
     date: Optional[str] = None,
-    sync: bool = False,
+    sync: bool = True,
     include_ai: bool = False,
 ):
     return _build_daily_wellness_context(

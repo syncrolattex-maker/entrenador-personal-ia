@@ -233,13 +233,31 @@ def _restore_tokens_from_db() -> bool:
         raw = database.get_setting("garmin_oauth_tokens_json")
         if not raw:
             return False
-        payload = json.loads(raw)
-        if not isinstance(payload, dict) or not payload:
-            return False
-        TOKEN_DIR.mkdir(parents=True, exist_ok=True)
-        for fname, content in payload.items():
-            if isinstance(fname, str) and fname.endswith(".json") and isinstance(content, str):
-                (TOKEN_DIR / Path(fname).name).write_text(content, encoding="utf-8")
+
+        # 1. Try garth format (base64 string from client.dumps())
+        if HAS_GARTH:
+            try:
+                client = garth.Client()
+                client.loads(raw)
+                TOKEN_DIR.mkdir(parents=True, exist_ok=True)
+                client.dump(str(TOKEN_DIR))
+                if any(TOKEN_DIR.glob("*.json")):
+                    return True
+            except Exception:
+                pass
+
+        # 2. Try JSON dict format ({filename: content})
+        try:
+            payload = json.loads(raw)
+            if isinstance(payload, dict) and payload:
+                TOKEN_DIR.mkdir(parents=True, exist_ok=True)
+                for fname, content in payload.items():
+                    if isinstance(fname, str) and fname.endswith(".json") and isinstance(content, str):
+                        (TOKEN_DIR / Path(fname).name).write_text(content, encoding="utf-8")
+                return any(TOKEN_DIR.glob("*.json"))
+        except Exception:
+            pass
+
         return any(TOKEN_DIR.glob("*.json"))
     except Exception as e:
         print(f"[Garmin] Restore tokens from DB warning: {e}")
@@ -1463,9 +1481,14 @@ def fetch_garmin_daily_wellness_raw(target_date: str) -> Dict[str, Any]:
     if g_client is not None:
         if not bundle["auth_method"]:
             bundle["auth_method"] = "garmin_garth_oauth"
+        uname = None
+        try:
+            uname = getattr(g_client, "username", None)
+        except Exception:
+            pass
+
         if not bundle["summary"]:
             try:
-                uname = getattr(g_client, "username", None)
                 ep = f"/usersummary-service/usersummary/daily/{uname}" if uname else "/usersummary-service/usersummary/daily"
                 bundle["summary"] = g_client.connectapi(ep, params={"calendarDate": d_str})
                 bundle["endpoints_used"]["summary"] = f"garth_legacy:{ep}"
@@ -1473,7 +1496,6 @@ def fetch_garmin_daily_wellness_raw(target_date: str) -> Dict[str, Any]:
                 bundle["errors"].append(f"garth_summary:{type(e).__name__}")
         if not bundle["sleep"]:
             try:
-                uname = getattr(g_client, "username", None)
                 ep = f"/wellness-service/wellness/dailySleepData/{uname}" if uname else "/wellness-service/wellness/dailySleepData"
                 bundle["sleep"] = g_client.connectapi(ep, params={"date": d_str, "nonBufferMillis": 60000})
                 bundle["endpoints_used"]["sleep"] = f"garth_legacy:{ep}"
@@ -1497,28 +1519,36 @@ def fetch_garmin_daily_wellness_raw(target_date: str) -> Dict[str, Any]:
             except Exception as e:
                 bundle["errors"].append(f"garth_bb:{type(e).__name__}")
 
-    gc_client = get_garmin_client() if (not bundle["summary"] and not bundle["sleep"]) else None
-    if gc_client is not None:
-        if not bundle["auth_method"]:
-            bundle["auth_method"] = "garminconnect_oauth"
-        if not bundle["summary"]:
-            try:
-                bundle["summary"] = gc_client.get_stats(d_str)
-                bundle["endpoints_used"]["summary"] = "garminconnect:get_stats"
-            except Exception as e:
-                bundle["errors"].append(f"gc_stats:{type(e).__name__}")
-        if not bundle["sleep"]:
-            try:
-                bundle["sleep"] = gc_client.get_sleep_data(d_str)
-                bundle["endpoints_used"]["sleep"] = "garminconnect:get_sleep_data"
-            except Exception as e:
-                bundle["errors"].append(f"gc_sleep:{type(e).__name__}")
-        if not bundle["hrv"]:
-            try:
-                bundle["hrv"] = gc_client.get_hrv_data(d_str)
-                bundle["endpoints_used"]["hrv"] = "garminconnect:get_hrv_data"
-            except Exception as e:
-                bundle["errors"].append(f"gc_hrv:{type(e).__name__}")
+    # Fallback to garminconnect if ANY essential wellness block is still missing
+    if not (bundle.get("summary") and bundle.get("sleep") and bundle.get("hrv")):
+        gc_client = get_garmin_client()
+        if gc_client is not None:
+            if not bundle["auth_method"]:
+                bundle["auth_method"] = "garminconnect_oauth"
+            if not bundle.get("summary"):
+                try:
+                    bundle["summary"] = gc_client.get_stats(d_str)
+                    bundle["endpoints_used"]["summary"] = "garminconnect:get_stats"
+                except Exception as e:
+                    bundle["errors"].append(f"gc_stats:{type(e).__name__}")
+            if not bundle.get("sleep"):
+                try:
+                    bundle["sleep"] = gc_client.get_sleep_data(d_str)
+                    bundle["endpoints_used"]["sleep"] = "garminconnect:get_sleep_data"
+                except Exception as e:
+                    bundle["errors"].append(f"gc_sleep:{type(e).__name__}")
+            if not bundle.get("hrv"):
+                try:
+                    bundle["hrv"] = gc_client.get_hrv_data(d_str)
+                    bundle["endpoints_used"]["hrv"] = "garminconnect:get_hrv_data"
+                except Exception as e:
+                    bundle["errors"].append(f"gc_hrv:{type(e).__name__}")
+            if not bundle.get("body_battery"):
+                try:
+                    bundle["body_battery"] = gc_client.get_body_battery(d_str)
+                    bundle["endpoints_used"]["body_battery"] = "garminconnect:get_body_battery"
+                except Exception as e:
+                    bundle["errors"].append(f"gc_bb:{type(e).__name__}")
 
     return bundle
 

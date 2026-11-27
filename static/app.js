@@ -252,6 +252,7 @@ async function initApp() {
   renderStrideHomeHeader();
   hideSuccessBanner();
   mostrarPantallaSeleccion();
+  loadWellnessToday();
 
   const elRecommendationBox = document.getElementById("recommendation-box");
   const elRecTipoLabel = document.getElementById("rec-tipo-label");
@@ -3570,8 +3571,12 @@ async function syncGarminNow() {
       return;
     }
     const data = await res.json();
-    showSuccessBanner(`✅ Sincronizadas ${data.activities_count} actividades de Garmin Connect.`);
+    showSuccessBanner(`✅ Sincronizadas ${data.activities_count} actividades y telemetría de Garmin.`);
     await initApp();
+    await loadWellnessToday(true);
+    if (state.wellnessHistoryDays) {
+      await loadWellnessHistory(state.wellnessHistoryDays, true);
+    }
   } catch (e) {
     showSuccessBanner("⚠️ Error de conexión al sincronizar Garmin.");
   }
@@ -6159,7 +6164,7 @@ async function loadWellnessToday(force = false) {
   }
 
   try {
-    const res = await fetch("/api/wellness/today");
+    const res = await fetch(`/api/wellness/today?sync=${force ? 'true' : 'false'}`);
     if (!res.ok) {
       console.warn("[Wellness] /api/wellness/today returned", res.status);
       return;
@@ -6552,7 +6557,14 @@ async function syncWellnessData(event) {
     if (!res.ok) throw new Error("Error en sincronización de bienestar");
     const data = await res.json();
     const syn = data.sync || {};
-    showSuccessBanner(`✅ Bienestar sincronizado: ${syn.synced_days || 0} días actualizados de Garmin.`);
+    if (syn.status === "not_connected") {
+      showSuccessBanner("⚠️ Garmin Connect no está conectado. Conecta tu cuenta en Perfil para sincronizar telemetría.");
+      const dashDisBanner = document.getElementById("wellness-dash-disconnected-banner");
+      if (dashDisBanner) dashDisBanner.style.display = "flex";
+    } else {
+      const count = syn.days_synced ?? syn.synced_days ?? 0;
+      showSuccessBanner(`✅ Bienestar sincronizado: ${count} días actualizados de Garmin.`);
+    }
     _wellnessCache.today = null;
     _wellnessCache.history = {};
     await loadWellnessToday(true);
